@@ -89,7 +89,7 @@ object Upnp {
             val socket = MulticastSocket(null).apply { reuseAddress = true; bind(InetSocketAddress(0)); soTimeout = 250 }
             socket.use { s ->
                 val msg = ("M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 2\r\nST: ssdp:all\r\n" +
-                    "USER-AGENT: Android/1 UPnP/1.1 AllNetworkTools/1.0\r\n\r\n").toByteArray()
+                    "USER-AGENT: Android/1 UPnP/1.1 AllNetworkTools/0.1\r\n\r\n").toByteArray()
                 val group = InetAddress.getByName("239.255.255.250")
                 val buf = ByteArray(2048)
                 val end = System.currentTimeMillis() + listenMs

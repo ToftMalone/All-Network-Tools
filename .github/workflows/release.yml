@@ -1,0 +1,45 @@
+name: Release
+
+# Pousser un tag « vX.Y » construit l'APK et publie une release GitHub avec l'APK en pièce jointe.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Installer la plateforme Android
+        run: sdkmanager "platforms;android-37.2" "build-tools;37.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Construire l'APK
+        run: >
+          ./gradlew :app:assembleRelease --no-daemon
+          -Pandroid.injected.signing.store.file=${{ github.workspace }}/signing/debug.keystore
+          -Pandroid.injected.signing.store.password=android
+          -Pandroid.injected.signing.key.alias=androiddebugkey
+          -Pandroid.injected.signing.key.password=android
+
+      - name: Nommer l'APK
+        run: cp app/build/outputs/apk/release/app-release.apk "AllNetworkTools-${{ github.ref_name }}.apk"
+
+      - name: Publier la release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: All Network Tools ${{ github.ref_name }}
+          body_path: .github/release-notes/${{ github.ref_name }}.md
+          files: AllNetworkTools-${{ github.ref_name }}.apk
