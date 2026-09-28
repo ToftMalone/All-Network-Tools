@@ -1,0 +1,75 @@
+package com.allnetworktools.model
+
+import com.allnetworktools.ui.theme.Sym
+
+/** Corner radii (dp) of the dock's leading button: top-start, top-end, bottom-end, bottom-start. */
+data class LeadCorners(val ts: Float, val te: Float, val be: Float, val bs: Float)
+
+enum class Network(
+    val label: String,
+    val icon: String,
+    val featuredShort: String,
+    val lead: LeadCorners,
+) {
+    Wifi("Wi-Fi", Sym.Wifi, "Scan", LeadCorners(24f, 24f, 24f, 24f)),
+    Bluetooth("Bluetooth", Sym.Bluetooth, "BLE", LeadCorners(18f, 18f, 18f, 18f)),
+    Cellular("Réseau mobile", Sym.CellBars3, "Cellules", LeadCorners(24f, 24f, 12f, 24f)),
+    Gnss("GNSS", Sym.SatelliteAlt, "Boussole", LeadCorners(14f, 24f, 14f, 24f)),
+    ;
+
+    // A getter rather than a constructor argument: Tool's entries reference Network, so eager
+    // initialisation in both directions would leave one side null.
+    val featured: Tool
+        get() = when (this) {
+            Wifi -> Tool.WifiScan
+            Bluetooth -> Tool.BleScan
+            Cellular -> Tool.Neighbors
+            Gnss -> Tool.Compass
+        }
+}
+
+/** Where the back arrow of a tool leads. */
+sealed interface ToolParent {
+    data object Tools : ToolParent
+    data object Dashboard : ToolParent
+    data class Other(val tool: Tool) : ToolParent
+}
+
+enum class Tool(
+    val network: Network,
+    val title: String,
+    val icon: String,
+    val topAction: String? = null,
+    val parent: ToolParent = ToolParent.Tools,
+    val implemented: Boolean = false,
+) {
+    WifiScan(Network.Wifi, "Scanner Wi-Fi", Sym.WifiFind, implemented = true),
+    Channels(Network.Wifi, "Analyseur de canaux", Sym.BarChart, Sym.Refresh),
+    Lan(Network.Wifi, "Appareils du LAN", Sym.Devices, Sym.Refresh),
+    LanDevice(Network.Wifi, "Appareil du LAN", Sym.Devices, Sym.MoreVert),
+    Ping(Network.Wifi, "Ping", Sym.NetworkPing, Sym.IosShare),
+    Trace(Network.Wifi, "Traceroute", Sym.Route, Sym.IosShare),
+    Ports(Network.Wifi, "Scan de ports", Sym.Lan, Sym.IosShare),
+    Dns(Network.Wifi, "DNS Lookup", Sym.Dns, Sym.History),
+    Speed(Network.Wifi, "Test de débit", Sym.Speed, Sym.History),
+
+    BleScan(Network.Bluetooth, "Scanner BLE", Sym.BluetoothSearching, implemented = true),
+    Gatt(Network.Bluetooth, "Appareil BLE", Sym.AccountTree, Sym.MoreVert),
+    Paired(Network.Bluetooth, "Appareil appairé", Sym.Headphones, Sym.MoreVert, ToolParent.Dashboard),
+    Tracker(Network.Bluetooth, "Traqueur de proximité", Sym.MyLocation),
+
+    Neighbors(Network.Cellular, "Cellules voisines", Sym.CellTower, implemented = true),
+    CellLog(Network.Cellular, "Journal des cellules", Sym.Timeline, Sym.IosShare),
+    SignalHistory(Network.Cellular, "Historique du signal", Sym.Monitoring, Sym.IosShare),
+    DataUsage(Network.Cellular, "Données mobiles", Sym.DataUsage, Sym.CalendarMonth),
+    CellDetail(Network.Cellular, "Détail de la cellule", Sym.CellTower, Sym.ContentCopy, ToolParent.Other(Neighbors)),
+
+    Compass(Network.Gnss, "Boussole", Sym.Explore, implemented = true),
+    Nmea(Network.Gnss, "Journal NMEA", Sym.Terminal, Sym.IosShare),
+    Track(Network.Gnss, "Trace GPX", Sym.Route, Sym.FolderOpen),
+    Ttff(Network.Gnss, "Test TTFF", Sym.Timer, Sym.History),
+    SatDetail(Network.Gnss, "Satellite", Sym.SatelliteAlt, Sym.MoreVert, ToolParent.Dashboard),
+    ;
+
+    val isFeatured: Boolean get() = network.featured == this
+}
