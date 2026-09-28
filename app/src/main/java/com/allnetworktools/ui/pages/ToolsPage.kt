@@ -66,8 +66,7 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
         ToolGroup("Consommation", listOf(ToolEntry(Tool.DataUsage, "Données mobiles", "Par SIM et par app"), ToolEntry(Tool.CellDetail, "Cellule de service", servingLabel ?: "Identifiants et mesures"))),
     )
     Network.Gnss -> listOf(
-        ToolGroup("Enregistrement", listOf(ToolEntry(Tool.Track, "Trace GPX", "Enregistrer, exporter"), ToolEntry(Tool.Nmea, "Journal NMEA", "Phrases brutes"))),
-        ToolGroup("Mesure", listOf(ToolEntry(Tool.Ttff, "Test TTFF", "Froid / tiède / chaud"), ToolEntry(Tool.SatDetail, "Satellite", "Détail, C/N0"))),
+        ToolGroup("Données brutes", listOf(ToolEntry(Tool.Nmea, "Journal NMEA", "Phrases du récepteur"))),
     )
 }
 

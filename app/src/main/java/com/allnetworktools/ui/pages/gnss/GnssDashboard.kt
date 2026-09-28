@@ -7,7 +7,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -37,12 +36,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.allnetworktools.MainViewModel
-import com.allnetworktools.Page
 import com.allnetworktools.data.Constellation
 import com.allnetworktools.data.FixType
 import com.allnetworktools.data.Satellite
 import com.allnetworktools.data.Units
-import com.allnetworktools.model.Tool
 import com.allnetworktools.ui.components.BlinkDot
 import com.allnetworktools.ui.components.CardHeader
 import com.allnetworktools.ui.components.EmptyStateCard
@@ -84,7 +81,6 @@ fun GnssDashboard(vm: MainViewModel) {
     val roles = AntTheme.net.gnss
     val units = AntTheme.settings.units
     val loc = g.location
-    val openSat = { s: Satellite -> vm.navigate { it.copy(page = Page.ToolPage(Tool.SatDetail, s.id)) } }
     PageColumn {
         Row(
             Modifier.fadeUp().fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(roles.container).padding(20.dp),
@@ -115,7 +111,7 @@ fun GnssDashboard(vm: MainViewModel) {
             if (g.visible.isEmpty()) {
                 EmptyStateCard(Sym.SatelliteAlt, "Recherche de satellites…", "Placez-vous à l'extérieur, ciel dégagé. Les premiers satellites apparaissent en quelques secondes.")
             } else {
-                SkyPlot(g.visible, onSat = openSat)
+                SkyPlot(g.visible)
                 FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Constellation.entries.forEach { c ->
                         val vis = g.visible.count { it.constellation == c }
@@ -147,7 +143,7 @@ fun GnssDashboard(vm: MainViewModel) {
             SectionCard {
                 CardHeader("C/N0 par satellite") { Text("dB-Hz", style = rf(12, 16), color = cs.onSurfaceVariant) }
                 val bars = g.satellites.sortedWith(compareByDescending<Satellite> { it.used }.thenByDescending { it.cn0 }).take(16)
-                Cn0Bars(bars, openSat)
+                Cn0Bars(bars)
             }
         }
     }
@@ -163,7 +159,7 @@ private fun HeroLine(k: String, v: String) {
 }
 
 @Composable
-fun SkyPlot(sats: List<Satellite>, highlight: String? = null, onSat: ((Satellite) -> Unit)? = null, height: androidx.compose.ui.unit.Dp = 320.dp) {
+fun SkyPlot(sats: List<Satellite>, height: androidx.compose.ui.unit.Dp = 320.dp) {
     val roles = AntTheme.net.gnss
     val track = cs.surfaceContainerHigh
     val line = cs.outlineVariant
@@ -200,11 +196,10 @@ fun SkyPlot(sats: List<Satellite>, highlight: String? = null, onSat: ((Satellite
                 val target = Offset((cx.value + r.value * rr * sin(a)).toFloat(), (cy.value - r.value * rr * cos(a)).toFloat())
                 val pos by animateOffsetAsState(target, tween(1000, easing = LinearEasing), label = "sat")
                 val col = constellationColor(s.constellation)
-                val size = if (s.id == highlight) 28.dp else 20.dp
+                val size = 20.dp
                 Box(
                     Modifier.offset { androidx.compose.ui.unit.IntOffset((pos.x.dp - size / 2).roundToPx(), (pos.y.dp - size / 2).roundToPx()) }.size(size).clip(CircleShape)
-                        .background(if (s.used) col else track).border(2.dp, col, CircleShape)
-                        .then(if (onSat != null) Modifier.clickable { onSat(s) } else Modifier),
+                        .background(if (s.used) col else track).border(2.dp, col, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(s.svid.toString(), style = rf(8, 10, 800), color = if (s.used) cs.surface else col, maxLines = 1)
@@ -215,7 +210,7 @@ fun SkyPlot(sats: List<Satellite>, highlight: String? = null, onSat: ((Satellite
 }
 
 @Composable
-private fun Cn0Bars(sats: List<Satellite>, onSat: (Satellite) -> Unit) {
+private fun Cn0Bars(sats: List<Satellite>) {
     Row(
         Modifier.padding(top = 14.dp).fillMaxWidth().height(140.dp),
         verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -224,7 +219,7 @@ private fun Cn0Bars(sats: List<Satellite>, onSat: (Satellite) -> Unit) {
             key(s.id) {
                 val h by animateFloatAsState((s.cn0 / 50f).coerceIn(0.02f, 1f), Motion.standard(), label = "cn0")
                 Column(
-                    Modifier.weight(1f).fillMaxHeight().clickable { onSat(s) },
+                    Modifier.weight(1f).fillMaxHeight(),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom,
                 ) {
                     Text(Math.round(s.cn0).toString(), style = rf(9, 12, 600, tnum = true), color = cs.onSurfaceVariant, maxLines = 1)

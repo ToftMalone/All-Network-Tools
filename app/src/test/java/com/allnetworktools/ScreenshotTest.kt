@@ -83,6 +83,7 @@ class ScreenshotTest {
     @Test fun cellDashboard() = shot("30_cell_dashboard", nav = NavState(Network.Cellular, Page.Dashboard))
     @Test fun neighbors() = shot("31_cell_neighbors", nav = NavState(Network.Cellular, Page.ToolPage(Tool.Neighbors)))
     @Test fun gnssDashboard() = shot("40_gnss_dashboard", nav = NavState(Network.Gnss, Page.Dashboard))
+    @Test fun gnssTools() = shot("43_gnss_tools", nav = NavState(Network.Gnss, Page.Tools))
     @Test fun compass() = shot("41_compass", nav = NavState(Network.Gnss, Page.ToolPage(Tool.Compass)))
     @Test fun gnssDenied() {
         Scenario.gnssDenied = true

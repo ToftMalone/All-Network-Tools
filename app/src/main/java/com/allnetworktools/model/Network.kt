@@ -17,8 +17,10 @@ enum class Network(
     Gnss("GNSS", Sym.SatelliteAlt, "Boussole", LeadCorners(14f, 24f, 14f, 24f)),
     ;
 
-    // A getter rather than a constructor argument: Tool's entries reference Network, so eager
+    // Getters rather than constructor arguments: Tool's entries reference Network, so eager
     // initialisation in both directions would leave one side null.
+
+    /** Tool highlighted at the top of the network's Tools page. */
     val featured: Tool
         get() = when (this) {
             Wifi -> Tool.WifiScan
@@ -26,6 +28,10 @@ enum class Network(
             Cellular -> Tool.Neighbors
             Gnss -> Tool.Compass
         }
+
+    /** Tool reachable directly from the dock; GNSS has none, its compass lives in the Tools page. */
+    val dockShortcut: Tool?
+        get() = if (this == Gnss) null else featured
 }
 
 /** Where the back arrow of a tool leads. */
@@ -66,10 +72,7 @@ enum class Tool(
 
     Compass(Network.Gnss, "Boussole", Sym.Explore, implemented = true),
     Nmea(Network.Gnss, "Journal NMEA", Sym.Terminal, Sym.IosShare),
-    Track(Network.Gnss, "Trace GPX", Sym.Route, Sym.FolderOpen),
-    Ttff(Network.Gnss, "Test TTFF", Sym.Timer, Sym.History),
-    SatDetail(Network.Gnss, "Satellite", Sym.SatelliteAlt, Sym.MoreVert, ToolParent.Dashboard),
     ;
 
-    val isFeatured: Boolean get() = network.featured == this
+    val isDockShortcut: Boolean get() = network.dockShortcut == this
 }

@@ -44,12 +44,12 @@ import com.allnetworktools.ui.theme.Sym
 import com.allnetworktools.ui.theme.rf
 import kotlinx.coroutines.launch
 
-enum class DockTab { Dashboard, Tools, Featured }
+enum class DockTab { Dashboard, Featured, Tools }
 
 fun activeTab(page: Page): DockTab? = when (page) {
     Page.Dashboard -> DockTab.Dashboard
     Page.Tools -> DockTab.Tools
-    is Page.ToolPage -> if (page.tool.isFeatured) DockTab.Featured else DockTab.Tools
+    is Page.ToolPage -> if (page.tool.isDockShortcut) DockTab.Featured else DockTab.Tools
     else -> null
 }
 
@@ -111,11 +111,12 @@ fun FloatingDock(
                     }
                 } else {
                     val active = activeTab(page)
-                    DockTab.entries.forEach { tab ->
+                    // Outils is always the last tab, just before the trailing action.
+                    DockTab.entries.filter { it != DockTab.Featured || network.dockShortcut != null }.forEach { tab ->
                         val (icon, label) = when (tab) {
                             DockTab.Dashboard -> Sym.SpaceDashboard to "Dashboard"
+                            DockTab.Featured -> network.dockShortcut!!.icon to network.featuredShort
                             DockTab.Tools -> Sym.Handyman to "Outils"
-                            DockTab.Featured -> network.featured.icon to network.featuredShort
                         }
                         TabButton(icon, label, tab == active) { onTab(tab) }
                     }
