@@ -8,7 +8,7 @@ import android.net.wifi.ScanResult
 import android.os.SystemClock
 import com.allnetworktools.data.AdapterInfo
 import com.allnetworktools.data.BleDevice
-import com.allnetworktools.data.BleKind
+import com.allnetworktools.data.Ad
 import com.allnetworktools.data.BluetoothRepository
 import com.allnetworktools.data.BluetoothSnapshot
 import com.allnetworktools.data.BondedDevice
@@ -103,14 +103,25 @@ private fun Context.fakeWifi() = object : WifiRepository(this@fakeWifi) {
     override val scanResults: Flow<List<WifiAp>> = flowOf(scan)
 }
 
+private fun fakeBle(addr: String, name: String?, rssi: Int, hex: String, connectable: Boolean = true) =
+    BleDevice.from(addr, name, rssi, null, connectable, 0, Ad.parseHex(hex))
+
 private val bleDevices = listOf(
-    BleDevice("F4:0E:11:A2:3C:9B", "Pixel Buds Pro 2", -48, -12, BleKind.Audio, "Google", true, 0, listOf("0xFE2C", "0x184E"), "00E0 01 4A 7C 22 0F", 0x1A, 102, 0x00E0, "02011A0303FE2C07FFE000014A7C22"),
-    BleDevice("C8:2A:DD:14:07:E1", "Pixel Watch 3", -55, null, BleKind.Watch, "Google", true, 0, companyId = 0x00E0),
-    BleDevice("70:99:1C:5B:E2:40", "JBL Flip 6", -71, null, BleKind.Audio, "Harman", true, 0),
-    BleDevice("E6:43:9A:0C:71:D8", "Tile Mate", -74, null, BleKind.Beacon, "Tile", false, 0),
-    BleDevice("D2:5F:88:31:AA:06", "Mi Smart Band 8", -79, null, BleKind.Watch, "Xiaomi", true, 0),
-    BleDevice("5A:1B:C7:9E:22:F3", null, -84, null, BleKind.Unknown, "Apple, Inc.", false, 0, companyId = 0x004C, raw = "02011A0AFF4C0010050B1C8E3D21"),
-    BleDevice("2C:41:A1:6D:90:3B", "LE-Bose QC45", -88, null, BleKind.Audio, "Bose", true, 0),
+    fakeBle("F4:0E:11:A2:3C:9B", "Pixel Buds Pro 2", -48, "02010606162CFECD8256"),
+    fakeBle("D3:11:6C:0A:52:9E", null, -52, "1EFF4C000719010E202B8F" + "00".repeat(20)),
+    fakeBle("C8:2A:DD:14:07:E1", "Pixel Watch 3", -55, "020106"),
+    fakeBle("54:8C:A0:5E:7B:11", null, -66, "0FFF0600010F2002A1B2C3D4E5F60718"),
+    fakeBle("E4:2B:34:7A:11:C0", "Polar H10 7A3B2C", -69, "0303" + "0D18"),
+    fakeBle("70:99:1C:5B:E2:40", "JBL Flip 6", -71, "020106"),
+    fakeBle("E6:43:9A:0C:71:D8", "Tile Mate", -74, "0303EDFE", connectable = false),
+    fakeBle("F0:12:88:43:9D:02", null, -77, "1AFF4C000215B9407F30F5F8466EAFF925556B57FE6D00010002C5", connectable = false),
+    fakeBle("D2:5F:88:31:AA:06", "Mi Smart Band 8", -79, "020106"),
+    fakeBle("C1:07:E8:55:20:19", null, -82, "0303AAFE0E16AAFE10E7036578616D706C6507", connectable = false),
+    fakeBle("5A:1B:C7:9E:22:F3", null, -84, "0AFF4C0010050B1C8E3D21", connectable = false),
+    fakeBle("48:AA:10:6F:31:C7", null, -85, "06FF7500420401"),
+    fakeBle("2C:41:A1:6D:90:3B", "LE-Bose QC45", -88, "020106"),
+    fakeBle("7E:03:5B:99:AC:40", null, -89, "020106020AF4"),
+    fakeBle("6B:20:91:C4:0F:E7", null, -90, "020106", connectable = false),
 )
 
 private fun Context.fakeBluetooth() = object : BluetoothRepository(this@fakeBluetooth) {

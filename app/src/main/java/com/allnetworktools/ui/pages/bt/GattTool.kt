@@ -111,9 +111,11 @@ class NotifyLine(val atMs: Long, val uuid: UUID, val value: ByteArray)
 
 enum class GattConn { Idle, Connecting, Connected, Lost }
 
+private val IdentityChars = setOf(0x2A00, 0x2A01, 0x2A24, 0x2A26, 0x2A29)
+
 private val GattSteps = listOf("Connexion GATT", "Négociation MTU", "Découverte des services", "Lecture des valeurs")
 
-class GattController(private val context: Context, private val scope: CoroutineScope) {
+class GattController(private val context: Context, private val scope: CoroutineScope, private val identities: com.allnetworktools.data.BleIdentityStore? = null) {
     var address by mutableStateOf<String?>(null)
     var phase by mutableStateOf(Phase.Idle)
     var conn by mutableStateOf(GattConn.Idle)
@@ -173,10 +175,11 @@ class GattController(private val context: Context, private val scope: CoroutineS
                     GattServiceUi(s.uuid, s.characteristics.map { ch -> keyOf(ch).also { handles[it] = ch }.let { GattCharUi(it, ch.uuid, ch.properties) } })
                 }
                 services.addAll(ui)
-                ui.flatMap { it.chars }.filter { it.canRead }.take(24).forEach { ch ->
+                ui.flatMap { it.chars }.filter { it.canRead }.sortedBy { if (GattNames.uuid16(it.uuid) in IdentityChars) 0 else 1 }.take(24).forEach { ch ->
                     runCatching { c.read(handles.getValue(ch.key)) }.onSuccess { values[ch.key] = it }
                 }
                 step = 4
+                learnIdentity(addr, ui)
                 elapsedS = (SystemClock.elapsedRealtime() - t0) / 1000f
                 conn = GattConn.Connected
                 ui.firstOrNull { GattNames.uuid16(it.uuid) !in setOf(0x1800, 0x1801) }?.let { expanded[it.uuid] = true }
@@ -186,6 +189,19 @@ class GattController(private val context: Context, private val scope: CoroutineS
                 lost(e.message ?: GattNames.status(e.status))
             }
         }
+    }
+
+    /** What this connection revealed feeds the scanner's identification. */
+    private fun learnIdentity(addr: String, ui: List<GattServiceUi>) {
+        val store = identities ?: return
+        fun text(uuid: Int) = ui.flatMap { it.chars }.firstOrNull { GattNames.uuid16(it.uuid) == uuid }?.let { values[it.key] }?.let(com.allnetworktools.data.BleIdentifier::text)
+        val appearance = ui.flatMap { it.chars }.firstOrNull { GattNames.uuid16(it.uuid) == 0x2A01 }?.let { values[it.key] }?.takeIf { it.size >= 2 }?.let { (it[0].toInt() and 0xFF) or ((it[1].toInt() and 0xFF) shl 8) }
+        store.put(
+            addr,
+            com.allnetworktools.data.GattIdentity(
+                text(0x2A00), appearance, text(0x2A29), text(0x2A24), text(0x2A26), ui.mapNotNull { GattNames.uuid16(it.uuid) }.toSet(),
+            ),
+        )
     }
 
     private fun lost(message: String) {
@@ -255,8 +271,8 @@ private fun phyLabel(p: Int?) = when (p) {
 }
 
 private fun flagsLabel(f: Int): String = buildList {
-    if (f and 0x01 != 0) add("LE Limited")
-    if (f and 0x02 != 0) add("LE General")
+    if (f and 0x01 != 0) add("LE limité")
+    if (f and 0x02 != 0) add("LE général")
     if (f and 0x04 != 0) add("BR/EDR non pris en charge")
 } .joinToString(" · ").ifEmpty { "0x%02X".format(f) }
 
@@ -290,7 +306,7 @@ fun GattTool(c: GattController, address: String?, device: BleDevice?, bonded: Bo
                 LeadingIcon(device?.icon ?: Sym.Bluetooth, acc.accent, acc.onAccent, 56.dp, RoundedCornerShape(20.dp), 28.dp)
                 Column(Modifier.weight(1f)) {
                     Text(device?.displayName ?: "Appareil BLE", style = gs(24, 30, 500), maxLines = 1)
-                    Text(listOfNotNull(address, device?.maker).joinToString(" · "), style = mono(12, 16), maxLines = 1)
+                    Text(listOfNotNull(address, device?.model?.takeIf { device.name != null && device.confidence >= 50 }, device?.maker).joinToString(" · "), style = mono(12, 16), maxLines = 1)
                 }
                 if (device != null) {
                     Column(horizontalAlignment = Alignment.End) {
@@ -326,11 +342,16 @@ fun GattTool(c: GattController, address: String?, device: BleDevice?, bonded: Bo
             )
         }
         when (c.phase) {
-            Phase.Idle -> AdvertCard(device)
+            Phase.Idle -> {
+                IdentityCard(device)
+                AdvertCard(device)
+                FramesCard(device)
+            }
             Phase.Running -> StepsCard(c)
             Phase.Error -> ToolError(Sym.LinkOff, "Connexion perdue", c.error ?: "L'appareil ne répond plus.", "Se reconnecter", connect)
             Phase.Empty -> ToolEmpty(Sym.AccountTree, "Aucun service exposé", "La connexion a réussi mais l'appareil ne publie aucun service GATT.", "Relancer la découverte", connect)
             Phase.Results -> {
+                IdentityCard(device)
                 Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp), verticalAlignment = Alignment.Bottom) {
                     Text("Services GATT · ${c.services.size}", Modifier.weight(1f), style = rf(14, 20, 600), color = acc.accent)
                     Text("découverts en ${fmt(c.elapsedS, 1)} s", style = rf(12, 16), color = cs.onSurfaceVariant)
@@ -358,6 +379,51 @@ private fun AdvertCard(device: BleDevice?) {
         InfoRow("Puissance TX", device.txPower?.let { "$it dBm" } ?: "Non annoncée")
         InfoRow("Intervalle observé", device.intervalMs?.let { "≈ $it ms" } ?: "—")
         InfoRow("Connectable", if (device.connectable) "Oui" else "Non")
+        InfoRow("Adresse", device.addressNote)
+        InfoRow("Annonce", if (device.extended) "BLE 5 (étendue)" else "Classique (legacy)")
+    }
+}
+
+@Composable
+private fun IdentityCard(d: BleDevice?) {
+    if (d == null) return
+    val acc = AntTheme.accent
+    SectionCard(shape = RoundedCornerShape(28.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LeadingIcon(d.icon, if (d.isUnknown) cs.surfaceContainerHighest else acc.container, if (d.isUnknown) cs.onSurfaceVariant else acc.onContainer, 48.dp, RoundedCornerShape(16.dp), 26.dp)
+            Column(Modifier.weight(1f)) {
+                Text(if (d.isUnknown) "Appareil non identifié" else d.model ?: d.kind.label, style = rf(16, 22, 600), maxLines = 2)
+                Text(listOfNotNull(d.kind.label.takeIf { !d.isUnknown }, d.maker).joinToString(" · ").ifEmpty { "Aucun indice dans l'annonce" }, style = rf(13, 18), color = cs.onSurfaceVariant)
+            }
+            if (!d.isUnknown) {
+                Box(Modifier.height(28.dp).clip(RoundedCornerShape(14.dp)).background(if (d.guessed) cs.surfaceContainerHighest else acc.accent).padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+                    Text(if (d.guessed) "Probable · ${d.confidence} %" else "${d.confidence} %", style = rf(12, 16, 700), color = if (d.guessed) cs.onSurface else acc.onAccent)
+                }
+            }
+        }
+        if (d.isUnknown) {
+            Text(
+                if (d.connectable) "Connectez-vous pour lire son nom, son modèle et son fabricant : l'identité sera mémorisée pour les prochains scans."
+                else "Cet appareil n'est pas connectable et son annonce ne contient aucun indice exploitable.",
+                Modifier.padding(top = 10.dp), style = rf(13, 18), color = cs.onSurfaceVariant,
+            )
+        }
+        if (d.evidence.isNotEmpty()) {
+            Text("Pourquoi", Modifier.padding(top = 12.dp, bottom = 4.dp), style = rf(13, 18, 600), color = acc.accent)
+            d.evidence.forEach { Text("• $it", style = rf(13, 18), color = cs.onSurfaceVariant) }
+        }
+        if (d.fromGatt) Text("Identité lue par connexion (GATT).", Modifier.padding(top = 8.dp), style = rf(12, 16, 600), color = acc.accent)
+        if (d.details.isNotEmpty()) {
+            Column(Modifier.padding(top = 6.dp)) { d.details.forEach { (k, v) -> InfoRow(k, v) } }
+        }
+    }
+}
+
+@Composable
+private fun FramesCard(d: BleDevice?) {
+    if (d == null || d.ads.isEmpty()) return
+    InfoList("Trames d'annonce · ${d.ads.size}") {
+        d.ads.forEach { s -> InfoRow("0x%02X · %s".format(s.type, com.allnetworktools.data.Ad.typeName(s.type)), com.allnetworktools.data.Ad.describe(s)) }
     }
 }
 

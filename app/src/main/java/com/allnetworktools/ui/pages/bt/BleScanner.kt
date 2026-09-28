@@ -95,7 +95,8 @@ fun BleScanner(vm: MainViewModel) {
                         when {
                             paused -> "Scan en pause · ${shown.size} ${plural(shown.size, "appareil")}"
                             devices.isEmpty() -> "Recherche… aucun appareil détecté"
-                            else -> "Scan actif · ${shown.size} ${plural(shown.size, "appareil")}"
+                            else -> "Scan actif · ${shown.size} ${plural(shown.size, "appareil")}" +
+                                devices.count { it.isUnknown }.let { u -> if (u > 0) " · $u ${plural(u, "inconnu")}" else "" }
                         },
                         style = rf(14, 20, 500),
                     )
@@ -104,11 +105,18 @@ fun BleScanner(vm: MainViewModel) {
         }
         BleSearchBar(f) { f.sheetOpen = true }
         BleActiveFilters(f) { f.sheetOpen = true }
+        val counts = devices.groupingBy { it.kind }.eachCount()
+        val kinds = counts.keys.sortedWith(compareBy({ it == BleKind.Unknown }, { -(counts[it] ?: 0) }))
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            (listOf(ALL) + BleKind.entries.map { it.filter }).forEach { f ->
-                AntFilterChip(f, filter == f, { filter = f }, roles.container, roles.onContainer)
+            AntFilterChip(ALL, filter == ALL, { filter = ALL }, roles.container, roles.onContainer, trailing = devices.size.toString())
+            kinds.forEach { k ->
+                AntFilterChip(k.filter, filter == k.filter, { filter = k.filter }, roles.container, roles.onContainer, trailing = counts[k].toString())
             }
+            if (filter != ALL && kinds.none { it.filter == filter }) AntFilterChip(filter, true, { filter = ALL }, roles.container, roles.onContainer, trailing = "0")
         }
+        val ident = vm.tools.bleIdentify
+        val unknownCount = devices.count { it.isUnknown }
+        IdentifyCard(ident, unknownCount, ident.candidates(devices).size) { ident.start(devices) }
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("${shown.size} ${plural(shown.size, "résultat")}", Modifier.weight(1f), style = rf(13, 18), color = cs.onSurfaceVariant)
             Symbol(Sym.SwapVert, size = 18.dp, tint = roles.accent)
@@ -181,7 +189,7 @@ private fun Radar(devices: List<BleDevice>, sweeping: Boolean) {
                     Box(Modifier.size(22.dp).offset((-4).dp, (-4).dp).clip(CircleShape).background(roles.accent.copy(alpha = 0.25f)))
                     Box(Modifier.size(14.dp).clip(CircleShape).background(roles.accent))
                     Text(
-                        d.displayName.substringBefore(' '),
+                        (d.name ?: d.model?.takeIf { d.confidence >= 50 } ?: d.maker ?: "?").substringBefore(' '),
                         Modifier.width(80.dp).offset(x = (-33).dp, y = 16.dp),
                         style = rf(10, 12, 600), color = roles.onContainer, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
@@ -212,14 +220,59 @@ private fun BleItem(d: BleDevice, index: Int, count: Int, onClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(d.displayName, Modifier.weight(1f, fill = false), style = rf(15, 20, 600), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Box(Modifier.height(20.dp).clip(RoundedCornerShape(6.dp)).background(cs.surfaceContainerHighest).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
-                    Text(d.kind.label, style = rf(10, 12, 600))
+                    Text(d.kind.label + if (d.guessed) " ?" else "", style = rf(10, 12, 600))
                 }
             }
-            Text("${d.address} · ${d.maker ?: "Fabricant inconnu"}", style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val sub = listOfNotNull(
+                d.address,
+                d.model?.takeIf { d.name != null && !it.equals(d.name, true) && d.confidence >= 50 },
+                d.maker?.takeIf { m -> d.model?.contains(m, true) != true && d.name?.contains(m, true) != true },
+                "BLE 5".takeIf { d.extended },
+            )
+            Text(sub.joinToString(" · "), style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Column(Modifier.width(56.dp), horizontalAlignment = Alignment.End) {
             Text(fmt(d.rssi), style = gs(18, 22, 500, tnum = true))
             LevelBar(((d.rssi + 100) / 60f).coerceAtLeast(0.05f), roles.accent, Modifier.padding(top = 4.dp), height = 4.dp)
         }
+    }
+}
+
+@Composable
+private fun IdentifyCard(c: BleIdentifyController, unknown: Int, candidates: Int, onStart: () -> Unit) {
+    val roles = AntTheme.net.bt
+    val haptics = AntTheme.haptics
+    if (!c.running && !c.finished && unknown == 0) return
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(roles.container).padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Symbol(if (c.running) Sym.Search else Sym.Help, size = 24.dp, filled = true, tint = roles.onContainer)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    when {
+                        c.running -> "Identification ${c.done + 1} / ${c.total}"
+                        c.finished -> "${c.found} ${plural(c.found, "appareil identifié", "appareils identifiés")} sur ${c.total}"
+                        else -> "$unknown ${plural(unknown, "appareil non identifié", "appareils non identifiés")}"
+                    },
+                    style = rf(15, 20, 600), color = roles.onContainer,
+                )
+                Text(
+                    when {
+                        c.running -> c.current ?: "Connexion…"
+                        candidates > 0 -> "Connexion brève en lecture seule à $candidates ${plural(candidates, "appareil")} proche${if (candidates > 1) "s" else ""} pour lire nom, modèle et fabricant."
+                        c.finished -> "Les identités lues sont conservées pour les prochains scans."
+                        else -> "Ces appareils ne sont pas connectables ou trop éloignés pour être interrogés."
+                    },
+                    style = rf(12, 16), color = roles.onContainer,
+                )
+            }
+            when {
+                c.running -> PillButton("Arrêter", { haptics.segment(); c.stop() }, icon = Sym.Stop, height = 40.dp, bg = cs.surface, fg = roles.accent)
+                candidates > 0 -> PillButton("Identifier", { haptics.confirm(); onStart() }, height = 40.dp, bg = roles.accent, fg = roles.onAccent)
+            }
+        }
+        if (c.running) com.allnetworktools.ui.tools.ProgressBar(c.done.toFloat() / c.total.coerceAtLeast(1), track = cs.surface)
     }
 }

@@ -108,11 +108,11 @@ class CellLogicTest {
     }
 
     @Test fun bleFilters() {
-        fun dev(name: String?, rssi: Int, company: Int?, raw: String?, services: List<String> = emptyList()) =
-            com.allnetworktools.data.BleDevice("AA:BB:CC:DD:EE:0${rssi and 7}", name, rssi, null, com.allnetworktools.data.BleKind.Unknown, null, true, 0, services, companyId = company, raw = raw)
-        val apple = dev(null, -60, 0x004C, "02011A0AFF4C0010050B1C8E3D21")
-        val pixel = dev("Pixel Buds", -75, 0x00E0, null, listOf("0xFE2C"))
-        val mesh = dev("Node", -90, null, "020106030328180B2A0011")
+        fun dev(name: String?, rssi: Int, hex: String) =
+            com.allnetworktools.data.BleDevice.from("AA:BB:CC:DD:EE:0${rssi and 7}", name, rssi, null, true, 0, com.allnetworktools.data.Ad.parseHex(hex))
+        val apple = dev(null, -60, "02011A0AFF4C0010050B1C8E3D21")
+        val pixel = dev("Pixel Buds", -75, "03032CFE")
+        val mesh = dev("Node", -90, "0303281802010 6".replace(" ", ""))
         val f = com.allnetworktools.ui.pages.bt.BleFilterState()
         assertTrue(listOf(apple, pixel, mesh).all(f::matches))
         assertEquals(setOf(com.allnetworktools.data.BleVendor.Mesh), mesh.vendors)
@@ -126,7 +126,8 @@ class CellLogicTest {
         f.toggleInclude(com.allnetworktools.data.BleVendor.Google)
         assertTrue(f.exclude.isEmpty())
         assertEquals(listOf(pixel), listOf(apple, pixel, mesh).filter(f::matches))
-        f.text = "ee:05"
-        assertTrue(f.matches(pixel))
+        f.include = emptySet()
+        f.text = "apple"
+        assertEquals(listOf(apple), listOf(apple, pixel, mesh).filter(f::matches))
     }
 }

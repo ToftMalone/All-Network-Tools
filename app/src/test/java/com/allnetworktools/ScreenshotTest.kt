@@ -225,7 +225,7 @@ class ScreenshotTest {
     }
     @Test fun trackerHotDark() = shot("88_tracker_found_dark", dark = true, nav = bt(Tool.Tracker)) { vm ->
         val c = vm.tools.tracker
-        c.follow(BleDevice("E6:43:9A:0C:71:D8", "Tile Mate", -48, null, BleKind.Beacon, "Tile", false, 0))
+        c.follow(BleDevice("E6:43:9A:0C:71:D8", "Tile Mate", -48, null, BleKind.Tag, "Tile", false, 0))
         c.history.addAll(listOf(-70f, -66f, -62f, -58f, -55f, -52f, -49f, -48f))
         c.rssi = -48f
     }
@@ -341,5 +341,12 @@ class ScreenshotTest {
             ),
         )
         c.phase = com.allnetworktools.ui.tools.Phase.Results
+    }
+
+    @Test fun bleIdentifiedUnnamed() = shot("B7_ble_identity_airpods", nav = bt(Tool.Gatt, "D3:11:6C:0A:52:9E"))
+    @Test fun bleIdentifiedUnknown() = shot("B8_ble_identity_unknown", nav = bt(Tool.Gatt, "7E:03:5B:99:AC:40"))
+    @Test fun bleIdentifyRunning() = shot("B9_ble_identify_running", nav = bt(Tool.BleScan)) { vm ->
+        val c = vm.tools.bleIdentify
+        c.running = true; c.total = 6; c.done = 2; c.current = "Appareil inconnu"
     }
 }

@@ -90,7 +90,7 @@ class BleFilterState {
 
     fun matches(d: BleDevice): Boolean {
         val q = text.trim()
-        if (q.isNotEmpty() && !(d.name?.contains(q, true) == true || d.address.contains(q, true) || d.address.replace(":", "").contains(q.replace(":", ""), true))) return false
+        if (q.isNotEmpty() && !(d.name?.contains(q, true) == true || d.model?.contains(q, true) == true || d.maker?.contains(q, true) == true || d.address.contains(q, true) || d.address.replace(":", "").contains(q.replace(":", ""), true))) return false
         when (nameMode) {
             NameMode.Named -> if (d.name.isNullOrBlank()) return false
             NameMode.Unnamed -> if (!d.name.isNullOrBlank()) return false
@@ -117,7 +117,7 @@ fun BleSearchBar(f: BleFilterState, onOpenSheet: () -> Unit) {
         ) {
             Symbol(Sym.Search, size = 22.dp, tint = cs.onSurfaceVariant)
             Box(Modifier.weight(1f)) {
-                if (f.text.isEmpty()) Text("Nom ou adresse", style = rf(15, 20), color = cs.onSurfaceVariant)
+                if (f.text.isEmpty()) Text("Nom, modèle ou adresse", style = rf(15, 20), color = cs.onSurfaceVariant)
                 BasicTextField(
                     f.text, { f.text = it }, Modifier.fillMaxWidth(), singleLine = true,
                     textStyle = rf(15, 20).copy(color = cs.onSurface), cursorBrush = SolidColor(acc.accent),
