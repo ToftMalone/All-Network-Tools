@@ -1,8 +1,11 @@
 name: Release
 
-# Construit l'APK et publie une release GitHub avec l'APK en pièce jointe, quand :
+# Construit l'APK signé et publie une release GitHub avec l'APK en pièce jointe, quand :
 #  - un tag « vX.Y » est poussé, ou
 #  - le fichier .github/release-version change (son contenu est le tag à créer, ex. « v0.1 »).
+#
+# Secrets requis (Settings > Secrets and variables > Actions) :
+#  KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
 on:
   push:
     tags: ['v*']
@@ -15,14 +18,25 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Vérifier les secrets de signature
+        run: |
+          for v in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then echo "::error::Le secret $v est absent. Ajoutez-le dans Settings > Secrets and variables > Actions."; exit 1; fi
+          done
 
       - name: Déterminer le tag
         id: tag
         run: |
           if [ "${{ github.ref_type }}" = "tag" ]; then t="${{ github.ref_name }}"; else t="$(tr -d ' \n\r' < .github/release-version)"; fi
-          test -f ".github/release-notes/$t.md"
+          test -f ".github/release-notes/$t.md" || { echo "::error::Notes manquantes : .github/release-notes/$t.md"; exit 1; }
           echo "name=$t" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v4
@@ -30,23 +44,24 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - uses: android-actions/setup-android@v3
-
-      - name: Installer la plateforme Android
-        run: sdkmanager "platforms;android-37.2" "build-tools;37.0.0"
+      - name: Préparer le SDK Android (déjà présent sur le runner)
+        run: |
+          SDKM="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | tail -1)"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-37.2" "build-tools;37.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Construire l'APK
-        run: >
-          ./gradlew :app:assembleRelease --no-daemon
-          -Pandroid.injected.signing.store.file=${{ github.workspace }}/signing/debug.keystore
-          -Pandroid.injected.signing.store.password=android
-          -Pandroid.injected.signing.key.alias=androiddebugkey
-          -Pandroid.injected.signing.key.password=android
-
-      - name: Nommer l'APK
-        run: cp app/build/outputs/apk/release/app-release.apk "AllNetworkTools-${{ steps.tag.outputs.name }}.apk"
+      - name: Construire l'APK signé
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          ./gradlew :app:assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/release.jks" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+          cp app/build/outputs/apk/release/app-release.apk "AllNetworkTools-${{ steps.tag.outputs.name }}.apk"
+          rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Publier la release
         uses: softprops/action-gh-release@v2
