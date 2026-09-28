@@ -23,6 +23,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.allnetworktools.Blocker
 import com.allnetworktools.MainViewModel
 import com.allnetworktools.data.PermGroup
@@ -109,6 +110,13 @@ class AppActions(
             launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
         }
     }
+
+    fun share(title: String, text: String) {
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, title).putExtra(Intent.EXTRA_TEXT, text)
+        launch(Intent.createChooser(send, title))
+    }
+
+    fun openUrl(url: String) = launch(Intent(Intent.ACTION_VIEW, url.toUri()))
 
     fun copy(label: String, text: String) {
         context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(label, text))

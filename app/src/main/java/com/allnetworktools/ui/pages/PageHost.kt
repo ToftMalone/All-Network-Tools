@@ -59,6 +59,16 @@ import com.allnetworktools.ui.pages.gnss.CompassTool
 import com.allnetworktools.ui.pages.gnss.GnssDashboard
 import com.allnetworktools.ui.pages.wifi.WifiDashboard
 import com.allnetworktools.ui.pages.wifi.WifiScanner
+import com.allnetworktools.ui.pages.wifi.ChannelsTool
+import com.allnetworktools.ui.pages.wifi.DnsTool
+import com.allnetworktools.ui.pages.wifi.LanDeviceTool
+import com.allnetworktools.ui.pages.wifi.LanTool
+import com.allnetworktools.ui.pages.wifi.PingTool
+import com.allnetworktools.ui.pages.wifi.PortsTool
+import com.allnetworktools.ui.pages.wifi.SpeedTool
+import com.allnetworktools.ui.pages.wifi.TraceTool
+import com.allnetworktools.data.standardLabel
+import androidx.compose.runtime.getValue
 import com.allnetworktools.ui.settings.SettingsScreen
 import com.allnetworktools.ui.theme.Motion
 import com.allnetworktools.ui.theme.Sym
@@ -147,7 +157,8 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
         return
     }
     val blocker = vm.blockers.collectAsStateWithLifecycle().value[net]
-    if (blocker != null) {
+    val internetTool = page is Page.ToolPage && page.tool in InternetTools
+    if (blocker != null && !internetTool) {
         BlockedPage(net, blocker)
         return
     }
@@ -164,7 +175,46 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.BleScan -> BleScanner(vm)
             Tool.Neighbors -> NeighborCells(vm)
             Tool.Compass -> CompassTool(vm)
+            Tool.Channels, Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed -> WifiToolRoute(vm, page)
             else -> ComingSoon(page.tool)
+        }
+        else -> Unit
+    }
+}
+
+/** Tools that only need an Internet connection, usable over mobile data with Wi-Fi off. */
+private val InternetTools = setOf(Tool.Ping, Tool.Trace, Tool.Dns, Tool.Speed, Tool.Ports)
+
+@Composable
+private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
+    val tools = vm.tools
+    val conn = vm.wifi.collectAsStateWithLifecycle().value.connection
+    val perms by vm.permissions.collectAsStateWithLifecycle()
+    val locationOn by vm.locationEnabled.collectAsStateWithLifecycle()
+    val actions = LocalActions.current
+    fun open(tool: Tool, arg: String? = null) = vm.navigate { it.copy(page = Page.ToolPage(tool, arg)) }
+    when (page.tool) {
+        Tool.Channels -> ChannelsTool(
+            tools.channels, conn, vm.wifiScan, vm::startWifiScan, perms.location && locationOn,
+            onFixLocation = { if (!perms.location) actions.request(PermGroup.Location) else actions.openLocationSettings() },
+        )
+        Tool.Lan -> LanTool(tools.lan, conn) { ip -> open(Tool.LanDevice, ip) }
+        Tool.LanDevice -> LanDeviceTool(
+            tools.lanDevice, page.arg, page.arg?.let(tools.lan::device), conn?.prefix,
+            onPing = { open(Tool.Ping, it) }, onPorts = { open(Tool.Ports, it) },
+        )
+        Tool.Ping -> PingTool(tools.ping, page.arg)
+        Tool.Trace -> TraceTool(tools.trace)
+        Tool.Ports -> PortsTool(tools.ports, page.arg, conn?.gateway)
+        Tool.Dns -> DnsTool(tools.dns, conn?.dns?.firstOrNull { '.' in it })
+        Tool.Speed -> {
+            val cell = vm.cell.collectAsStateWithLifecycle().value.state
+            val (label, icon) = when {
+                conn != null -> listOfNotNull(conn.ssid, standardLabel(conn.standard)?.first, "${conn.band.label} GHz").joinToString(" · ") to Sym.Wifi
+                cell != null -> listOfNotNull(cell.operator, cell.techLabel).joinToString(" · ") to Sym.CellBars3
+                else -> "Réseau actif" to Sym.Public
+            }
+            SpeedTool(tools.speed, label, icon)
         }
         else -> Unit
     }

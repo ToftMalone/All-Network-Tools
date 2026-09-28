@@ -24,6 +24,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,6 +76,7 @@ fun SettingsScreen(vm: MainViewModel) {
     val perms by vm.permissions.collectAsStateWithLifecycle()
     val actions = LocalActions.current
     var dialog by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     TopBarAction(Sym.Help) { dialog = "help" }
     PageColumn {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -134,8 +137,9 @@ fun SettingsScreen(vm: MainViewModel) {
             }
             Section("Données") {
                 Item(0, 3, Sym.History, "Historique conservé", if (s.historyDays == 0) "Illimité" else "${s.historyDays} jours", trailing = { LinkIcon(Sym.ChevronRight) }, onClick = { dialog = "history" })
-                Item(1, 3, Sym.IosShare, "Exporter toutes les mesures", "CSV, GPX et NMEA dans une archive ZIP", trailing = { LinkIcon(Sym.ChevronRight) }, onClick = {
-                    actions.toast("Aucune mesure enregistrée pour l'instant")
+                Item(1, 3, Sym.IosShare, "Exporter toutes les mesures", "Historique au format JSON", trailing = { LinkIcon(Sym.ChevronRight) }, onClick = {
+                    if (vm.history.isEmpty) actions.toast("Aucune mesure enregistrée pour l'instant")
+                    else scope.launch { actions.share("Mesures All Network Tools", vm.history.exportJson()) }
                 })
                 Item(2, 3, Sym.Delete, "Effacer toutes les données", "Journaux, traces et historiques", danger = true, trailing = { LinkIcon(Sym.ChevronRight) }, onClick = { dialog = "clear" })
             }
@@ -161,7 +165,10 @@ fun SettingsScreen(vm: MainViewModel) {
             title = { Text("Effacer toutes les données ?") },
             text = { Text("Les journaux, traces et historiques enregistrés seront supprimés définitivement. Vos réglages sont conservés.") },
             confirmButton = {
-                TextButton({ dialog = null; actions.toast("Aucune donnée enregistrée à effacer") }) { Text("Effacer", color = cs.error) }
+                TextButton({
+                    dialog = null
+                    scope.launch { vm.history.clear(); actions.toast("Données effacées") }
+                }) { Text("Effacer", color = cs.error) }
             },
             dismissButton = { TextButton({ dialog = null }) { Text("Annuler") } },
         )

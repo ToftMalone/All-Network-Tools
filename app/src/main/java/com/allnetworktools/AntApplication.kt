@@ -5,6 +5,7 @@ import com.allnetworktools.data.BluetoothRepository
 import com.allnetworktools.data.CellRepository
 import com.allnetworktools.data.CompassRepository
 import com.allnetworktools.data.GnssRepository
+import com.allnetworktools.data.HistoryStore
 import com.allnetworktools.data.PermissionsRepository
 import com.allnetworktools.data.RadiosRepository
 import com.allnetworktools.data.SettingsRepository
@@ -19,4 +20,5 @@ open class AntApplication : Application() {
     open val cell by lazy { CellRepository(this) }
     open val gnss by lazy { GnssRepository(this) }
     open val compass by lazy { CompassRepository(this) }
+    open val history by lazy { HistoryStore(this) }
 }

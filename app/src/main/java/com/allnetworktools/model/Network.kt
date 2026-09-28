@@ -52,7 +52,7 @@ enum class Tool(
     WifiScan(Network.Wifi, "Scanner Wi-Fi", Sym.WifiFind, implemented = true),
     Channels(Network.Wifi, "Analyseur de canaux", Sym.BarChart, Sym.Refresh),
     Lan(Network.Wifi, "Appareils du LAN", Sym.Devices, Sym.Refresh),
-    LanDevice(Network.Wifi, "Appareil du LAN", Sym.Devices, Sym.MoreVert),
+    LanDevice(Network.Wifi, "Appareil du LAN", Sym.Devices, Sym.MoreVert, ToolParent.Other(Lan)),
     Ping(Network.Wifi, "Ping", Sym.NetworkPing, Sym.IosShare),
     Trace(Network.Wifi, "Traceroute", Sym.Route, Sym.IosShare),
     Ports(Network.Wifi, "Scan de ports", Sym.Lan, Sym.IosShare),

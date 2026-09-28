@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -222,4 +223,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun markAsked(group: PermGroup) = updateSettings { markAsked(group.name) }
+
+    val tools = com.allnetworktools.ui.tools.ToolsHub(g, viewModelScope)
+    val history get() = g.history
+
+    init {
+        viewModelScope.launch { g.history.load(g.settings.settings.first().historyDays) }
+    }
 }

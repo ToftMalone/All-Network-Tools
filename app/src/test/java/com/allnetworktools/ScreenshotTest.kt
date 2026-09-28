@@ -10,6 +10,12 @@ import com.allnetworktools.data.ThemeMode
 import com.allnetworktools.model.Network
 import com.allnetworktools.model.Tool
 import com.allnetworktools.ui.AntApp
+import com.allnetworktools.ui.tools.Phase
+import com.allnetworktools.data.WifiBand
+import com.allnetworktools.data.net.DnsAnswer
+import com.allnetworktools.data.net.DnsRecord
+import com.allnetworktools.data.net.DnsType
+import com.allnetworktools.data.net.SpeedServer
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -41,13 +47,14 @@ class ScreenshotTest {
         Scenario.bleEmpty = false
     }
 
-    private fun shot(name: String, dark: Boolean = false, onboarding: Boolean = false, nav: NavState = NavState()) {
+    private fun shot(name: String, dark: Boolean = false, onboarding: Boolean = false, nav: NavState = NavState(), setup: (MainViewModel) -> Unit = {}) {
         runBlocking {
             app.settings.setTheme(if (dark) ThemeMode.Dark else ThemeMode.Light)
             app.settings.setOnboardingDone(!onboarding)
         }
         val vm = MainViewModel(app)
         vm.navigate { nav }
+        setup(vm)
         compose.mainClock.autoAdvance = false
         compose.setContent { AntApp(vm) }
         repeat(30) {
@@ -92,4 +99,69 @@ class ScreenshotTest {
     @Test fun settings() = shot("50_settings", nav = NavState(page = Page.Settings))
     @Test fun settingsDark() = shot("51_settings_dark", dark = true, nav = NavState(page = Page.Settings))
     @Test fun cellDashboardDark() = shot("32_cell_dashboard_dark", dark = true, nav = NavState(Network.Cellular, Page.Dashboard))
+
+    private fun tool(t: Tool, arg: String? = null) = NavState(Network.Wifi, Page.ToolPage(t, arg))
+
+    @Test fun channelsIdle() = shot("60_channels_idle", nav = tool(Tool.Channels))
+    @Test fun channelsResults() = shot("61_channels_results", nav = tool(Tool.Channels)) { vm ->
+        vm.tools.channels.band = WifiBand.B5
+        FakeData.scan.forEach { vm.tools.channels.seen[it.bssid] = it }
+        vm.tools.channels.phase = Phase.Results
+    }
+    @Test fun lanIdle() = shot("62_lan_idle", nav = tool(Tool.Lan))
+    @Test fun lanResults() = shot("63_lan_results", nav = tool(Tool.Lan)) { vm ->
+        vm.tools.lan.devices.addAll(FakeData.lan)
+        vm.tools.lan.subnet = "192.168.1.0/24"
+        vm.tools.lan.durationMs = 4800
+        vm.tools.lan.phase = Phase.Results
+    }
+    @Test fun lanDevice() = shot("64_lan_device", nav = tool(Tool.LanDevice, "192.168.1.23")) { vm ->
+        vm.tools.lan.devices.addAll(FakeData.lan)
+        vm.tools.lanDevice.ip = "192.168.1.23"
+        vm.tools.lanDevice.latency = 5f
+        vm.tools.lanDevice.services.addAll(listOf(8008 to "HTTP 200 OK", 8009 to null, 8443 to "HTTP 404 Not Found"))
+        vm.tools.lanDevice.phase = Phase.Results
+    }
+    @Test fun pingIdle() = shot("65_ping_idle", nav = tool(Tool.Ping))
+    @Test fun pingResults() = shot("66_ping_results", nav = tool(Tool.Ping)) { vm ->
+        val c = vm.tools.ping
+        c.resolved = "one.one.one.one"
+        c.results.addAll(listOf(13.2f, 12.8f, 15.1f, 14.0f, null, 13.6f, 29.4f, 12.9f, 13.3f, 14.2f))
+        c.phase = Phase.Results
+    }
+    @Test fun traceResults() = shot("67_trace_results", nav = tool(Tool.Trace)) { vm ->
+        val c = vm.tools.trace
+        c.target = "1.1.1.1"
+        c.hops.addAll(FakeData.hops)
+        c.phase = Phase.Results
+    }
+    @Test fun portsIdle() = shot("68_ports_idle", nav = tool(Tool.Ports))
+    @Test fun portsResults() = shot("69_ports_results", nav = tool(Tool.Ports)) { vm ->
+        val c = vm.tools.ports
+        c.host = "192.168.1.254"; c.total = 100; c.scanned = 100; c.closed = 93; c.filtered = 2
+        c.startedAt = 1000; c.endedAt = 1300
+        c.open.addAll(FakeData.ports)
+        c.phase = Phase.Results
+    }
+    @Test fun dnsResults() = shot("70_dns_results", nav = tool(Tool.Dns)) { vm ->
+        val c = vm.tools.dns
+        c.type = DnsType.NS; c.host = "google.com"
+        c.answer = DnsAnswer(0, (1..4).map { DnsRecord("NS", "ns$it.google.com", 21600) }, 9f)
+        listOf("Système" to 18f, "Cloudflare" to 9f, "Google" to 14f, "Quad9" to 21f).forEach { (k, v) -> c.compare[k] = v }
+        c.phase = Phase.Results
+    }
+    @Test fun speedEmpty() = shot("71_speed_empty", nav = tool(Tool.Speed)) { vm ->
+        vm.tools.speed.server = SpeedServer("Paris", "CDG", "Free SAS")
+    }
+    @Test fun speedResults() = shot("72_speed_results", nav = tool(Tool.Speed)) { vm ->
+        val c = vm.tools.speed
+        c.server = SpeedServer("Paris", "CDG", "Free SAS")
+        c.ping = 6f; c.jitter = 1.2f; c.down = 842f; c.up = 612f; c.current = 842f
+        c.phase = Phase.Results
+    }
+    @Test fun pingDark() = shot("73_ping_dark", dark = true, nav = tool(Tool.Ping)) { vm ->
+        vm.tools.ping.resolved = "one.one.one.one"
+        vm.tools.ping.results.addAll(listOf(13.2f, 12.8f, 15.1f, null, 13.6f))
+        vm.tools.ping.phase = Phase.Running
+    }
 }

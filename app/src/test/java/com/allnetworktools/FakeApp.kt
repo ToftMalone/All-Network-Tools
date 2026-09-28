@@ -66,7 +66,7 @@ private fun Context.fakeRadios() = object : RadiosRepository(this@fakeRadios) {
     override val locationEnabled: Flow<Boolean> = flowOf(true)
 }
 
-private val scan = listOf(
+internal val scan = listOf(
     WifiAp("Freebox-7A2C", "a4:3e:51:7c:2a:9f", -54, 5180, 80, "WPA3", ScanResult.WIFI_STANDARD_11AX, 5210),
     WifiAp("FreeWifi_secure", "a4:3e:51:7c:2a:a0", -58, 5180, 80, "WPA2-EAP", ScanResult.WIFI_STANDARD_11AX, 5210),
     WifiAp("Livebox-91F0", "70:fc:8f:11:22:33", -67, 5220, 80, "WPA2", ScanResult.WIFI_STANDARD_11AC, 5210),
@@ -202,4 +202,34 @@ class FakeApp : AntApplication() {
     override val cell by lazy { fakeCell() }
     override val gnss by lazy { fakeGnss() }
     override val compass by lazy { fakeCompass() }
+}
+
+object FakeData {
+    val scan get() = com.allnetworktools.scan
+
+    val lan = listOf(
+        com.allnetworktools.data.net.LanDevice("192.168.1.254", hostname = "freebox.lan", ms = 1f, isGateway = true, openPorts = setOf(80, 443)),
+        com.allnetworktools.data.net.LanDevice("192.168.1.42", isSelf = true),
+        com.allnetworktools.data.net.LanDevice("192.168.1.12", hostname = "macbook-air-de-lea.lan", ms = 4f, services = setOf("_companion-link._tcp")),
+        com.allnetworktools.data.net.LanDevice("192.168.1.20", hostname = "lgwebostv.lan", ms = 6f, services = setOf("_airplay._tcp")),
+        com.allnetworktools.data.net.LanDevice("192.168.1.23", mdnsName = "Chromecast Salon", ms = 5f, services = setOf("_googlecast._tcp")),
+        com.allnetworktools.data.net.LanDevice("192.168.1.31", hostname = "hp-laserjet.lan", ms = 9f, openPorts = setOf(9100, 631)),
+        com.allnetworktools.data.net.LanDevice("192.168.1.35", mdnsName = "Philips Hue", ms = 3f, services = setOf("_hue._tcp")),
+        com.allnetworktools.data.net.LanDevice("192.168.1.102", hostname = "esp32-18f36d.lan", ms = 14f),
+    )
+
+    val hops = listOf(
+        com.allnetworktools.ui.pages.wifi.Hop(1, "192.168.1.254", "freebox.lan", listOf(1.1f, 0.9f, 1.3f), "Passerelle · réseau local", false),
+        com.allnetworktools.ui.pages.wifi.Hop(2, "78.254.1.62", null, listOf(4.6f, 4.2f, 5.1f), "Routeur opérateur", false),
+        com.allnetworktools.ui.pages.wifi.Hop(3, null, null, listOf(null, null, null), "ICMP filtré par ce routeur", false),
+        com.allnetworktools.ui.pages.wifi.Hop(4, "37.49.237.10", "th2.franceix.net", listOf(6.1f, 6.0f, 6.6f), "Point d'échange Internet", false),
+        com.allnetworktools.ui.pages.wifi.Hop(5, "1.1.1.1", "one.one.one.one", listOf(6.4f, 6.2f, 6.5f), "Destination", true),
+    )
+
+    val ports = listOf(
+        com.allnetworktools.ui.pages.wifi.OpenPort(53, "domain", null, null),
+        com.allnetworktools.ui.pages.wifi.OpenPort(80, "http", "nginx · HTTP 200 OK", null),
+        com.allnetworktools.ui.pages.wifi.OpenPort(443, "https", "nginx · HTTP 403 Forbidden", null),
+        com.allnetworktools.ui.pages.wifi.OpenPort(445, "microsoft-ds", null, "Partage de fichiers exposé sur le réseau"),
+    )
 }
