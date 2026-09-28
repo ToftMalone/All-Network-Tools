@@ -107,7 +107,9 @@ fun AntTheme(settings: AppSettings, content: @Composable () -> Unit) {
         shapes = AntShapes,
         motionScheme = MotionScheme.expressive(),
     ) {
+        // Text without an explicit color falls back to LocalContentColor, which is black by default.
         CompositionLocalProvider(
+            androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onSurface,
             LocalNetworkColors provides netColors,
             LocalHaptics provides haptics,
             LocalAppSettings provides settings,
