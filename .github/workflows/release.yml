@@ -1,9 +1,13 @@
 name: Release
 
-# Pousser un tag « vX.Y » construit l'APK et publie une release GitHub avec l'APK en pièce jointe.
+# Construit l'APK et publie une release GitHub avec l'APK en pièce jointe, quand :
+#  - un tag « vX.Y » est poussé, ou
+#  - le fichier .github/release-version change (son contenu est le tag à créer, ex. « v0.1 »).
 on:
   push:
     tags: ['v*']
+    branches: ['**']
+    paths: ['.github/release-version']
 
 permissions:
   contents: write
@@ -13,6 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Déterminer le tag
+        id: tag
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then t="${{ github.ref_name }}"; else t="$(tr -d ' \n\r' < .github/release-version)"; fi
+          test -f ".github/release-notes/$t.md"
+          echo "name=$t" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v4
         with:
@@ -35,11 +46,14 @@ jobs:
           -Pandroid.injected.signing.key.password=android
 
       - name: Nommer l'APK
-        run: cp app/build/outputs/apk/release/app-release.apk "AllNetworkTools-${{ github.ref_name }}.apk"
+        run: cp app/build/outputs/apk/release/app-release.apk "AllNetworkTools-${{ steps.tag.outputs.name }}.apk"
 
       - name: Publier la release
         uses: softprops/action-gh-release@v2
         with:
-          name: All Network Tools ${{ github.ref_name }}
-          body_path: .github/release-notes/${{ github.ref_name }}.md
-          files: AllNetworkTools-${{ github.ref_name }}.apk
+          tag_name: ${{ steps.tag.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: All Network Tools ${{ steps.tag.outputs.name }}
+          body_path: .github/release-notes/${{ steps.tag.outputs.name }}.md
+          files: AllNetworkTools-${{ steps.tag.outputs.name }}.apk
+          make_latest: true
