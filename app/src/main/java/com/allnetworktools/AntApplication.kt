@@ -21,4 +21,5 @@ open class AntApplication : Application() {
     open val gnss by lazy { GnssRepository(this) }
     open val compass by lazy { CompassRepository(this) }
     open val history by lazy { HistoryStore(this) }
+    open val usage by lazy { com.allnetworktools.data.UsageRepository(this) }
 }

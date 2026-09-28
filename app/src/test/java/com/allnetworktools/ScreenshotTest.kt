@@ -19,6 +19,8 @@ import com.allnetworktools.data.net.SpeedServer
 import com.allnetworktools.data.BleDevice
 import com.allnetworktools.data.BleKind
 import com.allnetworktools.data.GattNames
+import com.allnetworktools.data.CellEvent
+import com.allnetworktools.data.SignalSample
 import com.allnetworktools.ui.pages.bt.GattCharUi
 import com.allnetworktools.ui.pages.bt.GattConn
 import com.allnetworktools.ui.pages.bt.GattServiceUi
@@ -52,6 +54,7 @@ class ScreenshotTest {
         Scenario.gnssDenied = false
         Scenario.throttled = false
         Scenario.bleEmpty = false
+        Scenario.usageGranted = false
     }
 
     private fun shot(name: String, dark: Boolean = false, onboarding: Boolean = false, nav: NavState = NavState(), setup: (MainViewModel) -> Unit = {}) {
@@ -225,5 +228,61 @@ class ScreenshotTest {
         c.follow(BleDevice("E6:43:9A:0C:71:D8", "Tile Mate", -48, null, BleKind.Beacon, "Tile", false, 0))
         c.history.addAll(listOf(-70f, -66f, -62f, -58f, -55f, -52f, -49f, -48f))
         c.rssi = -48f
+    }
+
+    private fun cellTool(t: Tool, arg: String? = null) = NavState(Network.Cellular, Page.ToolPage(t, arg))
+    private fun gnssTool(t: Tool) = NavState(Network.Gnss, Page.ToolPage(t))
+
+    private fun seedHistory() = runBlocking {
+        val now = System.currentTimeMillis()
+        val h = app.history
+        h.clear()
+        listOf(
+            CellEvent(now - 30 * 86_400_000L / 30 - 3_600_000, "down", "5G → 4G", "PCI 187 → 445 · n78 → B1", -115, "Perte de couverture NR", "LTE"),
+            CellEvent(now - 7_200_000, "handover", "Changement de cellule LTE", "PCI 445 → 322 · B1 → B3", -97, "eNB 81342", "LTE"),
+            CellEvent(now - 3_000_000, "down", "5G → 4G", "PCI 412 → 97 · n78 → B20", -108, "Perte de couverture NR", "LTE"),
+            CellEvent(now - 2_400_000, "up", "4G → 5G", "PCI 97 → 412 · B20 → n78", -95, "Retour de la couverture NR", "NR"),
+            CellEvent(now - 600_000, "handover", "Changement de cellule NR", "PCI 412 → 187 · n78", -92, "Même gNB 574187", "NR"),
+        ).forEach { h.addCellEvent(it) }
+        for (i in 0 until 24 * 60 step 4) {
+            val at = now - (24 * 60 - i) * 60_000L
+            val lte = i in 300..420 || i in 1000..1080
+            val base = if (lte) -101.0 else -92.0
+            h.addSignal(SignalSample(at, if (lte) "LTE" else "NR", (base + 5 * Math.sin(i / 37.0)).toInt(), -11 + (i / 50) % 4, 14 - (i / 70) % 6))
+        }
+    }
+
+    @Test fun cellLog() {
+        seedHistory(); shot("90_cell_log", nav = cellTool(Tool.CellLog))
+    }
+    @Test fun cellLogPaused() {
+        seedHistory(); shot("91_cell_log_paused", dark = true, nav = cellTool(Tool.CellLog)) { it.recorder.setEnabled(false) }
+    }
+    @Test fun signalHistory() {
+        seedHistory(); shot("92_signal_history", nav = cellTool(Tool.SignalHistory))
+    }
+    @Test fun signalHistoryEmpty() {
+        runBlocking { app.history.clear() }; shot("93_signal_history_empty", nav = cellTool(Tool.SignalHistory))
+    }
+    @Test fun dataUsageDenied() = shot("94_data_usage_denied", nav = cellTool(Tool.DataUsage))
+    @Test fun dataUsage() {
+        Scenario.usageGranted = true
+        runBlocking { app.settings.setDataPlanGb(20) }
+        shot("95_data_usage", nav = cellTool(Tool.DataUsage))
+    }
+    @Test fun cellDetail() = shot("96_cell_detail", nav = cellTool(Tool.CellDetail, "serving"))
+    @Test fun nmea() = shot("97_nmea", nav = gnssTool(Tool.Nmea)) { vm ->
+        val c = vm.tools.nmea
+        val t = System.currentTimeMillis()
+        listOf(
+            "\$GPGGA,123519.00,4851.2152,N,00221.1234,E,1,12,0.8,42.1,M,47.0,M,,*5C",
+            "\$GNGSA,A,3,05,13,15,18,20,23,24,,,,,,1.3,0.8,1.0,1*07",
+            "\$GPGSV,3,1,12,05,41,295,43,13,62,050,45,15,34,103,40,18,17,168,33,1*6B",
+            "\$GAGSV,2,1,07,02,27,248,38,07,53,137,44,08,61,292,46,26,12,040,29,7*7E",
+            "\$GNRMC,123519.00,A,4851.2152,N,00221.1234,E,0.02,,280926,,,A,V*1F",
+            "\$GNVTG,,T,,M,0.02,N,0.04,K,A*3D",
+            "\$GNGLL,4851.2152,N,00221.1234,E,123519.00,A,A*7A",
+        ).let { batch -> repeat(3) { r -> batch.forEach { c.add(t + r * 1000, it) } } }
+        c.live = false
     }
 }

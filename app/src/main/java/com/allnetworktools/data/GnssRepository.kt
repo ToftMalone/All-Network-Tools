@@ -111,6 +111,24 @@ open class GnssRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Raw NMEA 0183 sentences with their receive time. A GPS location request keeps the
+     * receiver running, since the chipset only emits sentences while it is active.
+     */
+    open fun nmea(): Flow<Pair<Long, String>> = callbackFlow {
+        val mgr = lm ?: run { awaitClose { }; return@callbackFlow }
+        val listener = OnNmeaMessageListener { msg, ts -> trySend(ts to msg.trim()) }
+        val keepAlive = LocationListener { }
+        runCatching {
+            mgr.addNmeaListener(context.mainExecutor, listener)
+            mgr.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, keepAlive, context.mainLooper)
+        }.onFailure { close(it) }
+        awaitClose {
+            mgr.removeNmeaListener(listener)
+            mgr.removeUpdates(keepAlive)
+        }
+    }
+
     /** Fix type from GSA and HDOP from GGA/GSA. */
     private fun parseNmea(msg: String): Pair<FixType?, Float?>? {
         val body = msg.trim().substringBefore('*')

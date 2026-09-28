@@ -16,6 +16,16 @@ class MainActivity : ComponentActivity() {
         setContent { AntApp(vm) }
     }
 
+    override fun onStart() {
+        super.onStart()
+        vm.setForeground(true)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        vm.setForeground(false)
+    }
+
     override fun onResume() {
         super.onResume()
         vm.refreshPermissions()

@@ -229,7 +229,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val tools = com.allnetworktools.ui.tools.ToolsHub(g, viewModelScope)
     val history get() = g.history
 
+    // ---- Recording ------------------------------------------------------------------------------
+
+    private val foreground = MutableStateFlow(false)
+    fun setForeground(v: Boolean) {
+        foreground.value = v
+    }
+
+    val recorder = com.allnetworktools.data.CellRecorder(g.history)
+
+    fun nmea() = g.gnss.nmea()
+
     init {
         viewModelScope.launch { g.history.load(g.settings.settings.first().historyDays) }
+        viewModelScope.launch {
+            combine(foreground, recorder.enabled) { fg, on -> fg && on }.distinctUntilChanged().collectLatest { active ->
+                if (active) cell.collect { recorder.onState(it.state) }
+            }
+        }
     }
 }

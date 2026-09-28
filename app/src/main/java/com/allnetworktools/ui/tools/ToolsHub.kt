@@ -3,6 +3,8 @@ package com.allnetworktools.ui.tools
 import com.allnetworktools.AntApplication
 import com.allnetworktools.data.net.LanScanner
 import com.allnetworktools.ui.pages.bt.GattController
+import com.allnetworktools.ui.pages.cell.DataUsageController
+import com.allnetworktools.ui.pages.gnss.NmeaController
 import com.allnetworktools.ui.pages.bt.TrackerController
 import com.allnetworktools.ui.pages.wifi.ChannelsController
 import com.allnetworktools.ui.pages.wifi.DnsController
@@ -28,4 +30,6 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val speed by lazy { SpeedController(scope, app.history) }
     val gatt by lazy { GattController(app, scope) }
     val tracker by lazy { TrackerController(app, scope) }
+    val dataUsage by lazy { DataUsageController(scope, app.usage) }
+    val nmea by lazy { NmeaController() }
 }

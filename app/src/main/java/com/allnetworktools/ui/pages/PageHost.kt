@@ -57,6 +57,11 @@ import com.allnetworktools.ui.pages.bt.GattTool
 import com.allnetworktools.ui.pages.bt.PairedTool
 import com.allnetworktools.ui.pages.bt.TrackerTool
 import com.allnetworktools.ui.pages.cell.CellDashboard
+import com.allnetworktools.ui.pages.cell.CellDetailTool
+import com.allnetworktools.ui.pages.cell.CellLogTool
+import com.allnetworktools.ui.pages.cell.DataUsageTool
+import com.allnetworktools.ui.pages.cell.SignalHistoryTool
+import com.allnetworktools.ui.pages.gnss.NmeaTool
 import com.allnetworktools.ui.pages.cell.NeighborCells
 import com.allnetworktools.ui.pages.gnss.CompassTool
 import com.allnetworktools.ui.pages.gnss.GnssDashboard
@@ -179,6 +184,21 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.Neighbors -> NeighborCells(vm)
             Tool.Compass -> CompassTool(vm)
             Tool.Gatt, Tool.Paired, Tool.Tracker -> BtToolRoute(vm, page)
+            Tool.CellLog -> CellLogTool(vm)
+            Tool.SignalHistory -> SignalHistoryTool(vm)
+            Tool.DataUsage -> {
+                val perms by vm.permissions.collectAsStateWithLifecycle()
+                val actions = LocalActions.current
+                DataUsageTool(
+                    vm.tools.dataUsage, PermGroup.UsageAccess in perms, com.allnetworktools.ui.theme.AntTheme.settings.dataPlanGb,
+                    onGrant = { actions.request(PermGroup.UsageAccess) },
+                    onPlan = { gb -> vm.updateSettings { setDataPlanGb(gb) } },
+                )
+            }
+            Tool.CellDetail -> CellDetailTool(vm.cell.collectAsStateWithLifecycle().value.state, page.arg) {
+                vm.navigate { it.copy(page = Page.ToolPage(Tool.Neighbors)) }
+            }
+            Tool.Nmea -> NmeaTool(vm.tools.nmea, vm::nmea)
             Tool.Channels, Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed -> WifiToolRoute(vm, page)
             else -> ComingSoon(page.tool)
         }
