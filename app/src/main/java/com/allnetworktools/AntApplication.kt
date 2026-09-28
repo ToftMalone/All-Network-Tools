@@ -22,4 +22,6 @@ open class AntApplication : Application() {
     open val compass by lazy { CompassRepository(this) }
     open val history by lazy { HistoryStore(this) }
     open val usage by lazy { com.allnetworktools.data.UsageRepository(this) }
+    val recording by lazy { com.allnetworktools.service.RecordingController(this) }
+    val cellRecorder by lazy { com.allnetworktools.data.CellRecorder(history) }
 }

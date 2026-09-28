@@ -104,12 +104,12 @@ private fun Context.fakeWifi() = object : WifiRepository(this@fakeWifi) {
 }
 
 private val bleDevices = listOf(
-    BleDevice("F4:0E:11:A2:3C:9B", "Pixel Buds Pro 2", -48, -12, BleKind.Audio, "Google", true, 0, listOf("0xFE2C", "0x184E"), "00E0 01 4A 7C 22 0F", 0x1A, 102),
-    BleDevice("C8:2A:DD:14:07:E1", "Pixel Watch 3", -55, null, BleKind.Watch, "Google", true, 0),
+    BleDevice("F4:0E:11:A2:3C:9B", "Pixel Buds Pro 2", -48, -12, BleKind.Audio, "Google", true, 0, listOf("0xFE2C", "0x184E"), "00E0 01 4A 7C 22 0F", 0x1A, 102, 0x00E0, "02011A0303FE2C07FFE000014A7C22"),
+    BleDevice("C8:2A:DD:14:07:E1", "Pixel Watch 3", -55, null, BleKind.Watch, "Google", true, 0, companyId = 0x00E0),
     BleDevice("70:99:1C:5B:E2:40", "JBL Flip 6", -71, null, BleKind.Audio, "Harman", true, 0),
     BleDevice("E6:43:9A:0C:71:D8", "Tile Mate", -74, null, BleKind.Beacon, "Tile", false, 0),
     BleDevice("D2:5F:88:31:AA:06", "Mi Smart Band 8", -79, null, BleKind.Watch, "Xiaomi", true, 0),
-    BleDevice("5A:1B:C7:9E:22:F3", null, -84, null, BleKind.Unknown, "Apple, Inc.", false, 0),
+    BleDevice("5A:1B:C7:9E:22:F3", null, -84, null, BleKind.Unknown, "Apple, Inc.", false, 0, companyId = 0x004C, raw = "02011A0AFF4C0010050B1C8E3D21"),
     BleDevice("2C:41:A1:6D:90:3B", "LE-Bose QC45", -88, null, BleKind.Audio, "Bose", true, 0),
 )
 

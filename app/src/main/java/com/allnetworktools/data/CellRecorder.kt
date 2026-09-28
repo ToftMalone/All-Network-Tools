@@ -1,8 +1,5 @@
 package com.allnetworktools.data
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 private val RadioTech.rank get() = when (this) {
     RadioTech.NR -> 4; RadioTech.LTE -> 3; RadioTech.WCDMA -> 2; RadioTech.GSM -> 1
@@ -17,20 +14,15 @@ private val RadioTech.node get() = if (this == RadioTech.NR) "gNB" else "eNB"
 /**
  * Turns successive serving-cell states into journal events (cell changes, technology changes,
  * loss and recovery of service) and records one signal sample per minute.
- * Runs only while the app is in the foreground and recording is not paused.
+ * Driven by the recording service, only for the recordings the user started.
  */
 class CellRecorder(private val history: HistoryStore, private val clock: () -> Long = System::currentTimeMillis) {
-    private val _enabled = MutableStateFlow(true)
-    val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
-    private val _pausedAt = MutableStateFlow<Long?>(null)
-    val pausedAt: StateFlow<Long?> = _pausedAt.asStateFlow()
     private var last: CellState? = null
     private var lastSampleAt = 0L
 
-    fun setEnabled(on: Boolean) {
-        _enabled.value = on
-        _pausedAt.value = if (on) null else clock()
-        if (!on) last = null
+    fun reset() {
+        last = null
+        lastSampleAt = 0L
     }
 
     /** Pure diff of two states, exposed for tests. */
@@ -69,16 +61,15 @@ class CellRecorder(private val history: HistoryStore, private val clock: () -> L
         return listOfNotNull(pci, band).joinToString(" · ")
     }
 
-    suspend fun onState(cur: CellState?) {
-        if (!_enabled.value) return
+    suspend fun onState(cur: CellState?, logEvents: Boolean, sampleSignal: Boolean) {
         if (cur == null) {
             last = null; return
         }
         val now = clock()
-        last?.let { prev -> diff(prev, cur, now)?.let { history.addCellEvent(it) } }
+        if (logEvents) last?.let { prev -> diff(prev, cur, now)?.let { history.addCellEvent(it) } }
         last = cur
         val s = cur.serving
-        if (s != null && now - lastSampleAt >= 60_000) {
+        if (sampleSignal && s != null && now - lastSampleAt >= 60_000) {
             lastSampleAt = now
             history.addSignal(SignalSample(now, s.tech.name, s.rsrp, s.rsrq, s.sinr))
         }

@@ -23,6 +23,10 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+enum class BleVendor(val label: String) {
+    Apple("Apple"), Microsoft("Microsoft"), Samsung("Samsung"), Google("Google"), Mesh("Bluetooth Mesh"), Beacon("Beacons"),
+}
+
 enum class BleKind(val label: String, val filter: String) {
     Audio("Audio", "Audio"),
     Watch("Montre", "Montres"),
@@ -45,7 +49,36 @@ data class BleDevice(
     val flags: Int? = null,
     /** Mean gap between received advertisements, a lower bound of the real interval. */
     val intervalMs: Int? = null,
+    val companyId: Int? = null,
+    /** Raw advertising + scan response payload, uppercase hex without separators. */
+    val raw: String? = null,
 ) {
+    /** AD structure types present in [raw] (0x01 flags, 0xFF manufacturer data, 0x2A mesh…). */
+    val adTypes: Set<Int>
+        get() {
+            val hex = raw ?: return emptySet()
+            val out = mutableSetOf<Int>()
+            var i = 0
+            while (i + 4 <= hex.length) {
+                val len = hex.substring(i, i + 2).toInt(16)
+                if (len == 0) break
+                out += hex.substring(i + 2, i + 4).toInt(16)
+                i += (len + 1) * 2
+            }
+            return out
+        }
+
+    val vendors: Set<BleVendor>
+        get() = buildSet {
+            val svc = services.toSet()
+            if (companyId == 0x004C) add(BleVendor.Apple)
+            if (companyId == 0x0006) add(BleVendor.Microsoft)
+            if (companyId == 0x0075 || "0xFD5A" in svc || "0xFD69" in svc) add(BleVendor.Samsung)
+            if (companyId == 0x00E0 || svc.any { it in setOf("0xFE2C", "0xFEF3", "0xFE9F", "0xFCF1", "0xFE8F") }) add(BleVendor.Google)
+            if ("0x1827" in svc || "0x1828" in svc || adTypes.any { it in 0x29..0x2B }) add(BleVendor.Mesh)
+            if (kind == BleKind.Beacon || "0xFEAA" in svc) add(BleVendor.Beacon)
+        }
+
     val displayName: String get() = name ?: "Inconnu"
 
     /** Stable pseudo-angle so a device keeps its place on the radar. */
@@ -95,6 +128,17 @@ private val Companies = mapOf(
     0x0078 to "Nike", 0x00C4 to "LG Electronics", 0x0002 to "Intel", 0x001D to "Qualcomm",
     0x000A to "Qualcomm", 0x0046 to "MediaTek", 0x0030 to "ST Microelectronics", 0x02FF to "Fitbit",
 )
+
+/** Hex of the AD structures, dropping the zero padding Android leaves after them. */
+private fun rawHex(bytes: ByteArray): String {
+    var end = 0
+    while (end < bytes.size) {
+        val len = bytes[end].toInt() and 0xFF
+        if (len == 0 || end + len >= bytes.size) break
+        end += len + 1
+    }
+    return bytes.copyOf(end).joinToString("") { "%02X".format(it) }
+}
 
 private fun uuid16(u: ParcelUuid): Int? {
     val s = u.uuid.toString()
@@ -292,6 +336,8 @@ open class BluetoothRepository(private val context: Context) {
                         "%04X ".format(mfg.keyAt(0)) + mfg.valueAt(0).joinToString(" ") { "%02X".format(it) }
                     } else prev?.manufacturerHex,
                     flags = record?.advertiseFlags?.takeIf { it >= 0 } ?: prev?.flags,
+                    companyId = if (mfg != null && mfg.isNotEmpty()) mfg.keyAt(0) else prev?.companyId,
+                    raw = record?.bytes?.let(::rawHex) ?: prev?.raw,
                     intervalMs = when {
                         gap == null -> prev?.intervalMs
                         prev?.intervalMs == null -> gap

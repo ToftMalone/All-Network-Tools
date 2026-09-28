@@ -82,7 +82,8 @@ fun BleScanner(vm: MainViewModel) {
     val devices = if (paused) frozen else vm.ble.collectAsStateWithLifecycle().value.also { frozen = it }
     TopBarAction(if (paused) Sym.PlayArrow else Sym.Pause) { haptics.segment(); paused = !paused }
 
-    val shown = devices.filter { filter == ALL || it.kind.filter == filter }.sortedByDescending { it.rssi }
+    val f = vm.tools.bleFilter
+    val shown = devices.filter { (filter == ALL || it.kind.filter == filter) && f.matches(it) }.sortedByDescending { it.rssi }
     val roles = AntTheme.net.bt
     PageColumn {
         SectionCard(shape = RoundedCornerShape(32.dp)) {
@@ -101,6 +102,8 @@ fun BleScanner(vm: MainViewModel) {
                 }
             }
         }
+        BleSearchBar(f) { f.sheetOpen = true }
+        BleActiveFilters(f) { f.sheetOpen = true }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (listOf(ALL) + BleKind.entries.map { it.filter }).forEach { f ->
                 AntFilterChip(f, filter == f, { filter = f }, roles.container, roles.onContainer)
@@ -114,16 +117,21 @@ fun BleScanner(vm: MainViewModel) {
         if (shown.isEmpty()) {
             SectionCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 28.dp)) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Aucun appareil à proximité", style = gs(20, 26, 500), textAlign = TextAlign.Center)
+                    Text(if (devices.isEmpty()) "Aucun appareil à proximité" else "Aucun appareil ne correspond", style = gs(20, 26, 500), textAlign = TextAlign.Center)
                     Text(
-                        "Le scan continue. Vérifiez que les appareils sont allumés et en mode visible.",
+                        if (devices.isEmpty()) "Le scan continue. Vérifiez que les appareils sont allumés et en mode visible."
+                        else "${devices.size} ${plural(devices.size, "appareil")} masqués par les filtres.",
                         Modifier.padding(top = 6.dp), style = rf(14, 20), color = cs.onSurfaceVariant, textAlign = TextAlign.Center,
                     )
                     PillButton(
-                        "Relancer le scan",
+                        if (devices.isEmpty()) "Relancer le scan" else "Réinitialiser les filtres",
                         {
-                            paused = false
-                            vm.restartBleScan()
+                            if (devices.isEmpty()) {
+                                paused = false
+                                vm.restartBleScan()
+                            } else {
+                                f.reset(); f.text = ""; f.nameMode = NameMode.All; filter = ALL
+                            }
                         },
                         Modifier.padding(top = 16.dp), bg = roles.accent, height = 40.dp, outlined = true,
                     )
@@ -136,6 +144,7 @@ fun BleScanner(vm: MainViewModel) {
             }
         }
     }
+    if (f.sheetOpen) BleFilterSheet(f, shown.size, devices.size) { f.sheetOpen = false }
 }
 
 @Composable

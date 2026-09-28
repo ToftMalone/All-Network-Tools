@@ -253,10 +253,12 @@ class ScreenshotTest {
     }
 
     @Test fun cellLog() {
-        seedHistory(); shot("90_cell_log", nav = cellTool(Tool.CellLog))
+        seedHistory(); app.recording.start(com.allnetworktools.service.RecKind.CellLog)
+        shot("90_cell_log", nav = cellTool(Tool.CellLog))
     }
-    @Test fun cellLogPaused() {
-        seedHistory(); shot("91_cell_log_paused", dark = true, nav = cellTool(Tool.CellLog)) { it.recorder.setEnabled(false) }
+    @Test fun cellLogStopped() {
+        seedHistory(); app.recording.stopAll()
+        shot("91_cell_log_stopped", dark = true, nav = cellTool(Tool.CellLog))
     }
     @Test fun signalHistory() {
         seedHistory(); shot("92_signal_history", nav = cellTool(Tool.SignalHistory))
@@ -284,5 +286,60 @@ class ScreenshotTest {
             "\$GNGLL,4851.2152,N,00221.1234,E,123519.00,A,A*7A",
         ).let { batch -> repeat(3) { r -> batch.forEach { c.add(t + r * 1000, it) } } }
         c.live = false
+    }
+
+    @Test fun sky() = shot("A0_gnss_sky", nav = gnssTool(Tool.Sky))
+    @Test fun skyMap() = shot("A1_gnss_sky_map", nav = gnssTool(Tool.Sky)) { it.tools.skyView.value = com.allnetworktools.ui.pages.gnss.SkyView.Map }
+    @Test fun skyMapDark() = shot("A2_gnss_sky_map_dark", dark = true, nav = gnssTool(Tool.Sky)) { it.tools.skyView.value = com.allnetworktools.ui.pages.gnss.SkyView.Map }
+
+    @Test fun bleFiltered() = shot("B0_ble_filtered", nav = bt(Tool.BleScan)) { vm ->
+        vm.tools.bleFilter.exclude = setOf(com.allnetworktools.data.BleVendor.Apple)
+        vm.tools.bleFilter.minRssi = -80
+        vm.tools.bleFilter.nameMode = com.allnetworktools.ui.pages.bt.NameMode.Named
+    }
+    @Test fun bleFilterSheet() = shot("B1_ble_filter_sheet", nav = bt(Tool.BleScan)) { vm ->
+        vm.tools.bleFilter.raw = "0xFF4C00"
+        vm.tools.bleFilter.include = setOf(com.allnetworktools.data.BleVendor.Google)
+        vm.tools.bleFilter.sheetOpen = true
+    }
+    @Test fun upnp() = shot("B2_upnp", nav = tool(Tool.Upnp)) { vm ->
+        val c = vm.tools.upnp
+        c.devices.addAll(
+            listOf(
+                com.allnetworktools.data.net.UpnpDevice("192.168.1.254", "http://192.168.1.254:5678/desc.xml", "Linux/4.19 UPnP/1.0", "Freebox Server", "Free", "Freebox v7", "urn:schemas-upnp-org:device:InternetGatewayDevice:2", listOf("Layer3Forwarding", "WANIPConnection"), "http://192.168.1.254/"),
+                com.allnetworktools.data.net.UpnpDevice("192.168.1.20", "http://192.168.1.20:1500/", "WebOS/4.0 UPnP/1.0", "[LG] webOS TV OLED55C1", "LG Electronics", "OLED55C1", "urn:schemas-upnp-org:device:MediaRenderer:1", listOf("AVTransport", "RenderingControl", "ConnectionManager")),
+                com.allnetworktools.data.net.UpnpDevice("192.168.1.30", "http://192.168.1.30:5000/ssdp/desc-DSM-eth0.xml", "Synology/DSM UPnP/1.0", "NAS-Maison (DS220+)", "Synology", "DS220+", "urn:schemas-upnp-org:device:Basic:1"),
+            ),
+        )
+        c.expanded["http://192.168.1.254:5678/desc.xml"] = true
+        c.phase = com.allnetworktools.ui.tools.Phase.Results
+    }
+    @Test fun bonjour() = shot("B3_bonjour", nav = tool(Tool.Bonjour)) { vm ->
+        val c = vm.tools.bonjour
+        c.services.addAll(
+            listOf(
+                com.allnetworktools.data.net.BonjourService("_googlecast._tcp", "Chromecast Salon", "192.168.1.23", 8009, mapOf("md" to "Chromecast", "fn" to "Salon")),
+                com.allnetworktools.data.net.BonjourService("_googlecast._tcp", "Nest Mini Cuisine", "192.168.1.41", 8009, mapOf("md" to "Google Nest Mini")),
+                com.allnetworktools.data.net.BonjourService("_ipp._tcp", "HP LaserJet M110w", "192.168.1.60", 631, mapOf("ty" to "HP LaserJet M110w")),
+                com.allnetworktools.data.net.BonjourService("_airplay._tcp", "MacBook Air de Léa", "192.168.1.12", 7000, mapOf("model" to "Mac14,2")),
+                com.allnetworktools.data.net.BonjourService("_hap._tcp", "Hue Bridge", "192.168.1.70", 8080, emptyMap()),
+            ),
+        )
+        c.phase = com.allnetworktools.ui.tools.Phase.Results
+    }
+    @Test fun whois() = shot("B4_whois", nav = tool(Tool.Whois)) { vm ->
+        val c = vm.tools.whois
+        c.query = "google.com"
+        c.result = com.allnetworktools.data.net.WhoisResult(
+            "google.com", false,
+            listOf(
+                com.allnetworktools.data.net.WhoisHop("whois.iana.org", "refer: whois.verisign-grs.com"),
+                com.allnetworktools.data.net.WhoisHop(
+                    "whois.markmonitor.com",
+                    "Domain Name: google.com\nRegistrar: MarkMonitor, Inc.\nCreation Date: 1997-09-15T07:00:00+0000\nRegistrar Registration Expiration Date: 2028-09-13T07:00:00+0000\nUpdated Date: 2024-08-02T02:17:33+0000\nRegistrant Organization: Google LLC\nRegistrant Country: US\nName Server: ns1.google.com\nName Server: ns2.google.com\nDomain Status: clientUpdateProhibited (https://www.icann.org/epp#clientUpdateProhibited)\nDNSSEC: unsigned",
+                ),
+            ),
+        )
+        c.phase = com.allnetworktools.ui.tools.Phase.Results
     }
 }

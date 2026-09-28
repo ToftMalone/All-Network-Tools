@@ -116,6 +116,14 @@ class AppActions(
         launch(Intent.createChooser(send, title))
     }
 
+    /** Shares a file from app storage through the FileProvider declared in the manifest. */
+    fun shareFile(file: java.io.File, mime: String, title: String) {
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        val send = Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri).putExtra(Intent.EXTRA_SUBJECT, title)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        launch(Intent.createChooser(send, title))
+    }
+
     fun openUrl(url: String) = launch(Intent(Intent.ACTION_VIEW, url.toUri()))
 
     fun copy(label: String, text: String) {

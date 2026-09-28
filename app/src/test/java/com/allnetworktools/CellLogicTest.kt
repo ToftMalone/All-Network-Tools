@@ -86,4 +86,47 @@ class CellLogicTest {
         assertEquals(Heat.Found, heatOf(-45f))
         assertEquals(Heat.Cold, heatOf(-80f))
     }
+
+    @Test fun subSatellitePoint() {
+        // Straight overhead: the satellite is above us.
+        val (lat, lon) = com.allnetworktools.data.SatGeo.subPoint(48.85, 2.35, 0.0, 90.0, 20_180.0)
+        assertEquals(48.85, lat, 0.01)
+        assertEquals(2.35, lon, 0.01)
+        // On the horizon due south a GEO satellite sits ~81° of arc away (on the equator or below it).
+        val (lat2, _) = com.allnetworktools.data.SatGeo.subPoint(0.0, 0.0, 180.0, 0.0, 35_786.0)
+        assertEquals(-81.3, lat2, 0.3)
+    }
+
+    @Test fun countryLookup() {
+        val world = com.allnetworktools.data.WorldMap.parse(
+            ApplicationProvider.getApplicationContext<android.content.Context>().assets.open("world/countries.txt").bufferedReader().readText(),
+        )
+        assertEquals("France", com.allnetworktools.data.WorldMap.countryAt(world, 46.5, 2.5))
+        assertEquals("Brésil", com.allnetworktools.data.WorldMap.countryAt(world, -10.0, -52.0))
+        assertNull(com.allnetworktools.data.WorldMap.countryAt(world, 0.0, -30.0))
+        assertEquals("Océan Atlantique", com.allnetworktools.data.WorldMap.oceanAt(0.0, -30.0))
+    }
+
+    @Test fun bleFilters() {
+        fun dev(name: String?, rssi: Int, company: Int?, raw: String?, services: List<String> = emptyList()) =
+            com.allnetworktools.data.BleDevice("AA:BB:CC:DD:EE:0${rssi and 7}", name, rssi, null, com.allnetworktools.data.BleKind.Unknown, null, true, 0, services, companyId = company, raw = raw)
+        val apple = dev(null, -60, 0x004C, "02011A0AFF4C0010050B1C8E3D21")
+        val pixel = dev("Pixel Buds", -75, 0x00E0, null, listOf("0xFE2C"))
+        val mesh = dev("Node", -90, null, "020106030328180B2A0011")
+        val f = com.allnetworktools.ui.pages.bt.BleFilterState()
+        assertTrue(listOf(apple, pixel, mesh).all(f::matches))
+        assertEquals(setOf(com.allnetworktools.data.BleVendor.Mesh), mesh.vendors)
+        f.raw = "0xff 4c00"
+        assertEquals(listOf(apple), listOf(apple, pixel, mesh).filter(f::matches))
+        f.raw = ""; f.nameMode = com.allnetworktools.ui.pages.bt.NameMode.Named; f.minRssi = -80
+        assertEquals(listOf(pixel), listOf(apple, pixel, mesh).filter(f::matches))
+        f.nameMode = com.allnetworktools.ui.pages.bt.NameMode.All; f.minRssi = com.allnetworktools.ui.pages.bt.RssiOff
+        f.toggleExclude(com.allnetworktools.data.BleVendor.Google)
+        assertEquals(listOf(apple, mesh), listOf(apple, pixel, mesh).filter(f::matches))
+        f.toggleInclude(com.allnetworktools.data.BleVendor.Google)
+        assertTrue(f.exclude.isEmpty())
+        assertEquals(listOf(pixel), listOf(apple, pixel, mesh).filter(f::matches))
+        f.text = "ee:05"
+        assertTrue(f.matches(pixel))
+    }
 }

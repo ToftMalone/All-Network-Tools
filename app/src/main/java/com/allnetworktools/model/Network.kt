@@ -14,7 +14,7 @@ enum class Network(
     Wifi("Wi-Fi", Sym.Wifi, "Scan", LeadCorners(24f, 24f, 24f, 24f)),
     Bluetooth("Bluetooth", Sym.Bluetooth, "BLE", LeadCorners(18f, 18f, 18f, 18f)),
     Cellular("Réseau mobile", Sym.CellBars3, "Cellules", LeadCorners(24f, 24f, 12f, 24f)),
-    Gnss("GNSS", Sym.SatelliteAlt, "Boussole", LeadCorners(14f, 24f, 14f, 24f)),
+    Gnss("GNSS", Sym.SatelliteAlt, "Ciel", LeadCorners(14f, 24f, 14f, 24f)),
     ;
 
     // Getters rather than constructor arguments: Tool's entries reference Network, so eager
@@ -26,10 +26,10 @@ enum class Network(
             Wifi -> Tool.WifiScan
             Bluetooth -> Tool.BleScan
             Cellular -> Tool.Neighbors
-            Gnss -> Tool.Compass
+            Gnss -> Tool.Sky
         }
 
-    /** Tool reachable directly from the dock; GNSS has none, its compass lives in the Tools page. */
+    /** Tool reachable directly from the dock; GNSS has none, its tools live in the Tools page. */
     val dockShortcut: Tool?
         get() = if (this == Gnss) null else featured
 }
@@ -58,6 +58,9 @@ enum class Tool(
     Ports(Network.Wifi, "Scan de ports", Sym.Lan, Sym.IosShare),
     Dns(Network.Wifi, "DNS Lookup", Sym.Dns, Sym.History),
     Speed(Network.Wifi, "Test de débit", Sym.Speed, Sym.History),
+    Upnp(Network.Wifi, "Scanner UPnP", Sym.Router, Sym.Refresh),
+    Bonjour(Network.Wifi, "Scanner Bonjour", Sym.Cast, Sym.Refresh),
+    Whois(Network.Wifi, "Whois", Sym.TravelExplore, Sym.IosShare),
 
     BleScan(Network.Bluetooth, "Scanner BLE", Sym.BluetoothSearching, implemented = true),
     Gatt(Network.Bluetooth, "Appareil BLE", Sym.AccountTree, Sym.MoreVert),
@@ -70,6 +73,7 @@ enum class Tool(
     DataUsage(Network.Cellular, "Données mobiles", Sym.DataUsage, Sym.CalendarMonth),
     CellDetail(Network.Cellular, "Détail de la cellule", Sym.CellTower, Sym.ContentCopy, ToolParent.Other(Neighbors)),
 
+    Sky(Network.Gnss, "Ciel GNSS", Sym.SatelliteAlt, implemented = true),
     Compass(Network.Gnss, "Boussole", Sym.Explore, implemented = true),
     Nmea(Network.Gnss, "Journal NMEA", Sym.Terminal, Sym.IosShare),
     ;

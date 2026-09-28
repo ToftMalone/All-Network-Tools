@@ -106,12 +106,14 @@ fun GnssDashboard(vm: MainViewModel) {
                 HeroLine("TTFF", g.ttffMs?.let { "${fmt(it / 1000f, 1)} s" } ?: "—")
             }
         }
-        SectionCard(shape = RoundedCornerShape(32.dp)) {
-            Text("Sky plot", Modifier.padding(bottom = 8.dp), style = rf(16, 22, 600))
+        SectionCard(shape = RoundedCornerShape(28.dp), onClick = { vm.navigate { it.copy(page = com.allnetworktools.Page.ToolPage(com.allnetworktools.model.Tool.Sky)) } }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Constellations", Modifier.weight(1f), style = rf(16, 22, 600))
+                com.allnetworktools.ui.components.Symbol(Sym.ChevronRight, size = 22.dp, tint = cs.onSurfaceVariant)
+            }
             if (g.visible.isEmpty()) {
-                EmptyStateCard(Sym.SatelliteAlt, "Recherche de satellites…", "Placez-vous à l'extérieur, ciel dégagé. Les premiers satellites apparaissent en quelques secondes.")
+                Text("Recherche de satellites… Placez-vous à l'extérieur, ciel dégagé.", Modifier.padding(top = 6.dp), style = rf(14, 20), color = cs.onSurfaceVariant)
             } else {
-                SkyPlot(g.visible)
                 FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Constellation.entries.forEach { c ->
                         val vis = g.visible.count { it.constellation == c }
@@ -127,6 +129,7 @@ fun GnssDashboard(vm: MainViewModel) {
                         }
                     }
                 }
+                Text("Sky plot et carte du monde dans l'outil Ciel GNSS", Modifier.padding(top = 10.dp), style = rf(12, 16), color = cs.onSurfaceVariant)
             }
         }
         TileGrid(

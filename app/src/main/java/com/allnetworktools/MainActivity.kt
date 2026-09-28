@@ -18,12 +18,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        vm.setForeground(true)
-    }
-
-    override fun onStop() {
-        super.onStop()
-        vm.setForeground(false)
+        // Restarts recordings whose service was killed while the app was away.
+        if (vm.recording.active.value.isNotEmpty()) com.allnetworktools.service.RecordingService.start(this)
     }
 
     override fun onResume() {

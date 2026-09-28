@@ -216,6 +216,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val compass: StateFlow<CompassReading?> = (if (g.compass.available) g.compass.readings else emptyFlow())
         .stateIn(viewModelScope, sharing, null)
     val compassAvailable get() = g.compass.available
+    fun lastKnownLocation() = g.gnss.lastKnownLocation()
     fun declination(): Float? = g.compass.declination(gnss.value.location ?: g.gnss.lastKnownLocation())
 
     // ---- settings -------------------------------------------------------------------------------
@@ -231,21 +232,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Recording ------------------------------------------------------------------------------
 
-    private val foreground = MutableStateFlow(false)
-    fun setForeground(v: Boolean) {
-        foreground.value = v
-    }
-
-    val recorder = com.allnetworktools.data.CellRecorder(g.history)
+    val recording get() = g.recording
 
     fun nmea() = g.gnss.nmea()
 
     init {
         viewModelScope.launch { g.history.load(g.settings.settings.first().historyDays) }
-        viewModelScope.launch {
-            combine(foreground, recorder.enabled) { fg, on -> fg && on }.distinctUntilChanged().collectLatest { active ->
-                if (active) cell.collect { recorder.onState(it.state) }
-            }
-        }
     }
 }

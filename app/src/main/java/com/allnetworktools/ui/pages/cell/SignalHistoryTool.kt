@@ -91,6 +91,11 @@ fun SignalHistoryTool(vm: MainViewModel) {
     val from = now - period.ms
     val samples = all.filter { it.atMs >= from }
     PageColumn {
+        com.allnetworktools.ui.pages.RecordingCard(
+            vm, com.allnetworktools.service.RecKind.Signal,
+            idleText = "Lancez-le pour mesurer le signal chaque minute, même application fermée.",
+            activeText = "Une mesure par minute en arrière-plan",
+        )
         SegmentedRow(HistPeriod.entries.map { it to it.label }, period, { period = it }, Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             HistMetric.entries.forEach { m -> AntFilterChip(m.spec.key, metric == m, { metric = m }) }
@@ -99,8 +104,8 @@ fun SignalHistoryTool(vm: MainViewModel) {
         if (points.count { it.value != null } < 2) {
             ToolEmpty(
                 com.allnetworktools.ui.theme.Sym.Monitoring, "Pas encore de données",
-                if (all.isEmpty()) "L'historique enregistre une mesure par minute tant que l'application est ouverte. Revenez dans quelques minutes."
-                else "Aucune mesure sur cette période. L'historique ne couvre que les moments où l'application était ouverte.",
+                if (all.isEmpty()) "Lancez l'enregistrement : une mesure est prise chaque minute. Revenez dans quelques minutes."
+                else "Aucune mesure sur cette période. L'historique ne couvre que les moments où l'enregistrement était lancé.",
                 if (period != HistPeriod.D30 && all.isNotEmpty()) "Voir 30 jours" else null,
             ) { period = HistPeriod.D30 }
             return@PageColumn
@@ -138,7 +143,7 @@ fun SignalHistoryTool(vm: MainViewModel) {
             ),
         ) { (k, v, unit), m -> com.allnetworktools.ui.components.MetricTile(k, v, unit, modifier = m) }
         Text(
-            "${fmt(samples.size)} ${plural(samples.size, "mesure")} · une par minute quand l'application est ouverte · conservées sur l'appareil.",
+            "${fmt(samples.size)} ${plural(samples.size, "mesure")} · une par minute pendant l'enregistrement · conservées sur l'appareil.",
             Modifier.padding(horizontal = 4.dp), style = rf(12, 16), color = cs.onSurfaceVariant,
         )
     }

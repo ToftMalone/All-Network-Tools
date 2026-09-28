@@ -46,9 +46,10 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     Network.Wifi -> listOf(
         ToolGroup("Analyse", listOf(ToolEntry(Tool.Channels, "Analyseur de canaux", "Canal recommandé"), ToolEntry(Tool.Speed, "Test de débit", "Ping, download, upload"))),
         ToolGroup("Réseau local", listOf(ToolEntry(Tool.Lan, "Appareils du LAN", "Découverte des hôtes"), ToolEntry(Tool.Ports, "Scan de ports", "TCP, ports courants"))),
+        ToolGroup("Découverte", listOf(ToolEntry(Tool.Upnp, "Scanner UPnP", "Box, TV, NAS, SSDP"), ToolEntry(Tool.Bonjour, "Scanner Bonjour", "Services mDNS / DNS-SD"))),
         ToolGroup(
             "Diagnostic",
-            listOf(ToolEntry(Tool.Ping, "Ping", "Latence, gigue, pertes"), ToolEntry(Tool.Trace, "Traceroute", "Sauts jusqu'à l'hôte"), ToolEntry(Tool.Dns, "DNS Lookup", "A, AAAA, MX, TXT, NS")),
+            listOf(ToolEntry(Tool.Ping, "Ping", "Latence, gigue, pertes"), ToolEntry(Tool.Trace, "Traceroute", "Sauts jusqu'à l'hôte"), ToolEntry(Tool.Dns, "DNS Lookup", "A, AAAA, MX, TXT, NS"), ToolEntry(Tool.Whois, "Whois", "Domaine ou adresse IP")),
         ),
     )
     Network.Bluetooth -> listOf(
@@ -66,7 +67,7 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
         ToolGroup("Consommation", listOf(ToolEntry(Tool.DataUsage, "Données mobiles", "Par SIM et par app"), ToolEntry(Tool.CellDetail, "Cellule de service", servingLabel ?: "Identifiants et mesures"))),
     )
     Network.Gnss -> listOf(
-        ToolGroup("Données brutes", listOf(ToolEntry(Tool.Nmea, "Journal NMEA", "Phrases du récepteur"))),
+        ToolGroup("Outils", listOf(ToolEntry(Tool.Compass, "Boussole", "Cap magnétique et vrai"), ToolEntry(Tool.Nmea, "Journal NMEA", "Phrases du récepteur"))),
     )
 }
 
@@ -74,7 +75,7 @@ private fun featuredSubtitle(net: Network) = when (net) {
     Network.Wifi -> "Réseaux alentour et occupation des canaux"
     Network.Bluetooth -> "Appareils à proximité, en direct, avec filtres"
     Network.Cellular -> "Cellules NR et LTE détectées par le modem"
-    Network.Gnss -> "Cap magnétique et vrai, étalonnage"
+    Network.Gnss -> "Sky plot et carte du monde des satellites"
 }
 
 @Composable
@@ -82,7 +83,7 @@ private fun featuredBadge(net: Network, vm: MainViewModel): String? = when (net)
     Network.Wifi -> vm.wifiScan.collectAsStateWithLifecycle().value?.let { "${it.size} ${plural(it.size, "réseau", "réseaux")}" }
     Network.Bluetooth -> vm.ble.collectAsStateWithLifecycle().value.size.let { "$it ${plural(it, "appareil")}" }
     Network.Cellular -> vm.cell.collectAsStateWithLifecycle().value.state?.neighbors?.size?.let { "$it ${plural(it, "cellule")}" }
-    Network.Gnss -> vm.compass.collectAsStateWithLifecycle().value?.let { headingLabel(it.magneticHeading) }
+    Network.Gnss -> vm.gnss.collectAsStateWithLifecycle().value.let { "${it.used.size}/${it.visible.size} satellites" }
 }
 
 @Composable

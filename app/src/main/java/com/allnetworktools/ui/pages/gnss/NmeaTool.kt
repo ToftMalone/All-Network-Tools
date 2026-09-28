@@ -52,6 +52,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.flow.Flow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 val NmeaTypes = listOf("GGA", "RMC", "GSA", "GSV", "VTG", "GLL", "Autres")
 
@@ -108,7 +109,7 @@ class NmeaController {
 }
 
 @Composable
-fun NmeaTool(c: NmeaController, source: () -> Flow<Pair<Long, String>>) {
+fun NmeaTool(c: NmeaController, vm: com.allnetworktools.MainViewModel, source: () -> Flow<Pair<Long, String>> = vm::nmea) {
     val actions = LocalActions.current
     val haptics = AntTheme.haptics
     val acc = AntTheme.accent
@@ -116,7 +117,30 @@ fun NmeaTool(c: NmeaController, source: () -> Flow<Pair<Long, String>>) {
     val typeColor = mapOf("GGA" to net.gps, "RMC" to net.beidou, "GSA" to net.galileo, "GSV" to acc.accent, "VTG" to net.glonass, "GLL" to net.qzss, "Autres" to cs.outline)
     LaunchedEffect(c.live) { if (c.live) source().collect { (ts, s) -> c.add(ts, s) } }
     val vis = c.visible().takeLast(40)
+    val recFile by vm.recording.nmeaFile.collectAsStateWithLifecycle()
+    val recCount by vm.recording.nmeaCount.collectAsStateWithLifecycle()
+    val recActive by vm.recording.active.collectAsStateWithLifecycle()
+    val recording = com.allnetworktools.service.RecKind.Nmea in recActive
     PageColumn {
+        com.allnetworktools.ui.pages.RecordingCard(
+            vm, com.allnetworktools.service.RecKind.Nmea,
+            idleText = "Enregistrez les phrases dans un fichier .nmea, même application fermée.",
+            activeText = "${fmt(recCount)} phrases · ${recFile?.name ?: "fichier .nmea"}",
+        )
+        val last = recFile
+        if (last != null && last.exists() && !recording) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(cs.surfaceContainerLow).padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Symbol(Sym.Description, size = 22.dp, tint = acc.accent)
+                Column(Modifier.weight(1f)) {
+                    Text(last.name, style = rf(14, 20, 600), maxLines = 1)
+                    Text("${fmt(last.length() / 1024f, 0)} Ko · dernier enregistrement", style = rf(12, 16), color = cs.onSurfaceVariant)
+                }
+                com.allnetworktools.ui.components.TextAction("Partager", { actions.shareFile(last, "text/plain", last.name) }, trailingIcon = Sym.IosShare)
+            }
+        }
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(cs.surfaceContainerLow).padding(start = 18.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),

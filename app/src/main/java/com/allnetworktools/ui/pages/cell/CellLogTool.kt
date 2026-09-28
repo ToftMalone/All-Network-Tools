@@ -104,33 +104,21 @@ private fun json(events: List<CellEvent>): String = org.json.JSONArray(
 @Composable
 fun CellLogTool(vm: MainViewModel) {
     val events by vm.history.cellEvents.collectAsStateWithLifecycle()
-    val recording by vm.recorder.enabled.collectAsStateWithLifecycle()
-    val pausedAt by vm.recorder.pausedAt.collectAsStateWithLifecycle()
+    val active by vm.recording.active.collectAsStateWithLifecycle()
+    val recording = com.allnetworktools.service.RecKind.CellLog in active
     val actions = LocalActions.current
     val haptics = AntTheme.haptics
     val acc = AntTheme.accent
     var filter by rememberSaveable { mutableStateOf(LogFilter.All) }
     var sheet by rememberSaveable { mutableStateOf(false) }
-    TopBarAction(if (recording) Sym.Pause else Sym.PlayArrow) { haptics.segment(); vm.recorder.setEnabled(!recording) }
     val shown = events.filter { it.matches(filter) }
     val time = SimpleDateFormat("HH:mm", Locale.FRANCE)
     PageColumn {
-        if (!recording) {
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(cs.surfaceContainerHigh).padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Symbol(Sym.PauseCircle, size = 24.dp, tint = cs.onSurfaceVariant)
-                Column(Modifier.weight(1f)) {
-                    Text("Enregistrement en pause", style = rf(15, 20, 600))
-                    Text(
-                        "Les changements ne sont plus consignés" + (pausedAt?.let { " depuis ${time.format(Date(it))}" } ?: "") + ".",
-                        style = rf(12, 16), color = cs.onSurfaceVariant,
-                    )
-                }
-                PillButton("Reprendre", { haptics.confirm(); vm.recorder.setEnabled(true) }, height = 40.dp, bg = acc.accent, fg = acc.onAccent)
-            }
-        }
+        com.allnetworktools.ui.pages.RecordingCard(
+            vm, com.allnetworktools.service.RecKind.CellLog,
+            idleText = "Lancez-le pour consigner les changements de cellule, même application fermée.",
+            activeText = "Continue en arrière-plan · notification pour l'arrêter",
+        )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 LogFilter.entries.forEach { f -> AntFilterChip(f.label, filter == f, { filter = f }) }
@@ -138,14 +126,14 @@ fun CellLogTool(vm: MainViewModel) {
             IconCircleButton(Sym.IosShare, { if (events.isEmpty()) actions.toast("Le journal est vide") else sheet = true }, size = 40.dp, tint = cs.onSurfaceVariant)
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (recording) BlinkDot(cs.error, 8.dp, 1200) else Box(Modifier.size(8.dp).clip(CircleShape).background(cs.outline))
-            Text(if (recording) "Enregistrement actif · application ouverte" else "En pause", Modifier.weight(1f), style = rf(13, 18, 500), color = cs.onSurfaceVariant)
+            Text("Stockés sur cet appareil", Modifier.weight(1f), style = rf(13, 18, 500), color = cs.onSurfaceVariant)
             Text("${shown.size} ${plural(shown.size, "événement")}", style = rf(13, 18), color = cs.onSurfaceVariant)
         }
         if (shown.isEmpty()) {
             ToolEmpty(
                 Sym.Timeline, "Aucun changement enregistré",
-                if (events.isEmpty()) "Vous êtes resté sur la même cellule depuis le début de l'enregistrement. Les changements s'afficheront ici."
+                if (events.isEmpty() && !recording) "Lancez l'enregistrement : chaque changement de cellule ou de technologie sera consigné ici."
+                else if (events.isEmpty()) "Vous êtes resté sur la même cellule depuis le début de l'enregistrement. Les changements s'afficheront ici."
                 else "Aucun événement ne correspond à ce filtre.",
                 if (events.isEmpty()) null else "Tout afficher",
             ) { filter = LogFilter.All }

@@ -62,6 +62,7 @@ import com.allnetworktools.ui.pages.cell.CellLogTool
 import com.allnetworktools.ui.pages.cell.DataUsageTool
 import com.allnetworktools.ui.pages.cell.SignalHistoryTool
 import com.allnetworktools.ui.pages.gnss.NmeaTool
+import com.allnetworktools.ui.pages.gnss.SkyTool
 import com.allnetworktools.ui.pages.cell.NeighborCells
 import com.allnetworktools.ui.pages.gnss.CompassTool
 import com.allnetworktools.ui.pages.gnss.GnssDashboard
@@ -183,6 +184,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.BleScan -> BleScanner(vm)
             Tool.Neighbors -> NeighborCells(vm)
             Tool.Compass -> CompassTool(vm)
+            Tool.Sky -> SkyTool(vm)
             Tool.Gatt, Tool.Paired, Tool.Tracker -> BtToolRoute(vm, page)
             Tool.CellLog -> CellLogTool(vm)
             Tool.SignalHistory -> SignalHistoryTool(vm)
@@ -198,8 +200,9 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.CellDetail -> CellDetailTool(vm.cell.collectAsStateWithLifecycle().value.state, page.arg) {
                 vm.navigate { it.copy(page = Page.ToolPage(Tool.Neighbors)) }
             }
-            Tool.Nmea -> NmeaTool(vm.tools.nmea, vm::nmea)
-            Tool.Channels, Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed -> WifiToolRoute(vm, page)
+            Tool.Nmea -> NmeaTool(vm.tools.nmea, vm)
+            Tool.Channels, Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed,
+            Tool.Upnp, Tool.Bonjour, Tool.Whois -> WifiToolRoute(vm, page)
             else -> ComingSoon(page.tool)
         }
         else -> Unit
@@ -207,7 +210,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
 }
 
 /** Tools that only need an Internet connection, usable over mobile data with Wi-Fi off. */
-private val InternetTools = setOf(Tool.Ping, Tool.Trace, Tool.Dns, Tool.Speed, Tool.Ports)
+private val InternetTools = setOf(Tool.Ping, Tool.Trace, Tool.Dns, Tool.Speed, Tool.Ports, Tool.Whois)
 
 @Composable
 private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
@@ -231,6 +234,9 @@ private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
         Tool.Trace -> TraceTool(tools.trace)
         Tool.Ports -> PortsTool(tools.ports, page.arg, conn?.gateway)
         Tool.Dns -> DnsTool(tools.dns, conn?.dns?.firstOrNull { '.' in it })
+        Tool.Upnp -> com.allnetworktools.ui.pages.wifi.UpnpTool(tools.upnp)
+        Tool.Bonjour -> com.allnetworktools.ui.pages.wifi.BonjourTool(tools.bonjour)
+        Tool.Whois -> com.allnetworktools.ui.pages.wifi.WhoisTool(tools.whois)
         Tool.Speed -> {
             val cell = vm.cell.collectAsStateWithLifecycle().value.state
             val (label, icon) = when {
