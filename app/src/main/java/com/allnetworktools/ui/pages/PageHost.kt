@@ -53,6 +53,9 @@ import com.allnetworktools.ui.components.StatePanel
 import com.allnetworktools.ui.home.pageBlock
 import com.allnetworktools.ui.pages.bt.BleScanner
 import com.allnetworktools.ui.pages.bt.BtDashboard
+import com.allnetworktools.ui.pages.bt.GattTool
+import com.allnetworktools.ui.pages.bt.PairedTool
+import com.allnetworktools.ui.pages.bt.TrackerTool
 import com.allnetworktools.ui.pages.cell.CellDashboard
 import com.allnetworktools.ui.pages.cell.NeighborCells
 import com.allnetworktools.ui.pages.gnss.CompassTool
@@ -175,6 +178,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.BleScan -> BleScanner(vm)
             Tool.Neighbors -> NeighborCells(vm)
             Tool.Compass -> CompassTool(vm)
+            Tool.Gatt, Tool.Paired, Tool.Tracker -> BtToolRoute(vm, page)
             Tool.Channels, Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed -> WifiToolRoute(vm, page)
             else -> ComingSoon(page.tool)
         }
@@ -215,6 +219,34 @@ private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
                 else -> "Réseau actif" to Sym.Public
             }
             SpeedTool(tools.speed, label, icon)
+        }
+        else -> Unit
+    }
+}
+
+@Composable
+private fun BtToolRoute(vm: MainViewModel, page: Page.ToolPage) {
+    val bt by vm.bluetooth.collectAsStateWithLifecycle()
+    val ble by vm.ble.collectAsStateWithLifecycle()
+    when (page.tool) {
+        Tool.Gatt -> GattTool(
+            vm.tools.gatt, page.arg, ble.firstOrNull { it.address == page.arg },
+            bonded = bt.bonded.any { it.address == page.arg },
+        )
+        Tool.Paired -> {
+            val d = bt.bonded.firstOrNull { it.address == page.arg }
+            PairedTool(
+                d, ble.firstOrNull { it.address == page.arg }?.rssi,
+                onForget = { page.arg != null && vm.forgetBluetooth(page.arg) },
+                onExplore = { vm.navigate { it.copy(page = Page.ToolPage(Tool.Gatt, page.arg)) } },
+            )
+        }
+        Tool.Tracker -> {
+            DisposableEffect(Unit) {
+                vm.setBleLowLatency(true)
+                onDispose { vm.setBleLowLatency(false) }
+            }
+            TrackerTool(vm.tools.tracker, ble)
         }
         else -> Unit
     }

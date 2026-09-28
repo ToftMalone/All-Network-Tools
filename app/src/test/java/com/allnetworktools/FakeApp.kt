@@ -103,7 +103,7 @@ private fun Context.fakeWifi() = object : WifiRepository(this@fakeWifi) {
 }
 
 private val bleDevices = listOf(
-    BleDevice("F4:0E:11:A2:3C:9B", "Pixel Buds Pro 2", -48, null, BleKind.Audio, "Google", true, 0),
+    BleDevice("F4:0E:11:A2:3C:9B", "Pixel Buds Pro 2", -48, -12, BleKind.Audio, "Google", true, 0, listOf("0xFE2C", "0x184E"), "00E0 01 4A 7C 22 0F", 0x1A, 102),
     BleDevice("C8:2A:DD:14:07:E1", "Pixel Watch 3", -55, null, BleKind.Watch, "Google", true, 0),
     BleDevice("70:99:1C:5B:E2:40", "JBL Flip 6", -71, null, BleKind.Audio, "Harman", true, 0),
     BleDevice("E6:43:9A:0C:71:D8", "Tile Mate", -74, null, BleKind.Beacon, "Tile", false, 0),
@@ -117,7 +117,7 @@ private fun Context.fakeBluetooth() = object : BluetoothRepository(this@fakeBlue
         BluetoothSnapshot(
             AdapterInfo("Pixel 9 Pro", listOf("Bluetooth 5", "LE Audio", "Auracast")),
             listOf(
-                BondedDevice("F4:0E:11:A2:3C:9B", "Pixel Buds Pro 2", Sym.Headphones, "Audio", true, listOf("LE Audio", "A2DP", "HFP")),
+                BondedDevice("F4:0E:11:A2:3C:9B", "Pixel Buds Pro 2", Sym.Headphones, "Audio", true, listOf("LE Audio", "A2DP", "HFP"), "Double mode", 80),
                 BondedDevice("C8:2A:DD:14:07:E1", "Pixel Watch 3", Sym.Watch, "Montre", true, listOf("GATT")),
                 BondedDevice("aa", "MX Keys", Sym.Keyboard, "Clavier", false, emptyList()),
                 BondedDevice("bb", "JBL Flip 6", Sym.Speaker, "Enceinte", false, emptyList()),

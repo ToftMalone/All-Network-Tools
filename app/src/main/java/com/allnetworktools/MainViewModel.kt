@@ -178,6 +178,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         bleLowLatency.value = v
     }
 
+    fun forgetBluetooth(address: String): Boolean = g.bluetooth.forget(address)
+
     fun restartBleScan() {
         bleRestarts.value++
     }

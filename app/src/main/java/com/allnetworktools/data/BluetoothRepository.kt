@@ -39,6 +39,12 @@ data class BleDevice(
     val maker: String?,
     val connectable: Boolean,
     val lastSeen: Long,
+    /** 16-bit (or full) service UUIDs from the advertisement. */
+    val services: List<String> = emptyList(),
+    val manufacturerHex: String? = null,
+    val flags: Int? = null,
+    /** Mean gap between received advertisements, a lower bound of the real interval. */
+    val intervalMs: Int? = null,
 ) {
     val displayName: String get() = name ?: "Inconnu"
 
@@ -66,6 +72,10 @@ data class BondedDevice(
     val kind: String,
     val connected: Boolean,
     val profiles: List<String>,
+    /** Classique, LE or Double mode. */
+    val transport: String = "Classique",
+    /** Battery reported over HFP/BAS, when the system exposes it. */
+    val battery: Int? = null,
 )
 
 data class BluetoothSnapshot(
@@ -170,6 +180,12 @@ open class BluetoothRepository(private val context: Context) {
                     kind = kind,
                     connected = isConnected,
                     profiles = profiles + if (d.address in gatt) listOf("GATT") else emptyList(),
+                    transport = when (runCatching { d.type }.getOrDefault(0)) {
+                        BluetoothDevice.DEVICE_TYPE_LE -> "Bluetooth LE"
+                        BluetoothDevice.DEVICE_TYPE_DUAL -> "Double mode"
+                        else -> "Classique (BR/EDR)"
+                    },
+                    battery = if (isConnected) batteryLevel(d) else null,
                 )
             }.sortedWith(compareByDescending<BondedDevice> { it.connected }.thenBy { it.name.lowercase() })
             trySend(BluetoothSnapshot(adapterInfo(), list))
@@ -192,6 +208,7 @@ open class BluetoothRepository(private val context: Context) {
                 BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED, BluetoothDevice.ACTION_NAME_CHANGED,
                 "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED",
                 "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED",
+                "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED",
             ) { SystemClock.elapsedRealtimeNanos() }.collect { emit() }
         }
         emit()
@@ -200,6 +217,16 @@ open class BluetoothRepository(private val context: Context) {
             proxies.forEach { (id, p) -> runCatching { a.closeProfileProxy(id, p) } }
         }
     }
+
+    /** Hidden but greylisted getter fed by HFP and the LE battery service; null when unknown or blocked. */
+    private fun batteryLevel(d: BluetoothDevice): Int? =
+        runCatching { d.javaClass.getMethod("getBatteryLevel").invoke(d) as Int }.getOrNull()?.takeIf { it in 0..100 }
+
+    /** Asks the stack to drop the bond; hidden API, so callers fall back to system settings when it returns false. */
+    open fun forget(address: String): Boolean = runCatching {
+        val d = adapter?.getRemoteDevice(address) ?: return false
+        d.javaClass.getMethod("removeBond").invoke(d) as Boolean
+    }.getOrDefault(false)
 
     private fun isAclConnected(d: BluetoothDevice): Boolean =
         runCatching { d.javaClass.getMethod("isConnected").invoke(d) as Boolean }.getOrDefault(false)
@@ -245,6 +272,10 @@ open class BluetoothRepository(private val context: Context) {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 val (kind, maker) = classify(result)
                 val prev = devices[result.device.address]
+                val now = SystemClock.elapsedRealtime()
+                val record = result.scanRecord
+                val gap = prev?.let { (now - it.lastSeen).toInt() }?.takeIf { it in 5..10_000 }
+                val mfg = record?.manufacturerSpecificData
                 val smoothed = if (prev == null) result.rssi else ((prev.rssi * 0.6f) + result.rssi * 0.4f).toInt()
                 devices[result.device.address] = BleDevice(
                     address = result.device.address,
@@ -254,7 +285,18 @@ open class BluetoothRepository(private val context: Context) {
                     kind = if (kind == BleKind.Unknown) prev?.kind ?: kind else kind,
                     maker = maker ?: prev?.maker,
                     connectable = result.isConnectable,
-                    lastSeen = SystemClock.elapsedRealtime(),
+                    lastSeen = now,
+                    services = record?.serviceUuids.orEmpty().map { u -> uuid16(u)?.let { "0x%04X".format(it) } ?: u.uuid.toString() }
+                        .ifEmpty { prev?.services.orEmpty() },
+                    manufacturerHex = if (mfg != null && mfg.isNotEmpty()) {
+                        "%04X ".format(mfg.keyAt(0)) + mfg.valueAt(0).joinToString(" ") { "%02X".format(it) }
+                    } else prev?.manufacturerHex,
+                    flags = record?.advertiseFlags?.takeIf { it >= 0 } ?: prev?.flags,
+                    intervalMs = when {
+                        gap == null -> prev?.intervalMs
+                        prev?.intervalMs == null -> gap
+                        else -> (prev.intervalMs * 0.8f + gap * 0.2f).toInt()
+                    },
                 )
             }
 

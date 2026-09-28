@@ -2,6 +2,8 @@ package com.allnetworktools.ui.tools
 
 import com.allnetworktools.AntApplication
 import com.allnetworktools.data.net.LanScanner
+import com.allnetworktools.ui.pages.bt.GattController
+import com.allnetworktools.ui.pages.bt.TrackerController
 import com.allnetworktools.ui.pages.wifi.ChannelsController
 import com.allnetworktools.ui.pages.wifi.DnsController
 import com.allnetworktools.ui.pages.wifi.LanController
@@ -24,4 +26,6 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val ports by lazy { PortsController(scope) }
     val dns by lazy { DnsController(scope) }
     val speed by lazy { SpeedController(scope, app.history) }
+    val gatt by lazy { GattController(app, scope) }
+    val tracker by lazy { TrackerController(app, scope) }
 }

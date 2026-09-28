@@ -16,6 +16,13 @@ import com.allnetworktools.data.net.DnsAnswer
 import com.allnetworktools.data.net.DnsRecord
 import com.allnetworktools.data.net.DnsType
 import com.allnetworktools.data.net.SpeedServer
+import com.allnetworktools.data.BleDevice
+import com.allnetworktools.data.BleKind
+import com.allnetworktools.data.GattNames
+import com.allnetworktools.ui.pages.bt.GattCharUi
+import com.allnetworktools.ui.pages.bt.GattConn
+import com.allnetworktools.ui.pages.bt.GattServiceUi
+import com.allnetworktools.ui.pages.bt.NotifyLine
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -163,5 +170,60 @@ class ScreenshotTest {
         vm.tools.ping.resolved = "one.one.one.one"
         vm.tools.ping.results.addAll(listOf(13.2f, 12.8f, 15.1f, null, 13.6f))
         vm.tools.ping.phase = Phase.Running
+    }
+
+    private fun bt(t: Tool, arg: String? = null) = NavState(Network.Bluetooth, Page.ToolPage(t, arg))
+
+    private fun fakeGatt(vm: MainViewModel) {
+        val c = vm.tools.gatt
+        c.address = "F4:0E:11:A2:3C:9B"
+        fun ch(svc: Int, n: Int, props: Int) = GattCharUi("$svc/$n", GattNames.uuid(n), props)
+        c.services.addAll(
+            listOf(
+                GattServiceUi(GattNames.uuid(0x1800), listOf(ch(0x1800, 0x2A00, 2), ch(0x1800, 0x2A01, 2))),
+                GattServiceUi(GattNames.uuid(0x180F), listOf(ch(0x180F, 0x2A19, 2 or 16))),
+                GattServiceUi(GattNames.uuid(0x180D), listOf(ch(0x180D, 0x2A37, 16), ch(0x180D, 0x2A38, 2))),
+                GattServiceUi(GattNames.uuid(0x180A), listOf(ch(0x180A, 0x2A29, 2), ch(0x180A, 0x2A26, 2))),
+            ),
+        )
+        c.values["${0x180F}/${0x2A19}"] = byteArrayOf(80)
+        c.values["${0x180D}/${0x2A37}"] = byteArrayOf(0, 72)
+        c.values["${0x180D}/${0x2A38}"] = byteArrayOf(2)
+        c.notifying["${0x180D}/${0x2A37}"] = true
+        c.expanded[GattNames.uuid(0x180F)] = true
+        c.expanded[GattNames.uuid(0x180D)] = true
+        c.log.add(NotifyLine(1_700_000_000_000, GattNames.uuid(0x2A37), byteArrayOf(0, 72)))
+        c.log.add(NotifyLine(1_700_000_000_000, GattNames.uuid(0x2A37), byteArrayOf(0, 71)))
+        c.mtu = 247; c.phy = 2; c.elapsedS = 1.8f
+        c.conn = GattConn.Connected
+        c.phase = Phase.Results
+    }
+
+    @Test fun gattIdle() = shot("80_gatt_idle", nav = bt(Tool.Gatt, "F4:0E:11:A2:3C:9B")) { it.tools.gatt.address = "F4:0E:11:A2:3C:9B" }
+    @Test fun gattRunning() = shot("81_gatt_running", nav = bt(Tool.Gatt, "F4:0E:11:A2:3C:9B")) { vm ->
+        vm.tools.gatt.address = "F4:0E:11:A2:3C:9B"
+        vm.tools.gatt.mtu = 247; vm.tools.gatt.step = 2
+        vm.tools.gatt.conn = GattConn.Connecting; vm.tools.gatt.phase = Phase.Running
+    }
+    @Test fun gattResults() = shot("82_gatt_results", nav = bt(Tool.Gatt, "F4:0E:11:A2:3C:9B"), setup = ::fakeGatt)
+    @Test fun gattError() = shot("83_gatt_error", nav = bt(Tool.Gatt, "F4:0E:11:A2:3C:9B")) { vm ->
+        vm.tools.gatt.address = "F4:0E:11:A2:3C:9B"
+        vm.tools.gatt.error = GattNames.status(133)
+        vm.tools.gatt.conn = GattConn.Lost; vm.tools.gatt.phase = Phase.Error
+    }
+    @Test fun paired() = shot("84_paired", nav = bt(Tool.Paired, "F4:0E:11:A2:3C:9B"))
+    @Test fun pairedOff() = shot("85_paired_off", nav = bt(Tool.Paired, "aa"))
+    @Test fun trackerIdle() = shot("86_tracker_idle", nav = bt(Tool.Tracker))
+    @Test fun trackerRunning() = shot("87_tracker_running", nav = bt(Tool.Tracker)) { vm ->
+        val c = vm.tools.tracker
+        c.follow(BleDevice("70:99:1C:5B:E2:40", "JBL Flip 6", -61, null, BleKind.Audio, "Harman", true, 0))
+        c.history.addAll(listOf(-82f, -80f, -79f, -77f, -76f, -74f, -73f, -72f, -70f, -68f, -66f, -65f, -63f, -62f, -61f))
+        c.rssi = -61f; c.trend = 1
+    }
+    @Test fun trackerHotDark() = shot("88_tracker_found_dark", dark = true, nav = bt(Tool.Tracker)) { vm ->
+        val c = vm.tools.tracker
+        c.follow(BleDevice("E6:43:9A:0C:71:D8", "Tile Mate", -48, null, BleKind.Beacon, "Tile", false, 0))
+        c.history.addAll(listOf(-70f, -66f, -62f, -58f, -55f, -52f, -49f, -48f))
+        c.rssi = -48f
     }
 }
