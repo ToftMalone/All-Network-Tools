@@ -36,5 +36,8 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val tracker by lazy { TrackerController(app, scope) }
     val dataUsage by lazy { DataUsageController(scope, app.usage) }
     val positionCompare = com.allnetworktools.ui.pages.gnss.PositionCompareController()
+    val passes by lazy { com.allnetworktools.ui.pages.gnss.PassesController(app.tles, scope) }
+    val towerMap by lazy { com.allnetworktools.ui.pages.cell.TowerMapController(app.towers, scope) }
+    val evilTwin = com.allnetworktools.ui.pages.wifi.EvilTwinController()
     val skyView = androidx.compose.runtime.mutableStateOf(com.allnetworktools.ui.pages.gnss.SkyView.Sky)
 }

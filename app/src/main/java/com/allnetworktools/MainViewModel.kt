@@ -266,6 +266,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun lastKnownLocation() = g.gnss.lastKnownLocation()
 
+    fun operatorPlmns() = g.cell.plmns()
+
     val positions: StateFlow<com.allnetworktools.data.PositionSet> = whenAvailable(Network.Gnss, com.allnetworktools.data.PositionSet()) {
         rate.flatMapLatest { g.gnss.positions(it) }
     }.stateIn(viewModelScope, sharing, com.allnetworktools.data.PositionSet())

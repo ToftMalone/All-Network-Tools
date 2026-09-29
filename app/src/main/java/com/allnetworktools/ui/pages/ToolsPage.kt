@@ -50,6 +50,7 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
             "Diagnostic",
             listOf(ToolEntry(Tool.Ping, "Ping", "Latence, gigue, pertes"), ToolEntry(Tool.Trace, "Traceroute", "Sauts jusqu'à l'hôte"), ToolEntry(Tool.Dns, "DNS Lookup", "A, AAAA, MX, TXT, NS"), ToolEntry(Tool.Whois, "Whois", "Domaine ou adresse IP")),
         ),
+        ToolGroup("Sécurité", listOf(ToolEntry(Tool.EvilTwin, "Faux points d'accès", "SSID dupliqués, evil twin"))),
     )
     Network.Bluetooth -> listOf(
         ToolGroup(
@@ -59,12 +60,14 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
                 ToolEntry(Tool.Paired, connectedDevice ?: "Appareil appairé", if (connectedDevice != null) "Appareil connecté" else "Profils, batterie", Sym.Headphones),
             ),
         ),
+        ToolGroup("Sécurité et test", listOf(ToolEntry(Tool.UnknownTrackers, "Traqueurs inconnus", "AirTag, SmartTag, Tile qui vous suivent"), ToolEntry(Tool.Advertiser, "Annonceur BLE", "Émettre une trame de test"))),
     )
     Network.Cellular -> listOf(
+        ToolGroup("Antennes", listOf(ToolEntry(Tool.TowerMap, "Carte des antennes", "Sites ANFR de votre opérateur"))),
         ToolGroup("Consommation", listOf(ToolEntry(Tool.DataUsage, "Données mobiles", "Par SIM et par app"), ToolEntry(Tool.CellDetail, "Cellule de service", servingLabel ?: "Identifiants et mesures"))),
     )
     Network.Gnss -> listOf(
-        ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"))),
+        ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"), ToolEntry(Tool.Passes, "Passages de satellites", "Levers et couchers prévus"))),
     )
 }
 

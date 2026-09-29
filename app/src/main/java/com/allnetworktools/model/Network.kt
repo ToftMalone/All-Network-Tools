@@ -61,18 +61,23 @@ enum class Tool(
     Upnp(Network.Wifi, "Scanner UPnP", Sym.Router, Sym.Refresh),
     Bonjour(Network.Wifi, "Scanner Bonjour", Sym.Cast, Sym.Refresh),
     Whois(Network.Wifi, "Whois", Sym.TravelExplore, Sym.IosShare),
+    EvilTwin(Network.Wifi, "Faux points d'accès", Sym.WifiTetheringError, Sym.Refresh),
 
     BleScan(Network.Bluetooth, "Scanner BLE", Sym.BluetoothSearching, implemented = true),
     Gatt(Network.Bluetooth, "Appareil BLE", Sym.AccountTree, Sym.MoreVert),
     Paired(Network.Bluetooth, "Appareil appairé", Sym.Headphones, Sym.MoreVert, ToolParent.Dashboard),
     Tracker(Network.Bluetooth, "Chaud/Froid", Sym.MyLocation),
+    UnknownTrackers(Network.Bluetooth, "Traqueurs inconnus", Sym.GppMaybe, Sym.RestartAlt),
+    Advertiser(Network.Bluetooth, "Annonceur BLE", Sym.Podcasts),
 
     Neighbors(Network.Cellular, "Cellules voisines", Sym.CellTower, implemented = true),
     DataUsage(Network.Cellular, "Données mobiles", Sym.DataUsage, Sym.CalendarMonth),
+    TowerMap(Network.Cellular, "Carte des antennes", Sym.Map, Sym.Refresh),
     CellDetail(Network.Cellular, "Détail de la cellule", Sym.CellTower, Sym.ContentCopy, ToolParent.Other(Neighbors)),
 
     Sky(Network.Gnss, "Ciel GNSS", Sym.SatelliteAlt, implemented = true),
     PositionCompare(Network.Gnss, "Comparer les positions", Sym.ShareLocation, Sym.Refresh),
+    Passes(Network.Gnss, "Passages de satellites", Sym.Orbit, Sym.Refresh),
     ;
 
     val isDockShortcut: Boolean get() = network.dockShortcut == this

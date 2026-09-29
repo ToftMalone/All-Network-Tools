@@ -198,6 +198,14 @@ open class CellRepository(private val context: Context) {
         return if (id != SubscriptionManager.INVALID_SUBSCRIPTION_ID) baseTm?.createForSubscriptionId(id) else baseTm
     }
 
+    /** MCC+MNC of the default data SIM and of the network it is registered on; null when unknown. */
+    open fun plmns(): Pair<String?, String?> {
+        val tm = defaultTm() ?: return null to null
+        val sim = runCatching { tm.simOperator }.getOrNull()?.takeIf { it.length >= 5 }
+        val net = runCatching { tm.networkOperator }.getOrNull()?.takeIf { it.length >= 5 }
+        return sim to net
+    }
+
     /**
      * Serving and neighbour cells of the default data SIM. Cell info needs READ_PHONE_STATE and
      * ACCESS_FINE_LOCATION; fresh measurements are requested every [refreshMs].

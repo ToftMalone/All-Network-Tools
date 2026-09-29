@@ -181,6 +181,8 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.Neighbors -> NeighborCells(vm)
             Tool.Sky -> SkyTool(vm)
             Tool.PositionCompare -> com.allnetworktools.ui.pages.gnss.PositionCompareTool(vm)
+            Tool.Passes -> com.allnetworktools.ui.pages.gnss.PassesTool(vm)
+            Tool.TowerMap -> com.allnetworktools.ui.pages.cell.TowerMapTool(vm)
             Tool.Gatt, Tool.Paired, Tool.Tracker -> BtToolRoute(vm, page)
             Tool.DataUsage -> {
                 val perms by vm.permissions.collectAsStateWithLifecycle()
@@ -195,7 +197,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
                 vm.navigate { it.copy(page = Page.ToolPage(Tool.Neighbors)) }
             }
             Tool.Channels, Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed,
-            Tool.Upnp, Tool.Bonjour, Tool.Whois -> WifiToolRoute(vm, page)
+            Tool.Upnp, Tool.Bonjour, Tool.Whois, Tool.EvilTwin -> WifiToolRoute(vm, page)
             else -> ComingSoon(page.tool)
         }
         else -> Unit
@@ -230,6 +232,10 @@ private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
         Tool.Upnp -> com.allnetworktools.ui.pages.wifi.UpnpTool(tools.upnp)
         Tool.Bonjour -> com.allnetworktools.ui.pages.wifi.BonjourTool(tools.bonjour)
         Tool.Whois -> com.allnetworktools.ui.pages.wifi.WhoisTool(tools.whois)
+        Tool.EvilTwin -> com.allnetworktools.ui.pages.wifi.EvilTwinTool(
+            tools.evilTwin, conn, vm.wifiScan, vm::startWifiScan, perms.location && locationOn,
+            onFixLocation = { if (!perms.location) actions.request(PermGroup.Location) else actions.openLocationSettings() },
+        )
         Tool.Speed -> {
             val cell = vm.cell.collectAsStateWithLifecycle().value.state
             val (label, icon) = when {
