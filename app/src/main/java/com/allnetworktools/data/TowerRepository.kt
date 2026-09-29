@@ -87,7 +87,21 @@ data class TowerSite(
     }
 }
 
-data class TowerQuery(val operator: FrOperator, val lat: Double, val lon: Double, val radiusM: Int)
+/**
+ * A search around a point, or inside the visible map area when [box] (south, west, north, east) is
+ * given; [lat]/[lon] then only order the results by distance.
+ */
+data class TowerQuery(val operator: FrOperator, val lat: Double, val lon: Double, val radiusM: Int, val box: DoubleArray? = null) {
+    override fun equals(other: Any?) = other is TowerQuery && other.operator == operator && other.lat == lat && other.lon == lon &&
+        other.radiusM == radiusM && other.box.contentEquals(box)
+
+    override fun hashCode() = listOf(operator, lat, lon, radiusM, box?.toList()).hashCode()
+
+    companion object {
+        fun area(op: FrOperator, south: Double, west: Double, north: Double, east: Double, fromLat: Double, fromLon: Double) =
+            TowerQuery(op, fromLat, fromLon, 0, doubleArrayOf(south, west, north, east))
+    }
+}
 
 data class TowerResult(val query: TowerQuery, val sites: List<TowerSite>, val emitterCount: Int, val truncated: Boolean, val fetchedAtMs: Long) {
     val dataUpdated: LocalDate? get() = sites.mapNotNull { it.updated }.maxOrNull()
@@ -103,7 +117,7 @@ open class TowerRepository {
         val url = Endpoint + "?dataset=observatoire_2g_3g_4g" +
             "&rows=$MaxRows" +
             "&refine.adm_lb_nom=" + URLEncoder.encode(q.operator.anfr, "UTF-8") +
-            "&geofilter.distance=${q.lat},${q.lon},${q.radiusM}" +
+            (q.box?.let { (s, w, n, e) -> "&geofilter.polygon=($s,$w),($s,$e),($n,$e),($n,$w)" } ?: "&geofilter.distance=${q.lat},${q.lon},${q.radiusM}") +
             "&fields=" + Fields.joinToString(",")
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 10_000

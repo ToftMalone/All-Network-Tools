@@ -242,16 +242,6 @@ class FakeApp : AntApplication() {
                 parse(q, FakeApp::class.java.classLoader!!.getResource("anfr_orange_paris.json")!!.readText(), System.currentTimeMillis())
         }
     }
-    override val advertiser by lazy {
-        object : com.allnetworktools.data.BleAdvertiser(this@FakeApp) {
-            private val s = MutableStateFlow<com.allnetworktools.data.AdvState>(com.allnetworktools.data.AdvState.Idle)
-            override val state: StateFlow<com.allnetworktools.data.AdvState> = s
-            override val supported = true
-            override fun deviceName() = "Pixel 9 Pro"
-            override fun start(c: com.allnetworktools.data.AdvConfig) { s.value = com.allnetworktools.data.AdvState.On(System.currentTimeMillis() - 42_000, -7) }
-            override fun stop() { s.value = com.allnetworktools.data.AdvState.Idle }
-        }
-    }
     override val updater by lazy {
         object : com.allnetworktools.update.AppUpdater(this@FakeApp, "0.1") {
             override suspend fun check(autoInstall: Boolean, force: Boolean) = Unit

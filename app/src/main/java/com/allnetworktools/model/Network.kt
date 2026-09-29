@@ -68,7 +68,6 @@ enum class Tool(
     Paired(Network.Bluetooth, "Appareil appairé", Sym.Headphones, Sym.MoreVert, ToolParent.Dashboard),
     Tracker(Network.Bluetooth, "Chaud/Froid", Sym.MyLocation),
     UnknownTrackers(Network.Bluetooth, "Traqueurs inconnus", Sym.GppMaybe, Sym.RestartAlt),
-    Advertiser(Network.Bluetooth, "Annonceur BLE", Sym.Podcasts),
 
     Neighbors(Network.Cellular, "Cellules voisines", Sym.CellTower, implemented = true),
     DataUsage(Network.Cellular, "Données mobiles", Sym.DataUsage, Sym.CalendarMonth),

@@ -60,7 +60,7 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
                 ToolEntry(Tool.Paired, connectedDevice ?: "Appareil appairé", if (connectedDevice != null) "Appareil connecté" else "Profils, batterie", Sym.Headphones),
             ),
         ),
-        ToolGroup("Sécurité et test", listOf(ToolEntry(Tool.UnknownTrackers, "Traqueurs inconnus", "AirTag, SmartTag, Tile qui vous suivent"), ToolEntry(Tool.Advertiser, "Annonceur BLE", "Émettre une trame de test"))),
+        ToolGroup("Sécurité", listOf(ToolEntry(Tool.UnknownTrackers, "Traqueurs inconnus", "AirTag, SmartTag, Tile qui vous suivent"))),
     )
     Network.Cellular -> listOf(
         ToolGroup("Antennes", listOf(ToolEntry(Tool.TowerMap, "Carte des antennes", "Sites ANFR de votre opérateur"))),

@@ -25,6 +25,7 @@ import com.allnetworktools.data.PositionSet
 import com.allnetworktools.data.Sighting
 import com.allnetworktools.data.TrackerDetect
 import com.allnetworktools.data.TrackerSignal
+import kotlinx.coroutines.launch
 import com.allnetworktools.ui.components.LeadingIcon
 import com.allnetworktools.ui.components.PillButton
 import com.allnetworktools.ui.components.SectionCard
@@ -45,9 +46,15 @@ import com.allnetworktools.util.plural
 import kotlinx.coroutines.delay
 
 /** A tag seen during the session, with where and when. */
-class TrackerCandidate(val address: String, val signal: TrackerSignal) {
+class TrackerCandidate(val address: String, signal: TrackerSignal) {
     val sightings = mutableListOf<Sighting>()
+    var signal by mutableStateOf(signal)
     var device by mutableStateOf<BleDevice?>(null)
+    /** Every address this tag used during the session (SmartTags change it every ~7 min). */
+    val addresses = mutableSetOf(address)
+    var lastLinkKey: String? = signal.linkKey
+    var lastHeardMs = 0L
+    var sound by mutableStateOf<SoundUi>(SoundUi.Idle)
     var assessment by mutableStateOf(FollowAssessment(FollowLevel.Nearby, 0, null, 0, 0))
 }
 
@@ -55,7 +62,41 @@ class TrackerCandidate(val address: String, val signal: TrackerSignal) {
  * Records every tracker tag heard while the tool is open, with the phone's position, and flags the
  * ones that stay with you over time and distance.
  */
-class UnknownTrackersController {
+sealed interface SoundUi {
+    data object Idle : SoundUi
+    data object Connecting : SoundUi
+    data class Playing(val via: String) : SoundUi
+    data class Message(val text: String, val error: Boolean) : SoundUi
+}
+
+class UnknownTrackersController(private val context: android.content.Context?, private val scope: kotlinx.coroutines.CoroutineScope?) {
+    private val sound by lazy { context?.let { com.allnetworktools.data.TagSound(it) } }
+
+    /** Rings the tag through DULT / Find My, the public non-owner protocols. */
+    fun ring(t: TrackerCandidate) {
+        val s = sound ?: return
+        val address = t.device?.address ?: return
+        if (t.sound == SoundUi.Connecting) return
+        candidates.values.forEach { if (it !== t && it.sound is SoundUi.Playing) it.sound = SoundUi.Idle }
+        t.sound = SoundUi.Connecting
+        scope?.launch {
+            t.sound = when (val r = s.play(address)) {
+                is com.allnetworktools.data.SoundResult.Playing -> SoundUi.Playing(r.protocol.label)
+                is com.allnetworktools.data.SoundResult.Refused -> SoundUi.Message(r.message, true)
+                is com.allnetworktools.data.SoundResult.Failed -> SoundUi.Message(r.message, true)
+            }
+            if (t.sound is SoundUi.Playing) {
+                // Tags stop by themselves after 5 to 30 s.
+                kotlinx.coroutines.delay(30_000)
+                if (t.sound is SoundUi.Playing) { s.stop(); t.sound = SoundUi.Idle }
+            }
+        }
+    }
+
+    fun stopSound(t: TrackerCandidate) {
+        scope?.launch { sound?.stop(); t.sound = SoundUi.Idle }
+    }
+
     val candidates = mutableStateMapOf<String, TrackerCandidate>()
     var sessionStart by mutableStateOf(System.currentTimeMillis())
         private set
@@ -64,6 +105,7 @@ class UnknownTrackersController {
     private var lastFix: Pair<Double, Double>? = null
 
     fun reset() {
+        scope?.launch { sound?.stop() }
         candidates.clear()
         sessionStart = System.currentTimeMillis()
         travelledM = 0.0
@@ -89,8 +131,14 @@ class UnknownTrackersController {
         }
         devices.forEach { d ->
             val sig = TrackerDetect.classify(d.ads) ?: return@forEach
-            val c = candidates.getOrPut(d.address) { TrackerCandidate(d.address, sig) }
+            val c = candidates.values.firstOrNull { d.address in it.addresses }
+                ?: sig.linkKey?.let { k -> candidates.values.firstOrNull { it.lastLinkKey == k && it.signal.net == sig.net && now - it.lastHeardMs < 20 * 60_000L } }
+                    ?.also { it.addresses += d.address }
+                ?: TrackerCandidate(d.address, sig).also { candidates[d.address] = it }
             c.device = d
+            c.signal = sig
+            sig.linkKey?.let { c.lastLinkKey = it }
+            c.lastHeardMs = now
             val last = c.sightings.lastOrNull()
             // One sighting every 15 s is plenty to follow a walk and keeps memory bounded.
             if (last == null || now - last.timeMs >= 15_000L) {
@@ -98,6 +146,8 @@ class UnknownTrackersController {
                 if (c.sightings.size > 2000) c.sightings.removeAt(0)
             }
             c.assessment = TrackerDetect.assess(sig, c.sightings)
+            // A rotating identifier changes with the epoch while the address stays: remember both.
+            if (sig.linkKey != null) c.lastLinkKey = sig.linkKey
         }
     }
 
@@ -164,13 +214,14 @@ fun UnknownTrackersTool(
                 null,
             )
         }
-        list.forEach { t -> TrackerCard(t, now, onLocate, onDetails) }
+        list.forEach { t -> TrackerCard(t, now, onLocate, onDetails, c::ring, c::stopSound) }
         SectionCard {
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Symbol(Sym.Info, size = 22.dp, tint = AntTheme.accent.accent)
                 Text(
-                    "Un AirTag ou un tag Google éloigné de son propriétaire l'annonce dans ses trames : c'est l'état « séparé » affiché ici. " +
-                        "Un tag séparé qui reste avec vous dans le temps et sur la distance est suspect. Les tags Samsung et Tile ne disent pas s'ils sont séparés. " +
+                    "Un AirTag, un tag Google ou un Galaxy SmartTag éloigné de son propriétaire l'annonce dans ses trames : c'est l'état « séparé » affiché ici. " +
+                        "Un tag séparé qui reste avec vous dans le temps et sur la distance est suspect. Tile ne dit pas s'il est séparé. " +
+                        "« Faire sonner » utilise les protocoles publics DULT (IETF) et Localiser d'Apple ; un tag ne sonne pour un inconnu que s'il est séparé de son propriétaire. " +
                         "Android propose aussi, dans Paramètres › Sécurité et urgences, des alertes de traqueurs inconnus qui fonctionnent en arrière-plan.",
                     style = rf(13, 18), color = cs.onSurfaceVariant,
                 )
@@ -180,7 +231,7 @@ fun UnknownTrackersTool(
 }
 
 @Composable
-private fun TrackerCard(t: TrackerCandidate, now: Long, onLocate: (BleDevice) -> Unit, onDetails: (String) -> Unit) {
+private fun TrackerCard(t: TrackerCandidate, now: Long, onLocate: (BleDevice) -> Unit, onDetails: (String) -> Unit, onRing: (TrackerCandidate) -> Unit, onStopSound: (TrackerCandidate) -> Unit) {
     val a = t.assessment
     val col = levelColor(a.level)
     SectionCard {
@@ -190,7 +241,7 @@ private fun TrackerCard(t: TrackerCandidate, now: Long, onLocate: (BleDevice) ->
                 Text(t.device?.name ?: t.signal.net.maker, style = rf(15, 20, 600), maxLines = 2)
                 Text(t.signal.net.label, style = rf(12, 16), color = cs.onSurfaceVariant, maxLines = 1)
                 Text(
-                    when (t.signal.separated) {
+                    t.signal.state ?: when (t.signal.separated) {
                         true -> "Séparé de son propriétaire"
                         false -> "Propriétaire à proximité"
                         null -> "État non annoncé par ce type de tag"
@@ -208,17 +259,33 @@ private fun TrackerCard(t: TrackerCandidate, now: Long, onLocate: (BleDevice) ->
             }
             stat(minutes(a.durationMs), "avec vous", Modifier.weight(1f))
             stat(a.spreadM?.let { dist(it) } ?: "—", "distance", Modifier.weight(1f))
-            stat("${a.places}", plural(a.places, "lieu"), Modifier.weight(1f))
+            stat("${a.places}", plural(a.places, "lieu", "lieux"), Modifier.weight(1f))
             stat(t.device?.rssi?.let { "$it" } ?: "—", "dBm", Modifier.weight(1f))
         }
         val lastSeen = t.sightings.lastOrNull()?.timeMs
         Text(
-            "${t.address} · vu ${a.sightings} fois" + (lastSeen?.let { " · dernière fois il y a ${((now - it) / 1000).coerceAtLeast(0)} s" } ?: ""),
+            (t.device?.address ?: t.address) + (if (t.addresses.size > 1) " · ${t.addresses.size} adresses successives" else "") + " · vu ${a.sightings} fois" + (lastSeen?.let { " · dernière fois il y a ${((now - it) / 1000).coerceAtLeast(0)} s" } ?: ""),
             Modifier.padding(top = 10.dp), style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant,
         )
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             t.device?.let { d -> PillButton("Chaud/Froid", { onLocate(d) }, Modifier.weight(1f), icon = Sym.MyLocation, height = 40.dp) }
-            PillButton("Détails", { onDetails(t.address) }, Modifier.weight(1f), icon = Sym.Info, height = 40.dp, outlined = true, bg = AntTheme.accent.accent)
+            PillButton("Détails", { onDetails(t.device?.address ?: t.address) }, Modifier.weight(1f), icon = Sym.Info, height = 40.dp, outlined = true, bg = AntTheme.accent.accent)
+        }
+        val snd = t.sound
+        PillButton(
+            when (snd) {
+                SoundUi.Connecting -> "Connexion au tag…"
+                is SoundUi.Playing -> "Arrêter la sonnerie"
+                else -> "Faire sonner"
+            },
+            { if (snd is SoundUi.Playing) onStopSound(t) else onRing(t) },
+            Modifier.fillMaxWidth().padding(top = 8.dp), icon = Sym.VolumeUp, height = 40.dp, outlined = true, bg = AntTheme.accent.accent,
+            enabled = t.device != null && snd != SoundUi.Connecting,
+        )
+        when (snd) {
+            is SoundUi.Playing -> Text("Sonnerie demandée via le ${snd.via}.", Modifier.padding(top = 6.dp), style = rf(12, 16), color = AntTheme.net.good)
+            is SoundUi.Message -> Text(snd.text, Modifier.padding(top = 6.dp), style = rf(12, 16), color = if (snd.error) cs.error else cs.onSurfaceVariant)
+            else -> Unit
         }
     }
 }

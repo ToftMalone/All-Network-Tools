@@ -34,6 +34,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -89,30 +93,56 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polygon
 
+/** Sites loaded for the visible map area; they accumulate as the map is moved. */
 class TowerMapController(private val repo: TowerRepository, private val scope: CoroutineScope) {
-    var result by mutableStateOf<TowerResult?>(null)
+    val sites = androidx.compose.runtime.mutableStateMapOf<Long, TowerSite>()
+    var operator by mutableStateOf<com.allnetworktools.data.FrOperator?>(null)
         private set
     var loading by mutableStateOf(false)
         private set
     var error by mutableStateOf<String?>(null)
         private set
-    var radiusKm by mutableStateOf(2)
+    /** The visible area is too large to ask the ANFR for every emitter: zoom in. */
+    var tooWide by mutableStateOf(false)
+        private set
+    var truncated by mutableStateOf(false)
+        private set
+    var dataUpdated by mutableStateOf<java.time.LocalDate?>(null)
+        private set
     var generations by mutableStateOf(setOf("2G", "3G", "4G", "5G"))
     var showPlanned by mutableStateOf(false)
     var selected by mutableStateOf<Long?>(null)
+    /** Camera kept between the card and the full-screen map, and across visits. */
+    var center by mutableStateOf<Pair<Double, Double>?>(null)
+    var zoom by mutableStateOf(15.0)
+    /** Set by the refresh action: the next camera report reloads even an area already loaded. */
+    var forceNext by mutableStateOf(false)
+    private var lastQuery: TowerQuery? = null
     private var job: Job? = null
 
-    fun load(q: TowerQuery, force: Boolean = false) {
-        val r = result
-        if (!force && r != null && r.query.operator == q.operator && r.query.radiusM == q.radiusM &&
-            TowerSite(0, q.lat, q.lon, null, "", emptyList(), emptyList(), null).distanceTo(r.query.lat, r.query.lon) < 150
-        ) return
+    /** Called when the camera settles; [box] is south, west, north, east. */
+    fun onViewport(op: com.allnetworktools.data.FrOperator, box: DoubleArray, me: Pair<Double, Double>, force: Boolean = false) {
+        if (operator != op) { sites.clear(); operator = op }
+        val (s, w, n, e) = box.toList()
+        val diag = TowerSite(0, s, w, null, "", emptyList(), emptyList(), null).distanceTo(n, e)
+        tooWide = diag > MaxDiagonalM
+        if (tooWide) return
+        val q = TowerQuery.area(op, s, w, n, e, me.first, me.second)
+        val last = lastQuery
+        // Skip when the new area lies inside the one already loaded.
+        if (!force && last != null && last.operator == op && last.box!!.let { b -> s >= b[0] && w >= b[1] && n <= b[2] && e <= b[3] }) return
         job?.cancel()
         loading = true
         error = null
         job = scope.launch {
             try {
-                result = repo.fetch(q)
+                // Load a margin around the view so small pans need no new request.
+                val dl = (n - s) * 0.25
+                val dw = (e - w) * 0.25
+                val wide = TowerQuery.area(op, s - dl, w - dw, n + dl, e + dw, me.first, me.second)
+                val r = repo.fetch(wide)
+                merge(r)
+                lastQuery = wide
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 error = e.message ?: "Réseau indisponible"
@@ -122,13 +152,30 @@ class TowerMapController(private val repo: TowerRepository, private val scope: C
         }
     }
 
-    fun visible(r: TowerResult): List<TowerSite> = r.sites.mapNotNull { s ->
+    private fun merge(r: TowerResult) {
+        r.sites.forEach { sites[it.supportId] = it }
+        truncated = r.truncated
+        r.dataUpdated?.let { d -> if (dataUpdated == null || d > dataUpdated!!) dataUpdated = d }
+        // Keep memory bounded when the user explores far.
+        if (sites.size > MaxSites) {
+            val q = r.query
+            sites.values.sortedByDescending { it.distanceTo(q.lat, q.lon) }.take(sites.size - MaxSites).forEach { sites.remove(it.supportId) }
+        }
+    }
+
+    fun visible(): List<TowerSite> = sites.values.mapNotNull { s ->
         val em = s.emitters.filter { it.generation in generations && (showPlanned || it.status != TowerSite.StatusPlanned) }
         if (em.isEmpty()) null else s.copy(emitters = em)
     }
 
     internal fun setForTest(r: TowerResult) {
-        result = r
+        operator = r.query.operator
+        merge(r)
+    }
+
+    companion object {
+        const val MaxDiagonalM = 40_000.0
+        const val MaxSites = 6000
     }
 }
 
@@ -158,9 +205,8 @@ fun TowerMapTool(vm: MainViewModel) {
     val loc = positions.fused ?: positions.gnss ?: positions.network ?: fallback
     val choice = remember { vm.operatorPlmns().let { (sim, net) -> chooseOperator(sim, net) to (sim to net) } }
     val op: OperatorChoice? = choice.first
-    val query = if (op != null && loc != null) TowerQuery(op.operator, loc.latitude, loc.longitude, c.radiusKm * 1000) else null
-    TopBarAction(Sym.Refresh) { query?.let { c.load(it, force = true) } }
-    LaunchedEffect(query?.operator, query?.radiusM, loc != null) { query?.let { c.load(it) } }
+    var full by remember { mutableStateOf(false) }
+    TopBarAction(Sym.Refresh) { c.forceNext = true }
     PageColumn {
         if (op == null) {
             val (sim, net) = choice.second
@@ -171,8 +217,13 @@ fun TowerMapTool(vm: MainViewModel) {
             )
             return@PageColumn
         }
-        val r = c.result
-        val sites = r?.let(c::visible).orEmpty()
+        if (loc == null) {
+            EmptyStateCard(Sym.LocationSearching, "Position inconnue", "La carte a besoin de votre position pour se centrer sur vous.")
+            return@PageColumn
+        }
+        val me = loc.latitude to loc.longitude
+        val sites = c.visible()
+        val nearest = sites.sortedBy { it.distanceTo(me.first, me.second) }
         HeroCard {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Symbol(Sym.CellTower, size = 28.dp, filled = true, tint = AntTheme.accent.accent)
@@ -182,49 +233,43 @@ fun TowerMapTool(vm: MainViewModel) {
                 (if (op.fromSim) "Opérateur de votre carte SIM" else "Réseau sur lequel vous êtes connecté") + " (${op.plmn.take(3)} ${op.plmn.drop(3)}). Seuls ses sites sont affichés.",
                 Modifier.padding(top = 4.dp), style = rf(13, 18),
             )
-            if (r != null && loc != null) {
-                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(sites.size.toString(), style = gs(48, 52, 500, -1.5f, tnum = true))
-                    Text("${plural(sites.size, "site")} à moins de ${c.radiusKm} km", Modifier.padding(bottom = 6.dp), style = rf(16, 22, 500))
-                }
-                sites.firstOrNull()?.let { s ->
-                    Text("Le plus proche : ${meters(s.distanceTo(loc.latitude, loc.longitude))} au ${cardinal(s.bearingFrom(loc.latitude, loc.longitude))}", style = rf(13, 18))
-                }
+            Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(sites.size.toString(), style = gs(48, 52, 500, -1.5f, tnum = true))
+                Text("${plural(sites.size, "site chargé", "sites chargés")} sur la carte", Modifier.padding(bottom = 6.dp), style = rf(16, 22, 500))
             }
-            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            nearest.firstOrNull()?.let { s ->
+                Text("Le plus proche : ${meters(s.distanceTo(me.first, me.second))} au ${cardinal(s.bearingFrom(me.first, me.second))}", style = rf(13, 18))
+            }
+            FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 when {
                     c.loading -> HeroChip("Interrogation de l'ANFR…", AntTheme.net.fair, blink = true)
-                    r != null -> HeroChip("ANFR · données du ${r.dataUpdated?.format(dmy) ?: "?"}", AntTheme.net.good)
+                    c.tooWide -> HeroChip("Zoomez pour charger les antennes", AntTheme.net.fair)
+                    c.dataUpdated != null -> HeroChip("ANFR · données du ${c.dataUpdated!!.format(dmy)}", AntTheme.net.good)
                 }
             }
         }
-        if (loc == null) {
-            EmptyStateCard(Sym.LocationSearching, "Position inconnue", "La carte a besoin de votre position pour chercher les antennes autour de vous.")
-            return@PageColumn
-        }
         val err = c.error
-        if (err != null && r == null) {
-            ToolError(Sym.CloudOff, "Données ANFR indisponibles", "Impossible de joindre data.anfr.fr ($err).", "Réessayer") { query?.let { c.load(it, force = true) } }
-            return@PageColumn
+        if (err != null) {
+            ToolError(Sym.CloudOff, "Données ANFR indisponibles", "Impossible de joindre data.anfr.fr ($err).", "Réessayer") { c.forceNext = true }
         }
-        SegmentedRow(listOf(1, 2, 5, 10).map { it to "$it km" }, c.radiusKm, { c.radiusKm = it; c.selected = null }, Modifier.fillMaxWidth(), height = 36.dp)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("5G", "4G", "3G", "2G").forEach { g ->
                 AntFilterChip(g, g in c.generations, { c.generations = if (g in c.generations) (c.generations - g).ifEmpty { c.generations } else c.generations + g }, leadingDot = genColor(g))
             }
             AntFilterChip("Projets approuvés", c.showPlanned, { c.showPlanned = !c.showPlanned })
         }
-        if (r == null) {
-            SectionCard { IndeterminateBar() }
-            return@PageColumn
-        }
-        if (r.truncated) {
+        if (c.truncated) {
             SectionCard(color = cs.errorContainer) {
-                Text("Zone très dense : l'ANFR renvoie au plus ${TowerRepository.MaxRows} émetteurs par requête. Réduisez le rayon pour tout voir.", style = rf(13, 18), color = cs.onErrorContainer)
+                Text("Zone très dense : l'ANFR renvoie au plus ${TowerRepository.MaxRows} émetteurs par requête. Zoomez pour tout voir.", style = rf(13, 18), color = cs.onErrorContainer)
+            }
+        }
+        if (full) {
+            com.allnetworktools.ui.components.FullscreenDialog({ full = false }) {
+                TowerMap(c, op, me, sites, Modifier.fillMaxSize(), onFullscreen = null)
             }
         }
         SectionCard(shape = RoundedCornerShape(28.dp), padding = PaddingValues(8.dp)) {
-            TowerMap(loc.latitude, loc.longitude, c.radiusKm * 1000.0, sites, c.selected) { c.selected = it }
+            TowerMap(c, op, me, sites, Modifier.fillMaxWidth().aspectRatio(0.95f).clip(RoundedCornerShape(20.dp)), onFullscreen = { full = true })
             Row(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 listOf("5G", "4G", "3G", "2G").filter { it in c.generations }.forEach { g ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -233,19 +278,17 @@ fun TowerMapTool(vm: MainViewModel) {
                     }
                 }
             }
-            Text("Couleur : génération la plus récente du site. Touchez un site pour voir ses émetteurs et leurs azimuts.", Modifier.padding(horizontal = 8.dp), style = rf(12, 16), color = cs.onSurfaceVariant)
+            Text("Déplacez la carte : les antennes de la zone affichée se chargent automatiquement. Touchez un site pour voir ses émetteurs et leurs azimuts.", Modifier.padding(horizontal = 8.dp), style = rf(12, 16), color = cs.onSurfaceVariant)
         }
         val sel = sites.firstOrNull { it.supportId == c.selected }
-        if (sel != null) SiteCard(sel, loc.latitude, loc.longitude)
-        if (sites.isEmpty()) {
-            EmptyStateCard(Sym.CellTower, "Aucun site", "Aucun site ${op.operator.label} déclaré à l'ANFR dans ce rayon avec ces filtres.")
-        } else {
+        if (sel != null) SiteCard(sel, me.first, me.second)
+        if (nearest.isNotEmpty()) {
             SectionCard(padding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)) {
-                Text("Sites les plus proches", Modifier.padding(bottom = 4.dp), style = rf(14, 20, 600), color = AntTheme.accent.accent)
-                sites.take(30).forEach { s ->
+                Text("Sites les plus proches de vous", Modifier.padding(bottom = 4.dp), style = rf(14, 20, 600), color = AntTheme.accent.accent)
+                nearest.take(20).forEach { s ->
                     Hairline()
                     Row(
-                        Modifier.fillMaxWidth().clickable { c.selected = s.supportId }.padding(vertical = 10.dp),
+                        Modifier.fillMaxWidth().clickable { c.selected = s.supportId; c.center = s.lat to s.lon }.padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Box(Modifier.size(12.dp).clip(CircleShape).background(genColor(s.bestGeneration)))
@@ -256,7 +299,7 @@ fun TowerMapTool(vm: MainViewModel) {
                                 style = rf(12, 16), color = cs.onSurfaceVariant, maxLines = 1,
                             )
                         }
-                        Text(meters(s.distanceTo(loc.latitude, loc.longitude)), style = rf(13, 18, 600, tnum = true))
+                        Text(meters(s.distanceTo(me.first, me.second)), style = rf(13, 18, 600, tnum = true))
                     }
                 }
             }
@@ -274,6 +317,7 @@ fun TowerMapTool(vm: MainViewModel) {
         }
     }
 }
+
 
 @Composable
 private fun SiteCard(s: TowerSite, lat: Double, lon: Double) {
@@ -361,17 +405,16 @@ private class TowerOverlay(private val density: Float) : Overlay() {
     }
 }
 
+
 @Composable
-private fun TowerMap(lat: Double, lon: Double, radiusM: Double, sites: List<TowerSite>, selected: Long?, onSelect: (Long?) -> Unit) {
+private fun TowerMap(c: TowerMapController, op: OperatorChoice, me: Pair<Double, Double>, sites: List<TowerSite>, modifier: Modifier, onFullscreen: (() -> Unit)?) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val dark = com.allnetworktools.ui.theme.isDarkTheme(AntTheme.settings)
-    val density = context.resources.displayMetrics.density
+    val density = LocalDensity.current.density
     val overlay = remember { TowerOverlay(density) }
-    val select by rememberUpdatedState(onSelect)
     val colors = mapOf("5G" to genColor("5G").toArgb(), "4G" to genColor("4G").toArgb(), "3G" to genColor("3G").toArgb(), "2G" to genColor("2G").toArgb())
     val accent = AntTheme.accent.accent.toArgb()
-    var fittedRadius by remember { mutableStateOf(-1.0) }
     val map = remember {
         configureOsm(context)
         TouchMapView(context).apply {
@@ -379,15 +422,34 @@ private fun TowerMap(lat: Double, lon: Double, radiusM: Double, sites: List<Towe
             setMultiTouchControls(true)
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             isTilesScaledToDpi = true
+            minZoomLevel = 5.0
             maxZoomLevel = 19.0
-            controller.setZoom(15.0)
-            controller.setCenter(GeoPoint(lat, lon))
+            controller.setZoom(c.zoom)
+            controller.setCenter((c.center ?: me).let { GeoPoint(it.first, it.second) })
         }
     }
-    fun fit() {
-        // zoomToBoundingBox never returns on a view that has no size yet.
-        if (map.width == 0 || map.height == 0) return
-        map.zoomToBoundingBox(BoundingBox.fromGeoPoints(Polygon.pointsAsCircle(GeoPoint(lat, lon), radiusM)).increaseByScale(1.05f), false, 16)
+    val report by rememberUpdatedState { force: Boolean ->
+        val b = map.boundingBox
+        if (map.width > 0 && map.height > 0) {
+            c.center = map.mapCenter.latitude to map.mapCenter.longitude
+            c.zoom = map.zoomLevelDouble
+            c.onViewport(op.operator, doubleArrayOf(b.latSouth, b.lonWest, b.latNorth, b.lonEast), me, force)
+        }
+    }
+    DisposableEffect(map) {
+        val listener = org.osmdroid.events.DelayedMapListener(object : org.osmdroid.events.MapListener {
+            override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean { report(false); return false }
+            override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean { report(false); return false }
+        }, 500)
+        map.addMapListener(listener)
+        map.addOnFirstLayoutListener { _, _, _, _, _ -> report(false) }
+        onDispose { map.removeMapListener(listener) }
+    }
+    LaunchedEffect(c.forceNext) { if (c.forceNext) { c.forceNext = false; report(true) } }
+    // A site picked in the list: bring it into view.
+    LaunchedEffect(c.selected) {
+        val s = sites.firstOrNull { it.supportId == c.selected } ?: return@LaunchedEffect
+        map.controller.animateTo(GeoPoint(s.lat, s.lon))
     }
     DisposableEffect(lifecycle) {
         val obs = LifecycleEventObserver { _, e ->
@@ -401,40 +463,41 @@ private fun TowerMap(lat: Double, lon: Double, radiusM: Double, sites: List<Towe
         map.onResume()
         onDispose { lifecycle.removeObserver(obs); map.onPause(); map.onDetach() }
     }
-    Box(Modifier.fillMaxWidth().aspectRatio(0.95f).clip(RoundedCornerShape(20.dp))) {
+    val safe = WindowInsets.safeDrawing
+    Box(modifier) {
         AndroidView(
             factory = { map },
             modifier = Modifier.fillMaxSize(),
             update = { m ->
-                m.overlays.clear()
-                m.overlays += Polygon().apply {
-                    points = Polygon.pointsAsCircle(GeoPoint(lat, lon), radiusM)
-                    fillPaint.color = (accent and 0x00FFFFFF) or 0x14000000
-                    setStrokeColor((accent and 0x00FFFFFF) or 0x88000000.toInt())
-                    setStrokeWidth(2f)
-                }
-                overlay.sites = sites.map { Triple(it, colors[it.bestGeneration] ?: accent, it.supportId == selected) }
-                overlay.me = GeoPoint(lat, lon)
+                overlay.sites = sites.map { Triple(it, colors[it.bestGeneration] ?: accent, it.supportId == c.selected) }
+                overlay.me = GeoPoint(me.first, me.second)
                 overlay.accent = accent
-                overlay.onTap = { select(it) }
-                m.overlays += overlay
+                overlay.onTap = { c.selected = it }
+                if (overlay !in m.overlays) m.overlays += overlay
                 m.overlayManager.tilesOverlay.setColorFilter(if (dark) darkTilesFilter else null)
-                if (fittedRadius != radiusM) {
-                    fittedRadius = radiusM
-                    if (m.width > 0 && m.height > 0) fit() else m.addOnFirstLayoutListener { _, _, _, _, _ -> fit() }
-                }
                 m.invalidate()
             },
         )
-        Column(Modifier.align(Alignment.TopEnd).padding(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.align(Alignment.TopEnd).windowInsetsPadding(safe).padding(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             val bg = cs.surface.copy(alpha = 0.92f)
+            if (onFullscreen != null) IconCircleButton(Sym.Fullscreen, onFullscreen, size = 36.dp, bg = bg, tint = cs.onSurface)
             IconCircleButton(Sym.Add, { map.controller.zoomIn() }, size = 36.dp, bg = bg, tint = cs.onSurface)
             IconCircleButton(Sym.Remove, { map.controller.zoomOut() }, size = 36.dp, bg = bg, tint = cs.onSurface)
-            IconCircleButton(Sym.MyLocation, { fit() }, size = 36.dp, bg = bg, tint = AntTheme.accent.accent)
+            IconCircleButton(Sym.MyLocation, { map.controller.animateTo(GeoPoint(me.first, me.second), 15.0, 600L) }, size = 36.dp, bg = bg, tint = AntTheme.accent.accent)
+        }
+        if (c.tooWide) {
+            Row(
+                Modifier.align(Alignment.TopCenter).windowInsetsPadding(safe).padding(top = 8.dp).clip(RoundedCornerShape(16.dp)).background(cs.inverseSurface)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Symbol(Sym.ZoomIn, size = 18.dp, tint = cs.inverseOnSurface)
+                Text("Zoomez pour charger les antennes", style = rf(12, 16, 600), color = cs.inverseOnSurface)
+            }
         }
         Text(
             "© les contributeurs d'OpenStreetMap",
-            Modifier.align(Alignment.BottomStart).padding(6.dp).clip(RoundedCornerShape(6.dp)).background(cs.surface.copy(alpha = 0.85f))
+            Modifier.align(Alignment.BottomStart).windowInsetsPadding(safe).padding(6.dp).clip(RoundedCornerShape(6.dp)).background(cs.surface.copy(alpha = 0.85f))
                 .clickable {
                     runCatching {
                         context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.openstreetmap.org/copyright")).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))

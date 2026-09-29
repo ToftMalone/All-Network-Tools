@@ -338,7 +338,7 @@ class ScreenshotTest {
         vm.tools.unknownTrackers.setForTest(
             listOf(
                 tag("F2:6B:91:0C:3A:58", "1EFF4C00121910" + "5A".repeat(22) + "0201", 38, walk, -61),
-                tag("C4:07:3B:E2:19:A0", "07165AFD10223344", 7, walk.take(3), -79),
+                tag("C4:07:3B:E2:19:A0", "02010403025AFD17165AFD12C24A037F21348D05197CC6BE000000ED90DFA7", 7, walk.take(3), -79),
                 tag("E8:12:77:40:BC:03", "07FF4C0012022400", 21, walk.take(2), -70),
             ),
             System.currentTimeMillis() - 41 * 60_000L, 2380.0,
@@ -347,10 +347,6 @@ class ScreenshotTest {
     @Test fun unknownTrackersEmpty() = shot("D5_unknown_trackers_empty", dark = true, nav = bt(Tool.UnknownTrackers)) { vm ->
         Scenario.bleEmpty = true
         vm.tools.unknownTrackers.reset()
-    }
-    @Test fun advertiser() = shot("D6_advertiser", nav = bt(Tool.Advertiser)) { vm -> vm.advertiser.start(vm.tools.advertiser.config) }
-    @Test fun advertiserEddystone() = shot("D7_advertiser_eddystone", dark = true, nav = bt(Tool.Advertiser)) { vm ->
-        vm.tools.advertiser.config = com.allnetworktools.data.AdvConfig(preset = com.allnetworktools.data.AdvPreset.Eddystone, url = "https://allnetwork.tools/", includeName = true)
     }
     @Test fun towerMap() = shot("D8_tower_map", nav = cellTool(Tool.TowerMap))
     @Test fun towerMapSelected() = shot("D9_tower_map_site", nav = cellTool(Tool.TowerMap)) { vm ->

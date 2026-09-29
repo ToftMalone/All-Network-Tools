@@ -2,9 +2,6 @@ package com.allnetworktools
 
 import android.net.wifi.ScanResult
 import com.allnetworktools.data.Ad
-import com.allnetworktools.data.AdvBuilder
-import com.allnetworktools.data.AdvConfig
-import com.allnetworktools.data.AdvPreset
 import com.allnetworktools.data.EvilTwin
 import com.allnetworktools.data.FollowLevel
 import com.allnetworktools.data.FrOperator
@@ -16,7 +13,6 @@ import com.allnetworktools.data.TrackerNet
 import com.allnetworktools.data.TwinRisk
 import com.allnetworktools.data.WifiAp
 import com.allnetworktools.data.chooseOperator
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -118,34 +114,6 @@ class NewToolsTest {
         assertEquals(FollowLevel.WithOwner, TrackerDetect.assess(near, walk).level)
     }
 
-    // ---- Advertiser ------------------------------------------------------------------------------
-
-    @Test fun buildsIBeaconFrame() {
-        val s = AdvBuilder.structures(AdvConfig(beaconUuid = "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0", major = 1, minor = 2, measuredPower = -59), null).getOrThrow().single()
-        assertEquals(Ad.MANUFACTURER, s.type)
-        assertEquals("4C000215E2C56DB5DFFB48D2B060D0F5A71096E000010002C5", s.data.joinToString("") { "%02X".format(it) })
-        assertEquals(27, AdvBuilder.size(listOf(s), false))
-        // Parsed back by the identification engine as an iBeacon.
-        assertEquals("iBeacon", com.allnetworktools.data.BleIdentify.identify(null, listOf(s)).model?.substringBefore(" ("))
-    }
-
-    @Test fun encodesEddystoneUrl() {
-        assertArrayEquals(byteArrayOf(0x03, 'e'.code.toByte(), 'x'.code.toByte(), 0x07), AdvBuilder.eddystoneUrl("https://ex.com"))
-        assertArrayEquals(byteArrayOf(0x00) + "example".toByteArray() + byteArrayOf(0x01) + "x".toByteArray(), AdvBuilder.eddystoneUrl("http://www.example.org/x"))
-        assertNull(AdvBuilder.eddystoneUrl("ftp://example.com"))
-        val frame = AdvBuilder.structures(AdvConfig(preset = AdvPreset.Eddystone, url = "https://example.com"), null).getOrThrow()
-        assertEquals("Beacon Eddystone-URL", com.allnetworktools.data.BleIdentify.identify(null, frame).model)
-    }
-
-    @Test fun rejectsBadInput() {
-        assertTrue(AdvBuilder.structures(AdvConfig(preset = AdvPreset.Manufacturer, payloadHex = "0G"), null).isFailure)
-        assertTrue(AdvBuilder.structures(AdvConfig(beaconUuid = "pas-un-uuid"), null).isFailure)
-        val long = AdvBuilder.structures(AdvConfig(preset = AdvPreset.Manufacturer, payloadHex = "00".repeat(30)), null).getOrThrow()
-        assertTrue(AdvBuilder.size(long, false) > 31)
-        val svc = AdvBuilder.structures(AdvConfig(preset = AdvPreset.Service, serviceUuid = "0xFFF0", serviceDataHex = "0102"), null).getOrThrow()
-        assertEquals(setOf(0xFFF0), Ad.uuids16(svc))
-    }
-
     // ---- Operators and ANFR data -------------------------------------------------------------------
 
     @Test fun operatorFollowsTheSimThenTheNetwork() {
@@ -179,5 +147,41 @@ class NewToolsTest {
         val json = javaClass.classLoader!!.getResource("anfr_free_paris.json")!!.readText()
         val r = TowerRepository.parse(TowerQuery(FrOperator.Orange, 48.8566, 2.3522, 600), json, 0)
         assertTrue(r.sites.isEmpty())
+    }
+
+    // ---- Galaxy SmartTag (reverse engineering of the SmartTag 2) --------------------------------
+
+    /** Frames captured with nRF Connect: same epoch 0xC2 and identifier, three states. */
+    private fun smartTagFrame(status: String) = Ad.parseHex("02010403025AFD17165AFD${status}C24A037F21348D05197CC6BE000000ED90DFA7")
+
+    @Test fun readsSmartTagStates() {
+        val lost = TrackerDetect.classify(smartTagFrame("11"))!!
+        assertEquals(TrackerNet.SamsungFind, lost.net)
+        assertEquals(true, lost.separated)
+        assertEquals("Déconnecté du propriétaire depuis moins de 15 min", lost.state)
+        assertEquals("C2:7F21348D05197CC6", lost.linkKey)
+        assertEquals(true, TrackerDetect.classify(smartTagFrame("12"))!!.separated)
+        val home = TrackerDetect.classify(smartTagFrame("15"))!!
+        assertEquals(false, home.separated)
+        assertEquals(FollowLevel.WithOwner, TrackerDetect.assess(home, listOf(Sighting(0, null, null, -50))).level)
+    }
+
+    @Test fun followsASmartTagAcrossAddressRotations() {
+        val c = com.allnetworktools.ui.pages.bt.UnknownTrackersController(null, null)
+        fun dev(addr: String, status: String) = com.allnetworktools.data.BleDevice.from(addr, null, -60, null, false, 0, smartTagFrame(status))
+        val pos = com.allnetworktools.data.PositionSet()
+        c.feed(listOf(dev("4E:D0:11:22:33:44", "11")), pos, 0)
+        // A state change forces a new private address, within the same epoch.
+        c.feed(listOf(dev("79:39:55:66:77:88", "12")), pos, 60_000)
+        assertEquals(1, c.candidates.size)
+        val t = c.candidates.values.single()
+        assertEquals(2, t.addresses.size)
+        assertEquals("Déconnecté du propriétaire depuis 15 min ou plus", t.signal.state)
+    }
+
+    @Test fun areaQueriesUseTheVisibleBox() {
+        val q = TowerQuery.area(FrOperator.Free, 48.85, 2.34, 48.86, 2.36, 48.855, 2.35)
+        assertEquals(listOf(48.85, 2.34, 48.86, 2.36), q.box!!.toList())
+        assertEquals(q, TowerQuery.area(FrOperator.Free, 48.85, 2.34, 48.86, 2.36, 48.855, 2.35))
     }
 }

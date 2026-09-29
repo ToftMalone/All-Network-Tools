@@ -18,7 +18,17 @@ enum class TrackerNet(val label: String, val maker: String) {
  * from its owner (Apple offline-finding frame, Google "unwanted tracking protection" frame), false when
  * it announces its owner is nearby, and null when the protocol does not tell.
  */
-data class TrackerSignal(val net: TrackerNet, val separated: Boolean?)
+data class TrackerSignal(
+    val net: TrackerNet,
+    val separated: Boolean?,
+    /** Precise state when the protocol gives one (SmartTag: "déconnecté depuis moins de 15 min"…). */
+    val state: String? = null,
+    /**
+     * Value that stays the same across a change of Bluetooth address, used to keep following a tag
+     * whose address rotates (SmartTag: epoch counter + rotating identifier).
+     */
+    val linkKey: String? = null,
+)
 
 data class Sighting(val timeMs: Long, val lat: Double?, val lon: Double?, val rssi: Int)
 
@@ -67,10 +77,37 @@ object TrackerDetect {
                 0x41 -> return TrackerSignal(TrackerNet.GoogleFindHub, true)
             }
         }
+        sd[0xFD5A]?.let { return smartTag(it) }
         val uuids = Ad.uuids16(ads)
         if (0xFD5A in uuids) return TrackerSignal(TrackerNet.SamsungFind, null)
         if (uuids.any { it == 0xFEED || it == 0xFEEC || it == 0xFD84 }) return TrackerSignal(TrackerNet.Tile, null)
         return null
+    }
+
+    /**
+     * Galaxy SmartTag service data (0xFD5A, 20 bytes), after a reverse engineering of the SmartTag 2:
+     * byte 0 = link with the owner's phone (0x15 connected, 0x11 lost for less than 15 min, 0x12 for
+     * 15 min or more), byte 1 = epoch counter (+1 every 15 min), bytes 4-11 = identifier rotating with
+     * the epoch, bytes 16-19 = check value. The address rotates on its own 15 min timer, shifted by
+     * about 7 min from the epoch, and on every state change: epoch + identifier bridge each rotation.
+     */
+    fun smartTag(d: ByteArray): TrackerSignal {
+        if (d.isEmpty()) return TrackerSignal(TrackerNet.SamsungFind, null)
+        val status = d.u8(0)
+        val (separated, state) = when (status) {
+            0x15 -> false to "Connecté au téléphone du propriétaire"
+            0x11 -> true to "Déconnecté du propriétaire depuis moins de 15 min"
+            0x12 -> true to "Déconnecté du propriétaire depuis 15 min ou plus"
+            else -> when (status and 0x07) {
+                5 -> false to "Connecté au propriétaire (0x%02X)".format(status)
+                1 -> true to "Déconnecté depuis moins de 15 min (0x%02X)".format(status)
+                2 -> true to "Déconnecté depuis 15 min ou plus (0x%02X)".format(status)
+                3 -> true to "Déconnecté depuis longtemps (0x%02X)".format(status)
+                else -> null to "État inconnu (0x%02X)".format(status)
+            }
+        }
+        val key = if (d.size >= 12) "%02X:".format(d.u8(1)) + d.hex(4, 12).replace(" ", "") else null
+        return TrackerSignal(TrackerNet.SamsungFind, separated, state, key)
     }
 
     fun distanceM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {

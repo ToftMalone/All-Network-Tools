@@ -179,4 +179,7 @@ object Sym {
     const val Podcasts = "podcasts"
     const val Height = "height"
     const val Event = "event"
+    const val Fullscreen = "fullscreen"
+    const val FullscreenExit = "fullscreen_exit"
+    const val ZoomIn = "zoom_in"
 }

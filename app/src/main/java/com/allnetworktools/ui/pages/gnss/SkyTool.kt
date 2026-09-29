@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -86,6 +87,19 @@ fun SkyTool(vm: MainViewModel) {
         val (lat, lon) = SatGeo.subPoint(observer.first, observer.second, s)
         SatOverhead(s, lat, lon, WorldMap.countryAt(countries, lat, lon) ?: WorldMap.oceanAt(lat, lon))
     }
+    var fullMap by remember { mutableStateOf(false) }
+    var fullSky by remember { mutableStateOf(false) }
+    if (fullMap && observer != null) {
+        com.allnetworktools.ui.components.FullscreenDialog({ fullMap = false }) { OsmSatelliteMap(observer, overhead, Modifier.fillMaxSize()) }
+    }
+    if (fullSky) {
+        com.allnetworktools.ui.components.FullscreenDialog({ fullSky = false }) {
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                val side = minOf(maxWidth, maxHeight)
+                Box(Modifier.size(side)) { SkyPlot(g.visible, height = side) }
+            }
+        }
+    }
     PageColumn {
         HeroCard {
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -103,7 +117,10 @@ fun SkyTool(vm: MainViewModel) {
         }
         when (view) {
             SkyView.Sky -> SectionCard(shape = RoundedCornerShape(32.dp)) {
-                SkyPlot(g.visible, height = 360.dp)
+                Box {
+                    SkyPlot(g.visible, height = 360.dp)
+                    IconCircleButton(Sym.Fullscreen, { fullSky = true }, Modifier.align(Alignment.TopEnd), size = 36.dp, bg = cs.surfaceContainerHigh, tint = cs.onSurface)
+                }
                 FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Constellation.entries.forEach { c ->
                         val vis = g.visible.count { it.constellation == c }
@@ -130,7 +147,7 @@ fun SkyTool(vm: MainViewModel) {
                     return@PageColumn
                 }
                 SectionCard(shape = RoundedCornerShape(28.dp), padding = androidx.compose.foundation.layout.PaddingValues(8.dp)) {
-                    OsmSatelliteMap(observer, overhead)
+                    OsmSatelliteMap(observer, overhead, onFullscreen = { fullMap = true })
                     Text(
                         "Point sous chaque satellite, calculé depuis sa direction et son orbite · fond de carte OpenStreetMap.",
                         Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp), style = rf(12, 16), color = cs.onSurfaceVariant,

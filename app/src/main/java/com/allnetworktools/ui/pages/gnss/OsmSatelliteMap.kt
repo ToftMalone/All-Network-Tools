@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -138,7 +141,12 @@ internal val darkTilesFilter = ColorMatrixColorFilter(
 )
 
 @Composable
-fun OsmSatelliteMap(observer: Pair<Double, Double>, sats: List<SatOverhead>) {
+fun OsmSatelliteMap(
+    observer: Pair<Double, Double>,
+    sats: List<SatOverhead>,
+    modifier: Modifier = Modifier.fillMaxWidth().aspectRatio(1.25f).clip(RoundedCornerShape(20.dp)),
+    onFullscreen: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
     val actions = LocalActions.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -180,7 +188,7 @@ fun OsmSatelliteMap(observer: Pair<Double, Double>, sats: List<SatOverhead>) {
             map.onDetach()
         }
     }
-    Box(Modifier.fillMaxWidth().aspectRatio(1.25f).clip(RoundedCornerShape(20.dp))) {
+    Box(modifier) {
         AndroidView(
             factory = { map },
             modifier = Modifier.fillMaxSize(),
@@ -194,8 +202,9 @@ fun OsmSatelliteMap(observer: Pair<Double, Double>, sats: List<SatOverhead>) {
                 m.invalidate()
             },
         )
-        Column(Modifier.align(Alignment.TopEnd).padding(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.align(Alignment.TopEnd).windowInsetsPadding(WindowInsets.safeDrawing).padding(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             val bg = cs.surface.copy(alpha = 0.92f)
+            if (onFullscreen != null) IconCircleButton(Sym.Fullscreen, onFullscreen, size = 36.dp, bg = bg, tint = cs.onSurface)
             IconCircleButton(Sym.Add, { map.controller.zoomIn() }, size = 36.dp, bg = bg, tint = cs.onSurface)
             IconCircleButton(Sym.Remove, { map.controller.zoomOut() }, size = 36.dp, bg = bg, tint = cs.onSurface)
             IconCircleButton(Sym.MyLocation, { map.controller.animateTo(here, 5.0, 600L) }, size = 36.dp, bg = bg, tint = acc)
@@ -203,7 +212,7 @@ fun OsmSatelliteMap(observer: Pair<Double, Double>, sats: List<SatOverhead>) {
         }
         Text(
             "© les contributeurs d'OpenStreetMap",
-            Modifier.align(Alignment.BottomStart).padding(6.dp).clip(RoundedCornerShape(6.dp)).background(cs.surface.copy(alpha = 0.85f))
+            Modifier.align(Alignment.BottomStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(6.dp).clip(RoundedCornerShape(6.dp)).background(cs.surface.copy(alpha = 0.85f))
                 .clickable { actions.openUrl("https://www.openstreetmap.org/copyright") }.padding(horizontal = 6.dp, vertical = 2.dp),
             style = rf(10, 13, 500), color = cs.onSurface,
         )
