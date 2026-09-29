@@ -11,6 +11,7 @@ on:
     tags: ['v*']
     branches: ['**']
     paths: ['.github/release-version']
+  workflow_dispatch:
 
 permissions:
   contents: write
