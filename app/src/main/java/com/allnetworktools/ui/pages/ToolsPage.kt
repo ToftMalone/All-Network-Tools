@@ -50,7 +50,15 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
             "Diagnostic",
             listOf(ToolEntry(Tool.Ping, "Ping", "Latence, gigue, pertes"), ToolEntry(Tool.Trace, "Traceroute", "Sauts jusqu'à l'hôte"), ToolEntry(Tool.Dns, "DNS Lookup", "A, AAAA, MX, TXT, NS"), ToolEntry(Tool.Whois, "Whois", "Domaine ou adresse IP")),
         ),
-        ToolGroup("Sécurité", listOf(ToolEntry(Tool.EvilTwin, "Faux points d'accès", "SSID dupliqués, evil twin"))),
+        ToolGroup(
+            "Sécurité",
+            listOf(
+                ToolEntry(Tool.Audit, "Audit du réseau", "Chiffrement, WPS, PMF, box"),
+                ToolEntry(Tool.EvilTwin, "Faux points d'accès", "SSID dupliqués, evil twin"),
+                ToolEntry(Tool.PortalDns, "Portail et DNS", "Portail captif, DNS falsifié"),
+                ToolEntry(Tool.Mitm, "Homme du milieu", "ARP spoofing, DHCP pirate"),
+            ),
+        ),
     )
     Network.Bluetooth -> listOf(
         ToolGroup(

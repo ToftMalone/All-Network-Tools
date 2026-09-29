@@ -376,4 +376,30 @@ class ScreenshotTest {
         )
         c.setForTest(t, plan)
     }
+
+    @Test fun audit() = shot("E0_wifi_audit", nav = tool(Tool.Audit)) { vm ->
+        val conn = com.allnetworktools.data.WifiConnection("Freebox-7A2C", "a4:3e:51:7c:2a:9f", -54, 5180, null, null, 6, "WPA3-Personnel (SAE)", "192.168.1.42", 24, "192.168.1.254", emptyList(), null, null)
+        val link = com.allnetworktools.data.LinkSnapshot(true, "192.168.1.254", emptyList(), listOf("192.168.1.254"), "192.168.1.254", false, null, true, false)
+        vm.tools.audit.setForTest(com.allnetworktools.data.NetworkAudit.checks(conn, "[RSN-SAE+PSK-CCMP][MFPC][WPS][ESS]", link, setOf(80, 443)), "Freebox-7A2C")
+    }
+    @Test fun portalDns() = shot("E1_portal_dns", nav = tool(Tool.PortalDns)) { vm ->
+        vm.tools.portalDns.setForTest(
+            listOf(
+                com.allnetworktools.data.SecCheck(com.allnetworktools.data.CheckLevel.Warn, "Portail captif", "Le réseau redirige le trafic web vers http://wifi.hotel-lumiere.fr/login : une page de connexion est probablement requise."),
+                com.allnetworktools.data.SecCheck(com.allnetworktools.data.CheckLevel.Good, "one.one.one.one → 1.1.1.1, 1.0.0.1", "Adresse authentique : le DNS du réseau ne falsifie pas cette réponse."),
+                com.allnetworktools.data.SecCheck(com.allnetworktools.data.CheckLevel.Good, "dns.google → 8.8.8.8, 8.8.4.4", "Adresse authentique : le DNS du réseau ne falsifie pas cette réponse."),
+                com.allnetworktools.data.SecCheck(com.allnetworktools.data.CheckLevel.Bad, "Domaines inexistants redirigés", "Un nom inventé (3f9c2a7e1b04.example.com) a reçu l'adresse 10.20.0.1 : le DNS redirige les erreurs vers une autre page."),
+                com.allnetworktools.data.SecCheck(com.allnetworktools.data.CheckLevel.Bad, "DNS intercepté", "Une requête envoyée à 192.0.2.53, où aucun serveur n'existe, a reçu une réponse : le réseau capte tout le trafic DNS (port 53), quel que soit le serveur choisi."),
+            ),
+            "Hotel-Lumiere-Guest",
+        )
+    }
+    @Test fun mitm() = shot("E2_mitm", nav = tool(Tool.Mitm)) { vm ->
+        val now = System.currentTimeMillis()
+        vm.tools.mitm.setForTest(
+            com.allnetworktools.data.GatewaySnapshot(now, "192.168.1.254", "192.168.1.254", listOf("192.168.1.254"), listOf("fe80::8e97:eaff:fe12:3456"), "192.168.1.37", "a4:3e:51:7c:2a:9f"),
+            listOf(com.allnetworktools.data.MitmEvent(now - 95_000, com.allnetworktools.data.CheckLevel.Bad, "Le premier routeur a changé : 192.168.1.254 → 192.168.1.37")),
+            23, now - 6 * 60_000L,
+        )
+    }
 }

@@ -197,7 +197,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
                 vm.navigate { it.copy(page = Page.ToolPage(Tool.Neighbors)) }
             }
             Tool.Channels, Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed,
-            Tool.Upnp, Tool.Bonjour, Tool.Whois, Tool.EvilTwin -> WifiToolRoute(vm, page)
+            Tool.Upnp, Tool.Bonjour, Tool.Whois, Tool.EvilTwin, Tool.Audit, Tool.PortalDns, Tool.Mitm -> WifiToolRoute(vm, page)
             else -> ComingSoon(page.tool)
         }
         else -> Unit
@@ -205,7 +205,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
 }
 
 /** Tools that only need an Internet connection, usable over mobile data with Wi-Fi off. */
-private val InternetTools = setOf(Tool.Ping, Tool.Trace, Tool.Dns, Tool.Speed, Tool.Ports, Tool.Whois)
+private val InternetTools = setOf(Tool.Ping, Tool.Trace, Tool.Dns, Tool.Speed, Tool.Ports, Tool.Whois, Tool.PortalDns)
 
 @Composable
 private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
@@ -232,6 +232,12 @@ private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
         Tool.Upnp -> com.allnetworktools.ui.pages.wifi.UpnpTool(tools.upnp)
         Tool.Bonjour -> com.allnetworktools.ui.pages.wifi.BonjourTool(tools.bonjour)
         Tool.Whois -> com.allnetworktools.ui.pages.wifi.WhoisTool(tools.whois)
+        Tool.Audit -> com.allnetworktools.ui.pages.wifi.AuditTool(tools.audit, conn, vm.wifiScan.collectAsStateWithLifecycle().value)
+        Tool.PortalDns -> {
+            val cell = vm.cell.collectAsStateWithLifecycle().value.state
+            com.allnetworktools.ui.pages.wifi.PortalDnsTool(tools.portalDns, conn?.ssid ?: cell?.operator?.let { "$it (données mobiles)" } ?: "réseau actif")
+        }
+        Tool.Mitm -> com.allnetworktools.ui.pages.wifi.MitmTool(tools.mitm, conn)
         Tool.EvilTwin -> com.allnetworktools.ui.pages.wifi.EvilTwinTool(
             tools.evilTwin, conn, vm.wifiScan, vm::startWifiScan, perms.location && locationOn,
             onFixLocation = { if (!perms.location) actions.request(PermGroup.Location) else actions.openLocationSettings() },

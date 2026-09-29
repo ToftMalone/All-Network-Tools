@@ -55,6 +55,8 @@ data class WifiAp(
     val security: String,
     val standard: Int,
     val centerFrequency: Int,
+    /** Raw capability string of the scan result ("[RSN-PSK-CCMP][MFPC][WPS][ESS]"). */
+    val caps: String = "",
 ) {
     val band: WifiBand get() = bandOf(frequency)
     val channel: Int get() = channelOf(frequency)
@@ -244,6 +246,7 @@ open class WifiRepository(context: Context) {
                 security = securityOfCapabilities(r.capabilities ?: ""),
                 standard = r.wifiStandard,
                 centerFrequency = r.centerFreq0.takeIf { it > 0 } ?: r.frequency,
+                caps = r.capabilities.orEmpty(),
             )
         }.sortedByDescending { it.rssi }
         val cb = object : WifiManager.ScanResultsCallback() {

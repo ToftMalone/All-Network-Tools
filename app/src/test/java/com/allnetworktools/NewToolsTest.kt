@@ -184,4 +184,66 @@ class NewToolsTest {
         assertEquals(listOf(48.85, 2.34, 48.86, 2.36), q.box!!.toList())
         assertEquals(q, TowerQuery.area(FrOperator.Free, 48.85, 2.34, 48.86, 2.36, 48.855, 2.35))
     }
+
+    // ---- Wi-Fi security --------------------------------------------------------------------------
+
+    private class FakeProbes(
+        val http: Triple<Int, Int, String?>? = Triple(204, 0, null),
+        val answers: Map<String, List<String>> = mapOf("one.one.one.one" to listOf("1.1.1.1", "1.0.0.1"), "dns.google" to listOf("8.8.8.8")),
+        val hijackNx: String? = null,
+        val intercept: Boolean = false,
+        val hop: String? = "192.168.1.254",
+    ) : com.allnetworktools.data.NetProbes {
+        override suspend fun connectivityCheck() = http
+        override suspend fun systemResolve(host: String) = answers[host] ?: hijackNx?.let { listOf(it) } ?: emptyList()
+        override suspend fun udpQuery(server: String, host: String) =
+            if (server == com.allnetworktools.data.PortalDnsCheck.Blackhole) (if (intercept) listOf("1.1.1.1") else null) else answers[host]
+        override suspend fun firstHop() = hop
+        override suspend fun tcpOpen(host: String, port: Int) = port == 80
+    }
+
+    private val cleanLink = com.allnetworktools.data.LinkSnapshot(true, "192.168.1.254", emptyList(), listOf("192.168.1.254"), "192.168.1.254", false, null, true, false)
+
+    @Test fun cleanNetworkPassesPortalAndDnsChecks() = kotlinx.coroutines.runBlocking {
+        val r = com.allnetworktools.data.PortalDnsCheck.run(FakeProbes(), cleanLink, "abc")
+        assertTrue(r.none { it.level == com.allnetworktools.data.CheckLevel.Bad || it.level == com.allnetworktools.data.CheckLevel.Warn })
+    }
+
+    @Test fun detectsPortalForgeryAndInterception() = kotlinx.coroutines.runBlocking {
+        val r = com.allnetworktools.data.PortalDnsCheck.run(
+            FakeProbes(http = Triple(302, 0, "http://portal.hotel/login"), answers = mapOf("one.one.one.one" to listOf("10.0.0.1"), "dns.google" to listOf("8.8.8.8")), hijackNx = "93.184.216.34", intercept = true),
+            cleanLink, "abc",
+        ).map { it.title }
+        assertTrue("Portail captif" in r)
+        assertTrue("Réponse DNS falsifiée" in r)
+        assertTrue("Domaines inexistants redirigés" in r)
+        assertTrue("DNS intercepté" in r)
+    }
+
+    @Test fun auditsTheConnectedNetwork() {
+        val conn = com.allnetworktools.data.WifiConnection("Box", "a4:3e:51:00:00:01", -50, 2437, null, null, 4, "WPA2-Personnel (PSK)", "192.168.1.2", 24, "192.168.1.254", emptyList(), null, null)
+        val c = com.allnetworktools.data.NetworkAudit.checks(conn, "[WPA2-PSK-TKIP+CCMP][RSN-PSK-CCMP][WPS][ESS]", cleanLink, setOf(80))
+        val titles = c.map { it.title }
+        assertTrue("WPS activé" in titles)
+        assertTrue("Chiffrement TKIP" in titles)
+        assertTrue("Trames de gestion non protégées" in titles)
+        assertTrue("DNS en clair" in titles)
+        assertTrue("Administration de la box en HTTP" in titles)
+        val s = com.allnetworktools.data.NetworkAudit.score(c)
+        assertTrue(s < 40)
+        val wpa3 = conn.copy(security = "WPA3-Personnel (SAE)")
+        val good = com.allnetworktools.data.NetworkAudit.checks(wpa3, "[RSN-SAE-CCMP][MFPR][ESS]", cleanLink.copy(privateDns = true), setOf(443))
+        assertEquals("A", com.allnetworktools.data.NetworkAudit.grade(com.allnetworktools.data.NetworkAudit.score(good)))
+    }
+
+    @Test fun flagsAnIntermediaryOnThePath() {
+        val ok = com.allnetworktools.data.GatewaySnapshot(0, "192.168.1.254", "192.168.1.254", listOf("192.168.1.254"), listOf("fe80::1"), "192.168.1.254", "b")
+        assertTrue(com.allnetworktools.data.MitmWatch.checks(ok).none { it.level == com.allnetworktools.data.CheckLevel.Bad })
+        val spoofed = ok.copy(timeMs = 15_000, firstHop = "192.168.1.37", ipv6Routers = listOf("fe80::1", "fe80::bad"))
+        assertTrue(com.allnetworktools.data.MitmWatch.checks(spoofed).any { it.title == "Un appareil s'intercale" })
+        val ev = com.allnetworktools.data.MitmWatch.changes(ok, spoofed)
+        assertEquals(2, ev.size)
+        // Roaming to another access point is not reported as an attack.
+        assertTrue(com.allnetworktools.data.MitmWatch.changes(ok, spoofed.copy(bssid = "other")).isEmpty())
+    }
 }

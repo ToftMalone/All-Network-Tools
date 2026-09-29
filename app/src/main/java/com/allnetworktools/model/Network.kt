@@ -62,6 +62,9 @@ enum class Tool(
     Bonjour(Network.Wifi, "Scanner Bonjour", Sym.Cast, Sym.Refresh),
     Whois(Network.Wifi, "Whois", Sym.TravelExplore, Sym.IosShare),
     EvilTwin(Network.Wifi, "Faux points d'accès", Sym.WifiTetheringError, Sym.Refresh),
+    Audit(Network.Wifi, "Audit du réseau", Sym.Shield, Sym.Refresh),
+    PortalDns(Network.Wifi, "Portail captif et DNS", Sym.Language, Sym.Refresh),
+    Mitm(Network.Wifi, "Homme du milieu", Sym.SwapHoriz, Sym.RestartAlt),
 
     BleScan(Network.Bluetooth, "Scanner BLE", Sym.BluetoothSearching, implemented = true),
     Gatt(Network.Bluetooth, "Appareil BLE", Sym.AccountTree, Sym.MoreVert),
