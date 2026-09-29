@@ -276,7 +276,8 @@ private fun PositionMap(sources: List<Triple<GeoPoint, Float, Int>>) {
             val r = acc.coerceAtLeast(10f).toDouble()
             org.osmdroid.views.overlay.Polygon.pointsAsCircle(g, r)
         }
-        if (pts.isEmpty()) return
+        // zoomToBoundingBox never returns on a view that has no size yet.
+        if (pts.isEmpty() || map.width == 0 || map.height == 0) return
         val box = BoundingBox.fromGeoPoints(pts).increaseByScale(1.3f)
         map.zoomToBoundingBox(box, false, 24)
         if (map.zoomLevelDouble > 19.0) map.controller.setZoom(19.0)
@@ -313,7 +314,7 @@ private fun PositionMap(sources: List<Triple<GeoPoint, Float, Int>>) {
                 overlay.dots = sources.map { it.first to it.third }
                 m.overlays += overlay
                 m.overlayManager.tilesOverlay.setColorFilter(if (dark) com.allnetworktools.ui.pages.gnss.darkTilesFilter else null)
-                if (!fitted) { fitted = true; fit() }
+                if (!fitted) { fitted = true; if (m.width > 0 && m.height > 0) fit() else m.addOnFirstLayoutListener { _, _, _, _, _ -> fit() } }
                 m.invalidate()
             },
         )
