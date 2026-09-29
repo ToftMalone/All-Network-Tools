@@ -43,6 +43,7 @@ object Scenario {
     var throttled = false
     var bleEmpty = false
     var usageGranted = false
+    var evilTwin = false
 }
 
 private fun Context.fakePermissions() = object : PermissionsRepository(this@fakePermissions) {
@@ -78,6 +79,13 @@ internal val scan = listOf(
     WifiAp("SFR_B2E1", "00:1f:9f:44:55:67", -70, 2462, 20, "WPA2", ScanResult.WIFI_STANDARD_11N, 2462),
 )
 
+/** A copy of the Freebox network, open and stronger, from a software-generated address; a Livebox copy from another maker. */
+internal val twins = listOf(
+    WifiAp("Freebox-7A2C", "02:4a:91:c3:5e:10", -41, 5180, 80, "Ouvert", ScanResult.WIFI_STANDARD_11N, 5180),
+    WifiAp("Livebox-91F0", "b8:27:eb:6a:0d:44", -58, 2412, 20, "WPA2", ScanResult.WIFI_STANDARD_11N, 2412),
+    WifiAp("Bbox-5G-4410", "e8:ad:a6:77:88:9a", -81, 5260, 80, "WPA2/3", ScanResult.WIFI_STANDARD_11AX, 5290),
+)
+
 private fun Context.fakeWifi() = object : WifiRepository(this@fakeWifi) {
     private var rssi = -54
     override val connection: Flow<WifiConnection?> = flowOf(
@@ -98,7 +106,7 @@ private fun Context.fakeWifi() = object : WifiRepository(this@fakeWifi) {
         MutableStateFlow(if (Scenario.throttled) SystemClock.elapsedRealtime() + 72_000 else 0L)
 
     override fun startScan() = !Scenario.throttled
-    override val scanResults: Flow<List<WifiAp>> = flowOf(scan)
+    override val scanResults: Flow<List<WifiAp>> = flowOf(if (Scenario.evilTwin) scan + twins else scan)
 }
 
 private fun fakeBle(addr: String, name: String?, rssi: Int, hex: String, connectable: Boolean = true) =
@@ -167,6 +175,8 @@ private fun Context.fakeCell() = object : CellRepository(this@fakeCell) {
         )
     }
 
+    override fun plmns(): Pair<String?, String?> = "20801" to "20801"
+
     override fun sims() = listOf(
         SimInfo(1, 1, "Orange F", listOf("Données mobiles", "Appels", "SMS"), false, "5G", 3, true),
         SimInfo(2, 2, "Free Mobile", emptyList(), true, "4G+", 2, false),
@@ -220,6 +230,28 @@ class FakeApp : AntApplication() {
     override val cell by lazy { fakeCell() }
     override val gnss by lazy { fakeGnss() }
     override val usage by lazy { fakeUsage() }
+    override val tles by lazy {
+        object : com.allnetworktools.data.orbit.TleRepository(null) {
+            override suspend fun load(forceRefresh: Boolean) =
+                parse(FakeApp::class.java.classLoader!!.getResource("gnss.tle")!!.readText(), System.currentTimeMillis() - 2 * 3_600_000L, false)
+        }
+    }
+    override val towers by lazy {
+        object : com.allnetworktools.data.TowerRepository() {
+            override suspend fun fetch(q: com.allnetworktools.data.TowerQuery) =
+                parse(q, FakeApp::class.java.classLoader!!.getResource("anfr_orange_paris.json")!!.readText(), System.currentTimeMillis())
+        }
+    }
+    override val advertiser by lazy {
+        object : com.allnetworktools.data.BleAdvertiser(this@FakeApp) {
+            private val s = MutableStateFlow<com.allnetworktools.data.AdvState>(com.allnetworktools.data.AdvState.Idle)
+            override val state: StateFlow<com.allnetworktools.data.AdvState> = s
+            override val supported = true
+            override fun deviceName() = "Pixel 9 Pro"
+            override fun start(c: com.allnetworktools.data.AdvConfig) { s.value = com.allnetworktools.data.AdvState.On(System.currentTimeMillis() - 42_000, -7) }
+            override fun stop() { s.value = com.allnetworktools.data.AdvState.Idle }
+        }
+    }
     override val updater by lazy {
         object : com.allnetworktools.update.AppUpdater(this@FakeApp, "0.1") {
             override suspend fun check(autoInstall: Boolean, force: Boolean) = Unit

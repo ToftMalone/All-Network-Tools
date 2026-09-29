@@ -145,7 +145,7 @@ private fun genColor(g: String): Color {
         "5G" -> n.cell.accent
         "4G" -> n.wifi.accent
         "3G" -> n.gnss.accent
-        else -> n.bt.accent
+        else -> cs.outline
     }
 }
 

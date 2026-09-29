@@ -22,6 +22,9 @@ enum class PermGroup(val permissions: List<String>) {
     ),
     Phone(listOf(Manifest.permission.READ_PHONE_STATE)),
 
+    /** Only for the BLE advertiser tool. */
+    Advertise(listOf(Manifest.permission.BLUETOOTH_ADVERTISE)),
+
     /** Special app-op, granted from the system "Usage access" screen. */
     UsageAccess(emptyList()),
 }

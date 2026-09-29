@@ -22,5 +22,6 @@ open class AntApplication : Application() {
     open val updater by lazy { com.allnetworktools.update.AppUpdater(this, BuildConfig.VERSION_NAME) }
     open val tles by lazy { com.allnetworktools.data.orbit.TleRepository(this) }
     open val towers by lazy { com.allnetworktools.data.TowerRepository() }
+    open val advertiser by lazy { com.allnetworktools.data.BleAdvertiser(this) }
     open val usage by lazy { com.allnetworktools.data.UsageRepository(this) }
 }

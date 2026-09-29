@@ -53,6 +53,7 @@ class ScreenshotTest {
         Scenario.throttled = false
         Scenario.bleEmpty = false
         Scenario.usageGranted = false
+        Scenario.evilTwin = false
     }
 
     private fun shot(name: String, dark: Boolean = false, onboarding: Boolean = false, nav: NavState = NavState(), setup: (MainViewModel) -> Unit = {}) {
@@ -309,5 +310,74 @@ class ScreenshotTest {
                 com.allnetworktools.RoamEvent(now - 1_900_000, "Freebox-7A2C", "a4:3e:51:7c:30:11", "a4:3e:51:7c:2a:9e", 2437, 5180, -78, -55, 640_000),
             ),
         )
+    }
+
+    @Test fun btTools() = shot("D0_bt_tools", nav = NavState(Network.Bluetooth, Page.Tools))
+    @Test fun cellTools() = shot("D1_cell_tools", nav = NavState(Network.Cellular, Page.Tools))
+    @Test fun evilTwin() {
+        Scenario.evilTwin = true
+        shot("D2_evil_twin", nav = tool(Tool.EvilTwin))
+    }
+    @Test fun evilTwinClean() = shot("D3_evil_twin_clean", dark = true, nav = tool(Tool.EvilTwin))
+
+    private fun tag(address: String, hex: String, minutesAgo: Int, path: List<Pair<Double, Double>>, rssi: Int): com.allnetworktools.ui.pages.bt.TrackerCandidate {
+        val ads = com.allnetworktools.data.Ad.parseHex(hex)
+        val sig = com.allnetworktools.data.TrackerDetect.classify(ads)!!
+        val now = System.currentTimeMillis()
+        return com.allnetworktools.ui.pages.bt.TrackerCandidate(address, sig).apply {
+            device = BleDevice.from(address, null, rssi, null, false, now, ads)
+            path.forEachIndexed { i, (la, lo) ->
+                sightings += com.allnetworktools.data.Sighting(now - minutesAgo * 60_000L + i * (minutesAgo * 60_000L / path.size.coerceAtLeast(1)), la, lo, rssi)
+            }
+            assessment = com.allnetworktools.data.TrackerDetect.assess(sig, sightings)
+        }
+    }
+
+    @Test fun unknownTrackers() = shot("D4_unknown_trackers", nav = bt(Tool.UnknownTrackers)) { vm ->
+        val walk = (0 until 12).map { 48.8566 + it * 0.0017 to 2.3522 + it * 0.0009 }
+        vm.tools.unknownTrackers.setForTest(
+            listOf(
+                tag("F2:6B:91:0C:3A:58", "1EFF4C00121910" + "5A".repeat(22) + "0201", 38, walk, -61),
+                tag("C4:07:3B:E2:19:A0", "07165AFD10223344", 7, walk.take(3), -79),
+                tag("E8:12:77:40:BC:03", "07FF4C0012022400", 21, walk.take(2), -70),
+            ),
+            System.currentTimeMillis() - 41 * 60_000L, 2380.0,
+        )
+    }
+    @Test fun unknownTrackersEmpty() = shot("D5_unknown_trackers_empty", dark = true, nav = bt(Tool.UnknownTrackers)) { vm ->
+        Scenario.bleEmpty = true
+        vm.tools.unknownTrackers.reset()
+    }
+    @Test fun advertiser() = shot("D6_advertiser", nav = bt(Tool.Advertiser)) { vm -> vm.advertiser.start(vm.tools.advertiser.config) }
+    @Test fun advertiserEddystone() = shot("D7_advertiser_eddystone", dark = true, nav = bt(Tool.Advertiser)) { vm ->
+        vm.tools.advertiser.config = com.allnetworktools.data.AdvConfig(preset = com.allnetworktools.data.AdvPreset.Eddystone, url = "https://allnetwork.tools/", includeName = true)
+    }
+    @Test fun towerMap() = shot("D8_tower_map", nav = cellTool(Tool.TowerMap))
+    @Test fun towerMapSelected() = shot("D9_tower_map_site", nav = cellTool(Tool.TowerMap)) { vm ->
+        runBlocking {
+            val r = app.towers.fetch(com.allnetworktools.data.TowerQuery(com.allnetworktools.data.FrOperator.Orange, 48.85661, 2.35222, 2000))
+            vm.tools.towerMap.setForTest(r)
+            vm.tools.towerMap.selected = r.sites.first().supportId
+        }
+    }
+    @Test fun passes() = shot("DA_passes", nav = gnssTool(Tool.Passes)) { vm -> precomputePasses(vm) }
+    @Test fun passesDark() = shot("DB_passes_dark", dark = true, nav = gnssTool(Tool.Passes)) { vm ->
+        vm.tools.passes.systems = setOf(com.allnetworktools.data.orbit.GnssSystem.Galileo)
+        precomputePasses(vm)
+    }
+
+    private fun precomputePasses(vm: MainViewModel) = runBlocking {
+        val c = vm.tools.passes
+        val t = app.tles.load()
+        val obs = com.allnetworktools.data.orbit.Observer(48.857, 2.352, 42.0)
+        val now = System.currentTimeMillis()
+        val sats = t.sats.filter { it.system in c.systems }
+        val end = now + c.hours * 3_600_000L
+        val plan = com.allnetworktools.ui.pages.gnss.PassPlan(
+            obs, now, end, c.mask.toDouble(),
+            com.allnetworktools.data.orbit.PassPredictor.visibleCounts(sats, obs, now, end, c.mask.toDouble(), c.hours * 3_600_000L / 96),
+            sats.flatMap { com.allnetworktools.data.orbit.PassPredictor.passes(it, obs, now, end, c.mask.toDouble()) }, sats,
+        )
+        c.setForTest(t, plan)
     }
 }

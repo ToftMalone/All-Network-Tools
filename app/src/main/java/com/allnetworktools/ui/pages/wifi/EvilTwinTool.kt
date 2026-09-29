@@ -105,7 +105,7 @@ fun EvilTwinTool(
             }
             val aps = scan.orEmpty().size
             Text(
-                "${reports.size} ${plural(reports.size, "nom de réseau")} et $aps ${plural(aps, "point d'accès", "points d'accès")} analysés",
+                "${reports.size} ${plural(reports.size, "nom de réseau", "noms de réseau")} et $aps ${plural(aps, "point d'accès", "points d'accès")} analysés",
                 style = rf(14, 20),
             )
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

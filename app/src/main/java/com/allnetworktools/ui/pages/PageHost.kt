@@ -183,7 +183,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.PositionCompare -> com.allnetworktools.ui.pages.gnss.PositionCompareTool(vm)
             Tool.Passes -> com.allnetworktools.ui.pages.gnss.PassesTool(vm)
             Tool.TowerMap -> com.allnetworktools.ui.pages.cell.TowerMapTool(vm)
-            Tool.Gatt, Tool.Paired, Tool.Tracker -> BtToolRoute(vm, page)
+            Tool.Gatt, Tool.Paired, Tool.Tracker, Tool.UnknownTrackers, Tool.Advertiser -> BtToolRoute(vm, page)
             Tool.DataUsage -> {
                 val perms by vm.permissions.collectAsStateWithLifecycle()
                 val actions = LocalActions.current
@@ -272,6 +272,19 @@ private fun BtToolRoute(vm: MainViewModel, page: Page.ToolPage) {
                 onDispose { vm.setBleLowLatency(false) }
             }
             TrackerTool(vm.tools.tracker, ble)
+        }
+        Tool.UnknownTrackers -> {
+            val positions by vm.positions.collectAsStateWithLifecycle()
+            com.allnetworktools.ui.pages.bt.UnknownTrackersTool(
+                vm.tools.unknownTrackers, ble, positions,
+                onLocate = { d -> vm.tools.tracker.follow(d); vm.navigate { it.copy(page = Page.ToolPage(Tool.Tracker)) } },
+                onDetails = { a -> vm.navigate { it.copy(page = Page.ToolPage(Tool.Gatt, a)) } },
+            )
+        }
+        Tool.Advertiser -> {
+            val perms by vm.permissions.collectAsStateWithLifecycle()
+            val actions = LocalActions.current
+            com.allnetworktools.ui.pages.bt.AdvertiserTool(vm.tools.advertiser, vm.advertiser, PermGroup.Advertise in perms) { actions.request(PermGroup.Advertise) }
         }
         else -> Unit
     }
