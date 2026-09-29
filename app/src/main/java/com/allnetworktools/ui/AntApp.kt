@@ -79,6 +79,7 @@ fun AntApp(vm: MainViewModel) {
                 } else {
                     MainShell(vm)
                 }
+                UpdateBanner(vm, Modifier.align(Alignment.TopCenter))
                 Snackbar(toaster, Modifier.align(Alignment.BottomCenter))
             }
         }

@@ -85,10 +85,6 @@ class AppActions(
                 openAppSettings()
                 toast("Autorisez l'accès dans Paramètres Android › Autorisations")
             }
-            group == PermGroup.BackgroundLocation && !vm.permissions.value.location -> {
-                toast("Autorisez d'abord la position précise")
-                request(PermGroup.Location)
-            }
             else -> {
                 vm.markAsked(group)
                 requestPermissions(group.permissions.toTypedArray())
@@ -113,14 +109,6 @@ class AppActions(
 
     fun share(title: String, text: String) {
         val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, title).putExtra(Intent.EXTRA_TEXT, text)
-        launch(Intent.createChooser(send, title))
-    }
-
-    /** Shares a file from app storage through the FileProvider declared in the manifest. */
-    fun shareFile(file: java.io.File, mime: String, title: String) {
-        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-        val send = Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri).putExtra(Intent.EXTRA_SUBJECT, title)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         launch(Intent.createChooser(send, title))
     }
 

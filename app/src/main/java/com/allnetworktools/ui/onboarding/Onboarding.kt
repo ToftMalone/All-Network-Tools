@@ -63,7 +63,6 @@ private val ObPerms = listOf(
     ObPerm(PermGroup.Location, Sym.LocationOn, "Position précise", "Wi-Fi (SSID, scans) et GNSS", Network.Wifi, Sym.Wifi),
     ObPerm(PermGroup.Nearby, Sym.BluetoothSearching, "Appareils à proximité", "Scan et connexion Bluetooth", Network.Bluetooth, Sym.Bluetooth),
     ObPerm(PermGroup.Phone, Sym.SimCard, "Téléphone", "Opérateur, cellules, double SIM", Network.Cellular, Sym.CellBars3),
-    ObPerm(PermGroup.Notifications, Sym.Notifications, "Notifications", "Scans et enregistrements en arrière-plan", Network.Gnss, Sym.Notifications),
 )
 
 @Composable

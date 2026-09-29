@@ -21,8 +21,6 @@ enum class PermGroup(val permissions: List<String>) {
         },
     ),
     Phone(listOf(Manifest.permission.READ_PHONE_STATE)),
-    Notifications(if (Build.VERSION.SDK_INT >= 33) listOf(Manifest.permission.POST_NOTIFICATIONS) else emptyList()),
-    BackgroundLocation(listOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION)),
 
     /** Special app-op, granted from the system "Usage access" screen. */
     UsageAccess(emptyList()),

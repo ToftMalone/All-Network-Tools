@@ -3,7 +3,6 @@ package com.allnetworktools
 import android.app.Application
 import com.allnetworktools.data.BluetoothRepository
 import com.allnetworktools.data.CellRepository
-import com.allnetworktools.data.CompassRepository
 import com.allnetworktools.data.GnssRepository
 import com.allnetworktools.data.HistoryStore
 import com.allnetworktools.data.PermissionsRepository
@@ -19,9 +18,7 @@ open class AntApplication : Application() {
     open val bluetooth by lazy { BluetoothRepository(this) }
     open val cell by lazy { CellRepository(this) }
     open val gnss by lazy { GnssRepository(this) }
-    open val compass by lazy { CompassRepository(this) }
     open val history by lazy { HistoryStore(this) }
+    open val updater by lazy { com.allnetworktools.update.AppUpdater(this, BuildConfig.VERSION_NAME) }
     open val usage by lazy { com.allnetworktools.data.UsageRepository(this) }
-    val recording by lazy { com.allnetworktools.service.RecordingController(this) }
-    val cellRecorder by lazy { com.allnetworktools.data.CellRecorder(history) }
 }

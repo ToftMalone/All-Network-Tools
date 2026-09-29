@@ -143,7 +143,7 @@ fun CellDetailTool(state: CellState?, arg: String?, onNeighbors: () -> Unit) {
         val tiles = buildList {
             q(m.rsrq, RsrqSpec).let { (t, c) -> add(Tile(if (nr) "SS-RSRQ" else "RSRQ", m.rsrq?.let { "${fmt(it)} dB" } ?: "—", t, c)) }
             q(m.sinr, SinrSpec).let { (t, c) -> add(Tile(if (nr) "SS-SINR" else "RSSNR", m.sinr?.let { "${fmt(it)} dB" } ?: "—", t, c)) }
-            if (!nr) q(m.rssi, RssiSpec).let { (t, c) -> add(Tile("RSSI", m.rssi?.let { "${fmt(it)} dBm" } ?: "—", t, c)) }
+            q(m.rssi, RssiSpec).let { (t, c) -> add(Tile(if (m.rssiEstimated) "RSSI (estimé)" else "RSSI", m.rssi?.let { "${if (m.rssiEstimated) "≈ " else ""}${fmt(it)} dBm" } ?: "—", t, c)) }
             val taNote = when {
                 m.timingAdvance == null -> "non mesuré"
                 nr -> "≈ ${fmt(m.timingAdvance * 150)} m"

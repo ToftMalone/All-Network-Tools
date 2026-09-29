@@ -55,6 +55,9 @@ data class GnssState(
     val constellationCount get() = visible.map { it.constellation }.filter { it != Constellation.Other }.distinct().size
 }
 
+/** The three positions Android can give at once: satellites, network (Wi-Fi + cell towers) and fused. */
+data class PositionSet(val gnss: Location? = null, val network: Location? = null, val fused: Location? = null)
+
 @SuppressLint("MissingPermission")
 open class GnssRepository(private val context: Context) {
     private val lm = context.getSystemService(LocationManager::class.java)
@@ -112,21 +115,26 @@ open class GnssRepository(private val context: Context) {
     }
 
     /**
-     * Raw NMEA 0183 sentences with their receive time. A GPS location request keeps the
-     * receiver running, since the chipset only emits sentences while it is active.
+     * Follows the GPS, network and fused providers together. The network provider is computed by
+     * the system from the visible Wi-Fi access points and the cell towers; Bluetooth is not a
+     * position source Android exposes to apps.
      */
-    open fun nmea(): Flow<Pair<Long, String>> = callbackFlow {
-        val mgr = lm ?: run { awaitClose { }; return@callbackFlow }
-        val listener = OnNmeaMessageListener { msg, ts -> trySend(ts to msg.trim()) }
-        val keepAlive = LocationListener { }
-        runCatching {
-            mgr.addNmeaListener(context.mainExecutor, listener)
-            mgr.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, keepAlive, context.mainLooper)
-        }.onFailure { close(it) }
-        awaitClose {
-            mgr.removeNmeaListener(listener)
-            mgr.removeUpdates(keepAlive)
+    open fun positions(refreshMs: Long): Flow<PositionSet> = callbackFlow {
+        val mgr = lm ?: run { trySend(PositionSet()); awaitClose { }; return@callbackFlow }
+        fun last(p: String) = runCatching { mgr.getLastKnownLocation(p) }.getOrNull()
+        var set = PositionSet(last(LocationManager.GPS_PROVIDER), last(LocationManager.NETWORK_PROVIDER), last(LocationManager.FUSED_PROVIDER))
+        val listeners = mutableListOf<LocationListener>()
+        fun follow(provider: String, apply: (PositionSet, Location) -> PositionSet) {
+            if (provider !in mgr.allProviders) return
+            val l = LocationListener { loc -> set = apply(set, loc); trySend(set) }
+            listeners += l
+            runCatching { mgr.requestLocationUpdates(provider, refreshMs, 0f, l, context.mainLooper) }
         }
+        follow(LocationManager.GPS_PROVIDER) { s, l -> s.copy(gnss = l) }
+        follow(LocationManager.NETWORK_PROVIDER) { s, l -> s.copy(network = l) }
+        follow(LocationManager.FUSED_PROVIDER) { s, l -> s.copy(fused = l) }
+        trySend(set)
+        awaitClose { listeners.forEach { mgr.removeUpdates(it) } }
     }
 
     /** Fix type from GSA and HDOP from GGA/GSA. */

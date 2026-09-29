@@ -48,6 +48,8 @@ data class CellMeasure(
     val timingAdvance: Int?,
     val bandwidthKhz: Int?,
     val downlinkMhz: Double?,
+    /** True when [rssi] is computed from RSRP and RSRQ because the modem does not report it (5G NR). */
+    val rssiEstimated: Boolean = false,
 ) {
     /** Key identifying the same physical cell across updates. */
     val key: String get() = "${tech.name}-$arfcn-$pci"
@@ -82,6 +84,10 @@ data class CellState(
     val hasService: Boolean,
 )
 
+/** RSSI (dBm) from SS-RSRP and SS-RSRQ, or null when either is missing. */
+internal fun nrRssi(rsrp: Int?, rsrq: Int?): Int? =
+    if (rsrp == null || rsrq == null) null else Math.round(rsrp + 10 * Math.log10(20.0) - rsrq).toInt()
+
 private fun nrArfcnToMhz(n: Int): Double = when {
     n < 600000 -> 0.005 * n
     n < 2016667 -> 3000 + 0.015 * (n - 600000)
@@ -107,11 +113,14 @@ private fun measure(info: CellInfo): CellMeasure? = when (info) {
             rsrp = ss.ssRsrp.validOr() ?: ss.csiRsrp.validOr(),
             rsrq = ss.ssRsrq.validOr() ?: ss.csiRsrq.validOr(),
             sinr = ss.ssSinr.validOr() ?: ss.csiSinr.validOr(),
-            rssi = null,
+            // Android exposes no RSSI for NR: SS-RSRQ = N × SS-RSRP / RSSI with N = 20 RB (the SSB width),
+            // hence RSSI ≈ RSRP + 10·log10(20) − RSRQ.
+            rssi = nrRssi(ss.ssRsrp.validOr() ?: ss.csiRsrp.validOr(), ss.ssRsrq.validOr() ?: ss.csiRsrq.validOr()),
             cqi = ss.csiCqiReport.firstOrNull(),
             timingAdvance = if (Build.VERSION.SDK_INT >= 34) ss.timingAdvanceMicros.validOr() else null,
             bandwidthKhz = null,
             downlinkMhz = arfcn?.let(::nrArfcnToMhz),
+            rssiEstimated = true,
         )
     }
     is CellInfoLte -> {

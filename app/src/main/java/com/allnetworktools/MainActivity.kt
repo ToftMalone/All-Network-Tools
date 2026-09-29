@@ -16,12 +16,6 @@ class MainActivity : ComponentActivity() {
         setContent { AntApp(vm) }
     }
 
-    override fun onStart() {
-        super.onStart()
-        // Restarts recordings whose service was killed while the app was away.
-        if (vm.recording.active.value.isNotEmpty()) com.allnetworktools.service.RecordingService.start(this)
-    }
-
     override fun onResume() {
         super.onResume()
         vm.refreshPermissions()

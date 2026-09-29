@@ -12,7 +12,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 enum class BleVendor(val label: String) {
-    Apple("Apple"), Microsoft("Microsoft"), Samsung("Samsung"), Google("Google"), Mesh("Bluetooth Mesh"), Beacon("Beacons"),
+    Apple("Apple"), Microsoft("Microsoft"), Samsung("Samsung"), Google("Google"), Mesh("Bluetooth Mesh"), Beacon("Tag"),
 }
 
 data class BleDevice(

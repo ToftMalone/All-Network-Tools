@@ -29,9 +29,9 @@ enum class Network(
             Gnss -> Tool.Sky
         }
 
-    /** Tool reachable directly from the dock; GNSS has none, its tools live in the Tools page. */
+    /** Tool reachable directly from the dock. */
     val dockShortcut: Tool?
-        get() = if (this == Gnss) null else featured
+        get() = featured
 }
 
 /** Where the back arrow of a tool leads. */
@@ -65,17 +65,14 @@ enum class Tool(
     BleScan(Network.Bluetooth, "Scanner BLE", Sym.BluetoothSearching, implemented = true),
     Gatt(Network.Bluetooth, "Appareil BLE", Sym.AccountTree, Sym.MoreVert),
     Paired(Network.Bluetooth, "Appareil appairé", Sym.Headphones, Sym.MoreVert, ToolParent.Dashboard),
-    Tracker(Network.Bluetooth, "Traqueur de proximité", Sym.MyLocation),
+    Tracker(Network.Bluetooth, "Chaud/Froid", Sym.MyLocation),
 
     Neighbors(Network.Cellular, "Cellules voisines", Sym.CellTower, implemented = true),
-    CellLog(Network.Cellular, "Journal des cellules", Sym.Timeline, Sym.IosShare),
-    SignalHistory(Network.Cellular, "Historique du signal", Sym.Monitoring, Sym.IosShare),
     DataUsage(Network.Cellular, "Données mobiles", Sym.DataUsage, Sym.CalendarMonth),
     CellDetail(Network.Cellular, "Détail de la cellule", Sym.CellTower, Sym.ContentCopy, ToolParent.Other(Neighbors)),
 
     Sky(Network.Gnss, "Ciel GNSS", Sym.SatelliteAlt, implemented = true),
-    Compass(Network.Gnss, "Boussole", Sym.Explore, implemented = true),
-    Nmea(Network.Gnss, "Journal NMEA", Sym.Terminal, Sym.IosShare),
+    PositionCompare(Network.Gnss, "Comparer les positions", Sym.ShareLocation, Sym.Refresh),
     ;
 
     val isDockShortcut: Boolean get() = network.dockShortcut == this

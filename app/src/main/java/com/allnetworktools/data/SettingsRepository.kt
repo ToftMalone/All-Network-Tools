@@ -31,6 +31,8 @@ data class AppSettings(
     val askedPermissions: Set<String> = emptySet(),
     /** Monthly mobile data allowance in GB, 0 when not set. */
     val dataPlanGb: Int = 0,
+    /** Look for a newer release on GitHub at launch and install it. */
+    val autoUpdate: Boolean = true,
 ) {
     val refreshMillis: Long get() = (refreshSeconds * 1000).toLong()
 }
@@ -50,6 +52,7 @@ class SettingsRepository(private val context: Context) {
         val onboarding = booleanPreferencesKey("onboarding_done")
         val asked = stringSetPreferencesKey("asked_permissions")
         val plan = intPreferencesKey("data_plan_gb")
+        val autoUpdate = booleanPreferencesKey("auto_update")
     }
 
     val settings: Flow<AppSettings> = context.store.data.map { p ->
@@ -66,6 +69,7 @@ class SettingsRepository(private val context: Context) {
             onboardingDone = p[K.onboarding] ?: d.onboardingDone,
             askedPermissions = p[K.asked] ?: d.askedPermissions,
             dataPlanGb = p[K.plan] ?: d.dataPlanGb,
+            autoUpdate = p[K.autoUpdate] ?: d.autoUpdate,
         )
     }
 
@@ -78,6 +82,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setKeepAwake(v: Boolean) = context.store.edit { it[K.awake] = v }
     suspend fun setHistoryDays(v: Int) = context.store.edit { it[K.history] = v }
     suspend fun setOnboardingDone(done: Boolean = true) = context.store.edit { it[K.onboarding] = done }
+    suspend fun setAutoUpdate(v: Boolean) = context.store.edit { it[K.autoUpdate] = v }
     suspend fun setDataPlanGb(v: Int) = context.store.edit { it[K.plan] = v }
     suspend fun markAsked(group: String) = context.store.edit { it[K.asked] = (it[K.asked] ?: emptySet()) + group }
 }

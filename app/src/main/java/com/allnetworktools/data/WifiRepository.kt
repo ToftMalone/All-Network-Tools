@@ -43,6 +43,9 @@ data class WifiConnection(
     val channel: Int get() = channelOf(frequency)
 }
 
+/** Live values read straight from the Wi-Fi stack; the BSSID changes when the device roams to another AP. */
+data class WifiPoll(val rssi: Int, val tx: Int, val rx: Int, val bssid: String?, val frequency: Int?)
+
 data class WifiAp(
     val ssid: String,
     val bssid: String,
@@ -198,10 +201,10 @@ open class WifiRepository(context: Context) {
 
     /** Latest RSSI and link speeds, read directly since capability callbacks are coarse. */
     @Suppress("DEPRECATION")
-    open fun pollRssi(): Triple<Int, Int, Int>? {
+    open fun pollRssi(): WifiPoll? {
         val i = wifi?.connectionInfo ?: return null
         if (i.networkId == -1 && i.rssi <= -127) return null
-        return Triple(i.rssi, i.txLinkSpeedMbps, i.rxLinkSpeedMbps)
+        return WifiPoll(i.rssi, i.txLinkSpeedMbps, i.rxLinkSpeedMbps, i.bssid?.takeIf { it != "02:00:00:00:00:00" }, i.frequency.takeIf { it > 0 })
     }
 
     private val _scanTimes = ArrayDeque<Long>()

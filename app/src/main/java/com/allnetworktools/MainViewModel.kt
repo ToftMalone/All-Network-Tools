@@ -9,7 +9,6 @@ import com.allnetworktools.data.BleDevice
 import com.allnetworktools.data.BluetoothSnapshot
 import com.allnetworktools.data.AdapterInfo
 import com.allnetworktools.data.CellState
-import com.allnetworktools.data.CompassReading
 import com.allnetworktools.data.GnssState
 import com.allnetworktools.data.PermGroup
 import com.allnetworktools.data.PermissionSnapshot
@@ -58,6 +57,20 @@ data class NavState(
 )
 
 data class WifiUi(val connection: WifiConnection?, val history: List<Float>)
+
+/** The device moved from one access point of the same network to another. */
+data class RoamEvent(
+    val atMs: Long,
+    val ssid: String?,
+    val fromBssid: String,
+    val toBssid: String,
+    val fromFreq: Int,
+    val toFreq: Int,
+    val rssiBefore: Int,
+    val rssiAfter: Int,
+    /** How long the device stayed on the previous AP, when known. */
+    val stayedMs: Long?,
+)
 data class CellUi(val state: CellState?, val history: List<Float>)
 
 private fun tickerFlow(periodMs: Long): Flow<Long> = flow {
@@ -145,8 +158,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val wifiLive: Flow<WifiConnection?> = whenAvailable(Network.Wifi, null) {
         combine(g.wifi.connection, rate) { c, r -> c to r }.flatMapLatest { (c, r) ->
             if (c == null) flowOf(null) else tickerFlow(r).map {
-                g.wifi.pollRssi()?.let { (rssi, tx, rx) ->
-                    c.copy(rssi = rssi, linkTx = tx.takeIf { it > 0 } ?: c.linkTx, linkRx = rx.takeIf { it > 0 } ?: c.linkRx)
+                g.wifi.pollRssi()?.let { p ->
+                    c.copy(
+                        rssi = p.rssi, linkTx = p.tx.takeIf { it > 0 } ?: c.linkTx, linkRx = p.rx.takeIf { it > 0 } ?: c.linkRx,
+                        bssid = p.bssid ?: c.bssid, frequency = p.frequency ?: c.frequency,
+                    )
                 } ?: c
             }
         }
@@ -160,6 +176,41 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         wifiLive.collect { conn = it; send(WifiUi(conn, if (it == null) emptyList() else hist)) }
     }.stateIn(viewModelScope, sharing, WifiUi(null, emptyList()))
+
+    private val _roams = MutableStateFlow<List<RoamEvent>>(emptyList())
+
+    /** Access-point changes on the current network, newest first. Cleared when the network changes. */
+    val roams: StateFlow<List<RoamEvent>> = _roams
+
+    val updater get() = g.updater
+
+    internal fun setRoamsForTest(list: List<RoamEvent>) {
+        _roams.value = list
+    }
+
+    private fun trackRoaming() {
+        viewModelScope.launch {
+            var last: WifiConnection? = null
+            var lastSince = SystemClock.elapsedRealtime()
+            wifiLive.collect { c ->
+                val prev = last
+                last = c
+                if (c == null) return@collect
+                if (prev == null || prev.ssid != c.ssid || prev.connectedAtElapsed != c.connectedAtElapsed) {
+                    if (prev != null) _roams.value = emptyList()
+                    lastSince = SystemClock.elapsedRealtime()
+                    return@collect
+                }
+                val a = prev.bssid
+                val b = c.bssid
+                if (a != null && b != null && !a.equals(b, true)) {
+                    val now = SystemClock.elapsedRealtime()
+                    _roams.value = (listOf(RoamEvent(System.currentTimeMillis(), c.ssid, a, b, prev.frequency, c.frequency, prev.rssi, c.rssi, now - lastSince)) + _roams.value).take(50)
+                    lastSince = now
+                }
+            }
+        }
+    }
 
     val wifiScan: StateFlow<List<WifiAp>?> = whenAvailable<List<WifiAp>?>(Network.Wifi, emptyList()) { g.wifi.scanResults }
         .stateIn(viewModelScope, sharing, null)
@@ -213,11 +264,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         rate.flatMapLatest { g.gnss.status(it) }
     }.stateIn(viewModelScope, sharing, GnssState())
 
-    val compass: StateFlow<CompassReading?> = (if (g.compass.available) g.compass.readings else emptyFlow())
-        .stateIn(viewModelScope, sharing, null)
-    val compassAvailable get() = g.compass.available
     fun lastKnownLocation() = g.gnss.lastKnownLocation()
-    fun declination(): Float? = g.compass.declination(gnss.value.location ?: g.gnss.lastKnownLocation())
+
+    val positions: StateFlow<com.allnetworktools.data.PositionSet> = whenAvailable(Network.Gnss, com.allnetworktools.data.PositionSet()) {
+        rate.flatMapLatest { g.gnss.positions(it) }
+    }.stateIn(viewModelScope, sharing, com.allnetworktools.data.PositionSet())
 
     // ---- settings -------------------------------------------------------------------------------
 
@@ -230,13 +281,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val tools = com.allnetworktools.ui.tools.ToolsHub(g, viewModelScope)
     val history get() = g.history
 
-    // ---- Recording ------------------------------------------------------------------------------
-
-    val recording get() = g.recording
-
-    fun nmea() = g.gnss.nmea()
-
     init {
+        trackRoaming()
+        viewModelScope.launch {
+            // Once per launch and at most every 6 hours: a newer GitHub release is downloaded and installed.
+            if (g.settings.settings.first().autoUpdate) runCatching { g.updater.check(autoInstall = true) }
+        }
         viewModelScope.launch { g.history.load(g.settings.settings.first().historyDays) }
     }
 }

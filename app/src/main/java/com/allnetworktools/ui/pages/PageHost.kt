@@ -58,13 +58,9 @@ import com.allnetworktools.ui.pages.bt.PairedTool
 import com.allnetworktools.ui.pages.bt.TrackerTool
 import com.allnetworktools.ui.pages.cell.CellDashboard
 import com.allnetworktools.ui.pages.cell.CellDetailTool
-import com.allnetworktools.ui.pages.cell.CellLogTool
 import com.allnetworktools.ui.pages.cell.DataUsageTool
-import com.allnetworktools.ui.pages.cell.SignalHistoryTool
-import com.allnetworktools.ui.pages.gnss.NmeaTool
 import com.allnetworktools.ui.pages.gnss.SkyTool
 import com.allnetworktools.ui.pages.cell.NeighborCells
-import com.allnetworktools.ui.pages.gnss.CompassTool
 import com.allnetworktools.ui.pages.gnss.GnssDashboard
 import com.allnetworktools.ui.pages.wifi.WifiDashboard
 import com.allnetworktools.ui.pages.wifi.WifiScanner
@@ -183,11 +179,9 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.WifiScan -> WifiScanner(vm)
             Tool.BleScan -> BleScanner(vm)
             Tool.Neighbors -> NeighborCells(vm)
-            Tool.Compass -> CompassTool(vm)
             Tool.Sky -> SkyTool(vm)
+            Tool.PositionCompare -> com.allnetworktools.ui.pages.gnss.PositionCompareTool(vm)
             Tool.Gatt, Tool.Paired, Tool.Tracker -> BtToolRoute(vm, page)
-            Tool.CellLog -> CellLogTool(vm)
-            Tool.SignalHistory -> SignalHistoryTool(vm)
             Tool.DataUsage -> {
                 val perms by vm.permissions.collectAsStateWithLifecycle()
                 val actions = LocalActions.current
@@ -200,7 +194,6 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.CellDetail -> CellDetailTool(vm.cell.collectAsStateWithLifecycle().value.state, page.arg) {
                 vm.navigate { it.copy(page = Page.ToolPage(Tool.Neighbors)) }
             }
-            Tool.Nmea -> NmeaTool(vm.tools.nmea, vm)
             Tool.Channels, Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed,
             Tool.Upnp, Tool.Bonjour, Tool.Whois -> WifiToolRoute(vm, page)
             else -> ComingSoon(page.tool)

@@ -48,6 +48,9 @@ import com.allnetworktools.ui.components.Symbol
 import com.allnetworktools.ui.components.TextAction
 import com.allnetworktools.ui.components.TileGrid
 import com.allnetworktools.ui.components.fadeUp
+import com.allnetworktools.data.bandOf
+import com.allnetworktools.data.channelOf
+import com.allnetworktools.util.plural
 import com.allnetworktools.ui.pages.PageColumn
 import com.allnetworktools.ui.theme.AntTheme
 import com.allnetworktools.ui.theme.Sym
@@ -156,12 +159,47 @@ fun WifiDashboard(vm: MainViewModel) {
             InfoRow("Bande", listOfNotNull("${c.band.label} GHz", unii(c.frequency)).joinToString(" · "))
             ap?.let { InfoRow("Largeur", "${it.widthMhz} MHz") }
         }
+        val roams by vm.roams.collectAsStateWithLifecycle()
+        if (roams.isNotEmpty()) RoamingCard(roams, scan)
         InfoList("Réseau IP", roles.accent) {
             InfoRow("IPv4", c.ipv4 ?: "—", c.ipv4?.let { { actions.copy("IPv4", it) } })
             c.prefix?.let { InfoRow("Masque", "${prefixToMask(it)} (/$it)") }
             InfoRow("Passerelle", c.gateway ?: "—", c.gateway?.let { { actions.copy("Passerelle", it) } })
             InfoRow("DNS", c.dns.take(2).joinToString(" · ").ifEmpty { "—" })
             c.ipv6?.let { InfoRow("IPv6", it) { actions.copy("IPv6", it) } }
+        }
+    }
+}
+
+private val roamTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.FRANCE)
+
+/** Short form of a BSSID: the last three bytes are what tells two APs of one network apart. */
+private fun shortBssid(b: String) = b.uppercase().takeLast(8)
+
+@Composable
+private fun RoamingCard(roams: List<com.allnetworktools.RoamEvent>, scan: List<com.allnetworktools.data.WifiAp>?) {
+    val roles = AntTheme.net.wifi
+    fun freq(f: Int) = "${bandOf(f).label} GHz · ch ${channelOf(f)}"
+    InfoList(
+        "Roaming · ${roams.size} ${plural(roams.size, "changement")} d'AP", roles.accent,
+        trailing = { Text(roams.first().ssid ?: "", style = rf(12, 16), color = cs.onSurfaceVariant) },
+    ) {
+        roams.forEach { r ->
+            com.allnetworktools.ui.components.Hairline()
+            Column(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Symbol(Sym.SwapHoriz, size = 20.dp, tint = roles.accent)
+                    Text("${shortBssid(r.fromBssid)} → ${shortBssid(r.toBssid)}", Modifier.weight(1f), style = rf(14, 20, 600, tnum = true))
+                    Text(roamTime.format(java.util.Date(r.atMs)), style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant)
+                }
+                val same = bandOf(r.fromFreq) == bandOf(r.toFreq)
+                Text(
+                    (if (same) freq(r.toFreq) else "${freq(r.fromFreq)} → ${freq(r.toFreq)} (changement de bande)") +
+                        " · ${fmt(r.rssiBefore)} → ${fmt(r.rssiAfter)} dBm",
+                    style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant,
+                )
+                r.stayedMs?.let { Text("Resté ${durationFr(it)} sur le précédent AP", style = rf(12, 16), color = cs.onSurfaceVariant) }
+            }
         }
     }
 }

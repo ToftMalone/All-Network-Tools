@@ -112,7 +112,7 @@ fun CellDashboard(vm: MainViewModel) {
             }
         }
         val rings = listOf(RsrpSpec to serving?.rsrp, RsrqSpec to serving?.rsrq, SinrSpec to serving?.sinr, RssiSpec to serving?.rssi)
-        TileGrid(rings) { (spec, v), mod -> QualityTile(spec, v, mod) }
+        TileGrid(rings) { (spec, v), mod -> QualityTile(spec, v, mod, estimated = spec === RssiSpec && serving?.rssiEstimated == true && v != null) }
         SectionCard {
             val windowMin = (300 * settings.refreshSeconds / 60).let { if (it >= 1) "${fmt(it)} min" else "${fmt(it * 60)} s" }
             CardHeader("Historique RSRP") { Text(windowMin, style = rf(12, 16), color = cs.onSurfaceVariant) }
@@ -179,7 +179,7 @@ fun CellIdentityRows(c: CellMeasure?) {
 }
 
 @Composable
-private fun QualityTile(spec: QualitySpec, v: Int?, modifier: Modifier) {
+private fun QualityTile(spec: QualitySpec, v: Int?, modifier: Modifier, estimated: Boolean = false) {
     val color = qualityColor(v, spec)
     val frac = if (v == null) 0.05f else (v - spec.min) / (spec.max - spec.min)
     Row(
@@ -188,9 +188,9 @@ private fun QualityTile(spec: QualitySpec, v: Int?, modifier: Modifier) {
     ) {
         QualityRing(frac, color)
         Column {
-            Text(spec.key, style = rf(12, 16, 600), color = cs.onSurfaceVariant)
+            Text(if (estimated) "${spec.key} (estimé)" else spec.key, style = rf(12, 16, 600), color = cs.onSurfaceVariant)
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(v?.let { fmt(it) } ?: "—", style = gs(24, 28, 500, tnum = true))
+                Text(v?.let { (if (estimated) "≈ " else "") + fmt(it) } ?: "—", style = gs(24, 28, 500, tnum = true))
                 Text(spec.unit, Modifier.padding(bottom = 3.dp), style = rf(11, 14), color = cs.onSurfaceVariant)
             }
             Text(v?.let { quality(it.toFloat(), spec.good, spec.fair).label } ?: "Indisponible", style = rf(12, 16, 700), color = color)

@@ -47,7 +47,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
 
 /** OpenStreetMap tiles need an identifying User-Agent; the tile cache stays in app storage. */
-private fun configureOsm(context: Context) {
+internal fun configureOsm(context: Context) {
     val c = Configuration.getInstance()
     if (c.userAgentValue == context.packageName) return
     c.userAgentValue = context.packageName
@@ -59,7 +59,7 @@ private fun configureOsm(context: Context) {
 
 /** A MapView that keeps its gestures instead of letting the scrolling page steal vertical drags. */
 @SuppressLint("ViewConstructor")
-private class TouchMapView(context: Context) : MapView(context) {
+internal class TouchMapView(context: Context) : MapView(context) {
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) parent?.requestDisallowInterceptTouchEvent(true)
         return super.dispatchTouchEvent(ev)
@@ -126,7 +126,7 @@ private class SatelliteOverlay(private val density: Float) : Overlay() {
 }
 
 /** Inverts the light OSM style so the map follows the dark theme. */
-private val DarkTiles = ColorMatrixColorFilter(
+internal val darkTilesFilter = ColorMatrixColorFilter(
     ColorMatrix(
         floatArrayOf(
             -0.9f, 0f, 0f, 0f, 235f,
@@ -190,7 +190,7 @@ fun OsmSatelliteMap(observer: Pair<Double, Double>, sats: List<SatOverhead>) {
                 overlay.colors = colors
                 overlay.accent = acc.toArgb()
                 overlay.ring = ring.toArgb()
-                m.overlayManager.tilesOverlay.setColorFilter(if (dark) DarkTiles else null)
+                m.overlayManager.tilesOverlay.setColorFilter(if (dark) darkTilesFilter else null)
                 m.invalidate()
             },
         )

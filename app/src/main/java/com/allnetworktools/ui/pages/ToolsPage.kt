@@ -31,7 +31,6 @@ import com.allnetworktools.ui.components.ShapeBadge
 import com.allnetworktools.ui.components.TileGrid
 import com.allnetworktools.ui.components.cookieShape
 import com.allnetworktools.ui.components.fadeUp
-import com.allnetworktools.ui.pages.gnss.headingLabel
 import com.allnetworktools.ui.theme.AntTheme
 import com.allnetworktools.ui.theme.Sym
 import com.allnetworktools.ui.theme.cs
@@ -56,18 +55,16 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
         ToolGroup(
             "Appareils",
             listOfNotNull(
-                ToolEntry(Tool.Tracker, "Traqueur de proximité", "Chaud / froid"),
-                ToolEntry(Tool.Gatt, "Services GATT", "Lecture / écriture"),
+                ToolEntry(Tool.Tracker, "Chaud/Froid", "Retrouver un appareil"),
                 ToolEntry(Tool.Paired, connectedDevice ?: "Appareil appairé", if (connectedDevice != null) "Appareil connecté" else "Profils, batterie", Sym.Headphones),
             ),
         ),
     )
     Network.Cellular -> listOf(
-        ToolGroup("Historique", listOf(ToolEntry(Tool.CellLog, "Journal des cellules", "Changements de cellule"), ToolEntry(Tool.SignalHistory, "Historique du signal", "1 h à 30 j"))),
         ToolGroup("Consommation", listOf(ToolEntry(Tool.DataUsage, "Données mobiles", "Par SIM et par app"), ToolEntry(Tool.CellDetail, "Cellule de service", servingLabel ?: "Identifiants et mesures"))),
     )
     Network.Gnss -> listOf(
-        ToolGroup("Outils", listOf(ToolEntry(Tool.Compass, "Boussole", "Cap magnétique et vrai"), ToolEntry(Tool.Nmea, "Journal NMEA", "Phrases du récepteur"))),
+        ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"))),
     )
 }
 

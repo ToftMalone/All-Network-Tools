@@ -57,8 +57,6 @@ private val PermRows = listOf(
     PermRow(PermGroup.Location, Sym.LocationOn, "Position précise", "Wi-Fi (SSID, scans), cellules et GNSS"),
     PermRow(PermGroup.Nearby, Sym.BluetoothSearching, "Appareils à proximité", "Scan et connexion Bluetooth"),
     PermRow(PermGroup.Phone, Sym.SimCard, "Téléphone", "Opérateur, cellules, double SIM"),
-    PermRow(PermGroup.Notifications, Sym.Notifications, "Notifications", "Scans et enregistrements en arrière-plan"),
-    PermRow(PermGroup.BackgroundLocation, Sym.ShareLocation, "Position en arrière-plan", "Enregistrement de trace écran éteint"),
     PermRow(PermGroup.UsageAccess, Sym.DataUsage, "Accès aux données d'utilisation", "Données mobiles consommées par application"),
 )
 
@@ -142,6 +140,26 @@ fun SettingsScreen(vm: MainViewModel) {
                     else scope.launch { actions.share("Mesures All Network Tools", vm.history.exportJson()) }
                 })
                 Item(2, 3, Sym.Delete, "Effacer toutes les données", "Journaux, traces et historiques", danger = true, trailing = { LinkIcon(Sym.ChevronRight) }, onClick = { dialog = "clear" })
+            }
+            Section("Mises à jour") {
+                val us by vm.updater.state.collectAsStateWithLifecycle()
+                Item(
+                    0, 2, Sym.Update, "Mises à jour automatiques", "Vérifie GitHub au lancement et installe la nouvelle version",
+                    trailing = { AntSwitch(s.autoUpdate) }, onClick = { vm.updateSettings { setAutoUpdate(!s.autoUpdate) } },
+                )
+                Item(
+                    1, 2, Sym.Refresh, "Rechercher maintenant",
+                    when (val u = us) {
+                        is com.allnetworktools.update.UpdateState.Checking -> "Vérification…"
+                        is com.allnetworktools.update.UpdateState.UpToDate -> "Vous avez la dernière version (${BuildConfig.VERSION_NAME})"
+                        is com.allnetworktools.update.UpdateState.Available -> "Version ${u.info.version} disponible"
+                        is com.allnetworktools.update.UpdateState.Downloading -> "Téléchargement de la version ${u.info.version}…"
+                        is com.allnetworktools.update.UpdateState.Failed -> u.message
+                        else -> "Version installée : ${BuildConfig.VERSION_NAME}"
+                    },
+                    trailing = { LinkIcon(Sym.ChevronRight) },
+                    onClick = { scope.launch { vm.updater.check(autoInstall = true, force = true) } },
+                )
             }
             Section("À propos") {
                 Item(0, 3, Sym.Info, "Version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")

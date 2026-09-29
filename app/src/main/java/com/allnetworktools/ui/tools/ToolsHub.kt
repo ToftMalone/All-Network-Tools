@@ -4,7 +4,6 @@ import com.allnetworktools.AntApplication
 import com.allnetworktools.data.net.LanScanner
 import com.allnetworktools.ui.pages.bt.GattController
 import com.allnetworktools.ui.pages.cell.DataUsageController
-import com.allnetworktools.ui.pages.gnss.NmeaController
 import com.allnetworktools.ui.pages.bt.TrackerController
 import com.allnetworktools.ui.pages.wifi.ChannelsController
 import com.allnetworktools.ui.pages.wifi.DnsController
@@ -36,6 +35,6 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val bleIdentify by lazy { com.allnetworktools.ui.pages.bt.BleIdentifyController(scope, app.bluetooth) }
     val tracker by lazy { TrackerController(app, scope) }
     val dataUsage by lazy { DataUsageController(scope, app.usage) }
-    val nmea by lazy { NmeaController() }
+    val positionCompare = com.allnetworktools.ui.pages.gnss.PositionCompareController()
     val skyView = androidx.compose.runtime.mutableStateOf(com.allnetworktools.ui.pages.gnss.SkyView.Sky)
 }

@@ -19,8 +19,6 @@ import com.allnetworktools.data.net.SpeedServer
 import com.allnetworktools.data.BleDevice
 import com.allnetworktools.data.BleKind
 import com.allnetworktools.data.GattNames
-import com.allnetworktools.data.CellEvent
-import com.allnetworktools.data.SignalSample
 import com.allnetworktools.ui.pages.bt.GattCharUi
 import com.allnetworktools.ui.pages.bt.GattConn
 import com.allnetworktools.ui.pages.bt.GattServiceUi
@@ -101,7 +99,6 @@ class ScreenshotTest {
     @Test fun neighbors() = shot("31_cell_neighbors", nav = NavState(Network.Cellular, Page.ToolPage(Tool.Neighbors)))
     @Test fun gnssDashboard() = shot("40_gnss_dashboard", nav = NavState(Network.Gnss, Page.Dashboard))
     @Test fun gnssTools() = shot("43_gnss_tools", nav = NavState(Network.Gnss, Page.Tools))
-    @Test fun compass() = shot("41_compass", nav = NavState(Network.Gnss, Page.ToolPage(Tool.Compass)))
     @Test fun gnssDenied() {
         Scenario.gnssDenied = true
         shot("42_gnss_denied", nav = NavState(Network.Gnss, Page.Dashboard))
@@ -233,39 +230,6 @@ class ScreenshotTest {
     private fun cellTool(t: Tool, arg: String? = null) = NavState(Network.Cellular, Page.ToolPage(t, arg))
     private fun gnssTool(t: Tool) = NavState(Network.Gnss, Page.ToolPage(t))
 
-    private fun seedHistory() = runBlocking {
-        val now = System.currentTimeMillis()
-        val h = app.history
-        h.clear()
-        listOf(
-            CellEvent(now - 30 * 86_400_000L / 30 - 3_600_000, "down", "5G → 4G", "PCI 187 → 445 · n78 → B1", -115, "Perte de couverture NR", "LTE"),
-            CellEvent(now - 7_200_000, "handover", "Changement de cellule LTE", "PCI 445 → 322 · B1 → B3", -97, "eNB 81342", "LTE"),
-            CellEvent(now - 3_000_000, "down", "5G → 4G", "PCI 412 → 97 · n78 → B20", -108, "Perte de couverture NR", "LTE"),
-            CellEvent(now - 2_400_000, "up", "4G → 5G", "PCI 97 → 412 · B20 → n78", -95, "Retour de la couverture NR", "NR"),
-            CellEvent(now - 600_000, "handover", "Changement de cellule NR", "PCI 412 → 187 · n78", -92, "Même gNB 574187", "NR"),
-        ).forEach { h.addCellEvent(it) }
-        for (i in 0 until 24 * 60 step 4) {
-            val at = now - (24 * 60 - i) * 60_000L
-            val lte = i in 300..420 || i in 1000..1080
-            val base = if (lte) -101.0 else -92.0
-            h.addSignal(SignalSample(at, if (lte) "LTE" else "NR", (base + 5 * Math.sin(i / 37.0)).toInt(), -11 + (i / 50) % 4, 14 - (i / 70) % 6))
-        }
-    }
-
-    @Test fun cellLog() {
-        seedHistory(); app.recording.start(com.allnetworktools.service.RecKind.CellLog)
-        shot("90_cell_log", nav = cellTool(Tool.CellLog))
-    }
-    @Test fun cellLogStopped() {
-        seedHistory(); app.recording.stopAll()
-        shot("91_cell_log_stopped", dark = true, nav = cellTool(Tool.CellLog))
-    }
-    @Test fun signalHistory() {
-        seedHistory(); shot("92_signal_history", nav = cellTool(Tool.SignalHistory))
-    }
-    @Test fun signalHistoryEmpty() {
-        runBlocking { app.history.clear() }; shot("93_signal_history_empty", nav = cellTool(Tool.SignalHistory))
-    }
     @Test fun dataUsageDenied() = shot("94_data_usage_denied", nav = cellTool(Tool.DataUsage))
     @Test fun dataUsage() {
         Scenario.usageGranted = true
@@ -273,21 +237,8 @@ class ScreenshotTest {
         shot("95_data_usage", nav = cellTool(Tool.DataUsage))
     }
     @Test fun cellDetail() = shot("96_cell_detail", nav = cellTool(Tool.CellDetail, "serving"))
-    @Test fun nmea() = shot("97_nmea", nav = gnssTool(Tool.Nmea)) { vm ->
-        val c = vm.tools.nmea
-        val t = System.currentTimeMillis()
-        listOf(
-            "\$GPGGA,123519.00,4851.2152,N,00221.1234,E,1,12,0.8,42.1,M,47.0,M,,*5C",
-            "\$GNGSA,A,3,05,13,15,18,20,23,24,,,,,,1.3,0.8,1.0,1*07",
-            "\$GPGSV,3,1,12,05,41,295,43,13,62,050,45,15,34,103,40,18,17,168,33,1*6B",
-            "\$GAGSV,2,1,07,02,27,248,38,07,53,137,44,08,61,292,46,26,12,040,29,7*7E",
-            "\$GNRMC,123519.00,A,4851.2152,N,00221.1234,E,0.02,,280926,,,A,V*1F",
-            "\$GNVTG,,T,,M,0.02,N,0.04,K,A*3D",
-            "\$GNGLL,4851.2152,N,00221.1234,E,123519.00,A,A*7A",
-        ).let { batch -> repeat(3) { r -> batch.forEach { c.add(t + r * 1000, it) } } }
-        c.live = false
-    }
-
+    @Test fun positionCompare() = shot("97_position_compare", nav = gnssTool(Tool.PositionCompare))
+    @Test fun positionCompareDark() = shot("98_position_compare_dark", dark = true, nav = gnssTool(Tool.PositionCompare))
     @Test fun sky() = shot("A0_gnss_sky", nav = gnssTool(Tool.Sky))
     @Test fun skyMap() = shot("A1_gnss_sky_map", nav = gnssTool(Tool.Sky)) { it.tools.skyView.value = com.allnetworktools.ui.pages.gnss.SkyView.Map }
     @Test fun skyMapDark() = shot("A2_gnss_sky_map_dark", dark = true, nav = gnssTool(Tool.Sky)) { it.tools.skyView.value = com.allnetworktools.ui.pages.gnss.SkyView.Map }
@@ -348,5 +299,15 @@ class ScreenshotTest {
     @Test fun bleIdentifyRunning() = shot("B9_ble_identify_running", nav = bt(Tool.BleScan)) { vm ->
         val c = vm.tools.bleIdentify
         c.running = true; c.total = 6; c.done = 2; c.current = "Appareil inconnu"
+    }
+
+    @Test fun wifiRoaming() = shot("C0_wifi_roaming", nav = NavState(Network.Wifi, Page.Dashboard)) { vm ->
+        val now = System.currentTimeMillis()
+        vm.setRoamsForTest(
+            listOf(
+                com.allnetworktools.RoamEvent(now - 40_000, "Freebox-7A2C", "a4:3e:51:7c:2a:9f", "a4:3e:51:7c:30:11", 5180, 5500, -71, -52, 1_820_000),
+                com.allnetworktools.RoamEvent(now - 1_900_000, "Freebox-7A2C", "a4:3e:51:7c:30:11", "a4:3e:51:7c:2a:9e", 2437, 5180, -78, -55, 640_000),
+            ),
+        )
     }
 }

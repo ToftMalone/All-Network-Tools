@@ -15,8 +15,6 @@ import com.allnetworktools.data.BondedDevice
 import com.allnetworktools.data.CellMeasure
 import com.allnetworktools.data.CellRepository
 import com.allnetworktools.data.CellState
-import com.allnetworktools.data.CompassReading
-import com.allnetworktools.data.CompassRepository
 import com.allnetworktools.data.Constellation
 import com.allnetworktools.data.FixType
 import com.allnetworktools.data.GnssRepository
@@ -50,7 +48,7 @@ object Scenario {
 private fun Context.fakePermissions() = object : PermissionsRepository(this@fakePermissions) {
     override val state: StateFlow<PermissionSnapshot> = MutableStateFlow(
         PermissionSnapshot(
-            PermGroup.entries.toSet() - PermGroup.BackgroundLocation - (if (Scenario.usageGranted) emptySet() else setOf(PermGroup.UsageAccess)) -
+            PermGroup.entries.toSet() - (if (Scenario.usageGranted) emptySet() else setOf(PermGroup.UsageAccess)) -
                 (if (Scenario.gnssDenied) setOf(PermGroup.Location) else emptySet()),
         ),
     )
@@ -91,9 +89,9 @@ private fun Context.fakeWifi() = object : WifiRepository(this@fakeWifi) {
         ),
     )
 
-    override fun pollRssi(): Triple<Int, Int, Int> {
+    override fun pollRssi(): com.allnetworktools.data.WifiPoll {
         rssi = (rssi + listOf(-3, -1, 0, 2, 3).random()).coerceIn(-64, -46)
-        return Triple(rssi, 1201, 960)
+        return com.allnetworktools.data.WifiPoll(rssi, 1201, 960, "a4:3e:51:7c:2a:9f", 5180)
     }
 
     override val throttledUntil: StateFlow<Long> =
@@ -145,7 +143,7 @@ private fun Context.fakeBluetooth() = object : BluetoothRepository(this@fakeBlue
 private fun cell(tech: RadioTech, band: String, pci: Int, label: String, arfcn: Int, level: Int, registered: Boolean = false) = CellMeasure(
     tech = tech, registered = registered, band = band, arfcnLabel = label, arfcn = arfcn, pci = pci, tac = 36104,
     cellId = if (registered) 2351872017L else null, nodeId = if (registered) 574187L else null, sector = 17,
-    mcc = "208", mnc = "01", rsrp = level, rsrq = -11, sinr = 14, rssi = if (tech == RadioTech.LTE || registered) -67 else null,
+    mcc = "208", mnc = "01", rsrp = level, rsrq = -11, sinr = 14, rssi = when (tech) { RadioTech.LTE -> -67; RadioTech.NR -> level + 24; else -> null }, rssiEstimated = tech == RadioTech.NR,
     cqi = 12, timingAdvance = 3, bandwidthKhz = if (registered) 90_000 else null, downlinkMhz = if (tech == RadioTech.NR) 3549.99 else null,
 )
 
@@ -198,12 +196,20 @@ private fun Context.fakeGnss() = object : GnssRepository(this@fakeGnss) {
 
     override fun lastKnownLocation() = loc
     override fun status(refreshMs: Long): Flow<GnssState> = flowOf(GnssState(sats, loc, FixType.Fix3D, 0.8f, 4100))
-}
 
-private fun Context.fakeCompass() = object : CompassRepository(this@fakeCompass) {
-    override val available = true
-    override fun declination(location: Location?) = 1.8f
-    override val readings: Flow<CompassReading> = flowOf(CompassReading(182f, 2f, 1f, 47f, SensorManager.SENSOR_STATUS_ACCURACY_HIGH))
+    private fun at(provider: String, dLat: Double, dLon: Double, acc: Float) = Location(provider).apply {
+        latitude = loc.latitude + dLat; longitude = loc.longitude + dLon; altitude = 47.0; accuracy = acc
+        elapsedRealtimeNanos = android.os.SystemClock.elapsedRealtimeNanos() - 3_000_000_000L
+        extras = android.os.Bundle().apply { putInt("satellites", 13) }
+    }
+
+    override fun positions(refreshMs: Long): Flow<com.allnetworktools.data.PositionSet> = flowOf(
+        com.allnetworktools.data.PositionSet(
+            gnss = at(LocationManager.GPS_PROVIDER, 0.0, 0.0, 3.2f),
+            network = at(LocationManager.NETWORK_PROVIDER, 0.00028, 0.00035, 28f),
+            fused = at(LocationManager.FUSED_PROVIDER, 0.00004, 0.00005, 6f),
+        ),
+    )
 }
 
 class FakeApp : AntApplication() {
@@ -213,8 +219,12 @@ class FakeApp : AntApplication() {
     override val bluetooth by lazy { fakeBluetooth() }
     override val cell by lazy { fakeCell() }
     override val gnss by lazy { fakeGnss() }
-    override val compass by lazy { fakeCompass() }
     override val usage by lazy { fakeUsage() }
+    override val updater by lazy {
+        object : com.allnetworktools.update.AppUpdater(this@FakeApp, "0.1") {
+            override suspend fun check(autoInstall: Boolean, force: Boolean) = Unit
+        }
+    }
 }
 
 private fun Context.fakeUsage() = object : com.allnetworktools.data.UsageRepository(this@fakeUsage) {
