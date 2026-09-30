@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
@@ -95,9 +96,31 @@ class TrackerController(private val context: Context, private val scope: Corouti
     private var lastHeard = 0L
     private var p = 4f
 
+    /** Compass heading of the phone (degrees), fed by the screen; null without a compass. */
+    var heading by mutableStateOf<Float?>(null)
+    var sweep by mutableStateOf<com.allnetworktools.data.DirectionSweep?>(null)
+        private set
+    /** Bumped on every sample so the sweep's progress redraws. */
+    var sweepTick by mutableIntStateOf(0)
+        private set
+    var direction by mutableStateOf<com.allnetworktools.data.DirectionEstimate?>(null)
+        private set
+
+    fun startSweep() {
+        sweep = com.allnetworktools.data.DirectionSweep()
+        direction = null
+        sweepTick = 0
+    }
+
+    fun cancelSweep() {
+        sweep = null
+    }
+
     fun follow(d: BleDevice) {
         target = d
         history.clear()
+        sweep = null
+        direction = null
         rssi = d.rssi.toFloat(); p = 4f; trend = 0
         lastPacket = d.lastSeen; lastHeard = SystemClock.elapsedRealtime()
         phase = Phase.Running
@@ -106,6 +129,8 @@ class TrackerController(private val context: Context, private val scope: Corouti
     fun stop() {
         phase = Phase.Idle
         target = null
+        sweep = null
+        direction = null
     }
 
     /** Called with each ~1 s scan snapshot: scalar Kalman filter on RSSI, 60 s history, trend over 5 s. */
@@ -117,6 +142,17 @@ class TrackerController(private val context: Context, private val scope: Corouti
         if (d != null && d.lastSeen != lastPacket) {
             lastPacket = d.lastSeen; lastHeard = now
             target = d
+            val h = heading
+            val sw = sweep
+            if (h != null && sw != null) {
+                // Raw readings: the filter would smear the peak over the turn.
+                sw.add(h, d.rssi.toFloat())
+                sweepTick++
+                if (sw.complete) {
+                    direction = sw.estimate()
+                    sweep = null
+                }
+            }
             p += 0.8f
             val k = p / (p + 6f)
             rssi += k * (d.rssi - rssi)
@@ -166,6 +202,7 @@ fun TrackerTool(c: TrackerController, nearby: List<BleDevice>) {
             Phase.Idle, Phase.Error, Phase.Results -> PickDevice(nearby) { haptics.confirm(); c.follow(it) }
             Phase.Running -> {
                 HotColdCard(c)
+                DirectionCard(c)
                 HistoryCard(c)
             }
             Phase.Empty -> {
@@ -314,3 +351,135 @@ private fun HistoryCard(c: TrackerController) {
         )
     }
 }
+
+/** Compass heading from the rotation vector, for a phone held flat; null when the sensor is missing. */
+@Composable
+private fun rememberHeading(): Pair<Boolean, Float?> {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var heading by androidx.compose.runtime.remember { mutableStateOf<Float?>(null) }
+    var available by androidx.compose.runtime.remember { mutableStateOf(true) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val sm = context.getSystemService(android.hardware.SensorManager::class.java)
+        val sensor = sm?.getDefaultSensor(android.hardware.Sensor.TYPE_ROTATION_VECTOR)
+            ?: sm?.getDefaultSensor(android.hardware.Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR)
+        val rot = FloatArray(9)
+        val ori = FloatArray(3)
+        val listener = object : android.hardware.SensorEventListener {
+            override fun onSensorChanged(e: android.hardware.SensorEvent) {
+                android.hardware.SensorManager.getRotationMatrixFromVector(rot, e.values)
+                android.hardware.SensorManager.getOrientation(rot, ori)
+                val deg = ((Math.toDegrees(ori[0].toDouble()).toFloat() % 360f) + 360f) % 360f
+                val prev = heading
+                // Light smoothing across the 359° → 0° wrap.
+                heading = if (prev == null) deg else {
+                    val d = ((deg - prev + 540f) % 360f) - 180f
+                    ((prev + 0.3f * d) % 360f + 360f) % 360f
+                }
+            }
+
+            override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) = Unit
+        }
+        available = sensor != null
+        if (sensor != null) sm.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_UI)
+        onDispose { sm?.unregisterListener(listener) }
+    }
+    return available to heading
+}
+
+private fun relativeWords(rel: Float): String {
+    val r = ((rel % 360f) + 360f) % 360f
+    return when {
+        r < 22.5f || r >= 337.5f -> "Droit devant vous"
+        r < 67.5f -> "Devant, à droite"
+        r < 112.5f -> "À votre droite"
+        r < 157.5f -> "Derrière, à droite"
+        r < 202.5f -> "Derrière vous"
+        r < 247.5f -> "Derrière, à gauche"
+        r < 292.5f -> "À votre gauche"
+        else -> "Devant, à gauche"
+    }
+}
+
+@Composable
+private fun DirectionCard(c: TrackerController) {
+    val (hasCompass, heading) = rememberHeading()
+    LaunchedEffect(heading) { c.heading = heading }
+    val acc = AntTheme.accent
+    SectionCard {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Symbol(Sym.Navigation, size = 22.dp, filled = true, tint = acc.accent)
+            Text("Direction de l'appareil", Modifier.weight(1f), style = rf(16, 22, 600))
+        }
+        val sweep = c.sweep
+        val dir = c.direction
+        when {
+            !hasCompass -> Text(
+                "Ce téléphone n'a pas de boussole : la direction ne peut pas être mesurée.",
+                Modifier.padding(top = 8.dp), style = rf(13, 18), color = cs.onSurfaceVariant,
+            )
+            heading == null -> Text(
+                "Lecture de la boussole…",
+                Modifier.padding(top = 8.dp), style = rf(13, 18), color = cs.onSurfaceVariant,
+            )
+            sweep != null -> {
+                @Suppress("UNUSED_VARIABLE") val tick = c.sweepTick
+                Box(Modifier.padding(top = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    val done = acc.accent
+                    val todo = cs.surfaceContainerHighest
+                    val needle = cs.onSurface
+                    Canvas(Modifier.size(200.dp)) {
+                        val sw = 18.dp.toPx()
+                        val tl = androidx.compose.ui.geometry.Offset(sw / 2, sw / 2)
+                        val sz = androidx.compose.ui.geometry.Size(size.width - sw, size.height - sw)
+                        for (i in 0 until sweep.sectors) {
+                            // Sector 0 starts at north; canvas angles start at 3 o'clock.
+                            drawArc(if (sweep.covered(i)) done else todo, i * 30f - 90f + 1.5f, 27f, false, tl, sz, style = Stroke(sw))
+                        }
+                        val a = Math.toRadians((heading - 90f).toDouble())
+                        val r = size.minDimension / 2 - sw * 1.6f
+                        drawLine(needle, center, center + androidx.compose.ui.geometry.Offset((r * kotlin.math.cos(a)).toFloat(), (r * kotlin.math.sin(a)).toFloat()), 4.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    }
+                    Text("${sweep.coveredCount} / ${sweep.sectors}", style = gs(22, 28, 600, tnum = true))
+                }
+                Text(
+                    "Tenez le téléphone à plat devant vous, contre le corps, et tournez lentement sur vous-même jusqu'à remplir le cercle. " +
+                        "Votre corps masque le signal venant de derrière : il est le plus fort face à l'appareil.",
+                    Modifier.padding(top = 10.dp), style = rf(13, 18), color = cs.onSurfaceVariant,
+                )
+                PillButton("Annuler", { c.cancelSweep() }, Modifier.fillMaxWidth().padding(top = 10.dp), height = 44.dp, outlined = true, bg = acc.accent)
+            }
+            dir != null -> {
+                val rel = dir.bearing - heading
+                val angle by androidx.compose.animation.core.animateFloatAsState(
+                    ((rel % 360f) + 360f) % 360f, tween(300), label = "arrow",
+                )
+                Box(Modifier.padding(top = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(180.dp).clip(CircleShape).background(acc.container), contentAlignment = Alignment.Center) {
+                        Symbol(Sym.Navigation, Modifier.graphicsRotation(angle), size = 110.dp, filled = true, tint = acc.accent)
+                    }
+                }
+                Text(relativeWords(rel), Modifier.fillMaxWidth().padding(top = 12.dp), style = gs(24, 30, 500), textAlign = TextAlign.Center)
+                Text(
+                    "Cap ${fmt(dir.bearing)}° · confiance ${dir.confidence} (${fmt(dir.marginDb, 1)} dB d'écart avec l'arrière)",
+                    Modifier.fillMaxWidth().padding(top = 2.dp), style = rf(13, 18, tnum = true), color = cs.onSurfaceVariant, textAlign = TextAlign.Center,
+                )
+                if (dir.confidence == "faible") {
+                    Text(
+                        "Signal presque identique dans toutes les directions : rapprochez-vous ou refaites la mesure dans un endroit plus dégagé.",
+                        Modifier.padding(top = 8.dp), style = rf(12, 16), color = cs.error,
+                    )
+                }
+                PillButton("Mesurer à nouveau", { c.startSweep() }, Modifier.fillMaxWidth().padding(top = 12.dp), icon = Sym.ThreeSixty, height = 44.dp, outlined = true, bg = acc.accent)
+            }
+            else -> {
+                Text(
+                    "Le Bluetooth ne donne pas de direction directement. Faites un tour sur vous-même : l'application repère le côté où le signal est le plus fort, puis la flèche suit la boussole.",
+                    Modifier.padding(top = 8.dp), style = rf(13, 18), color = cs.onSurfaceVariant,
+                )
+                PillButton("Trouver la direction", { c.startSweep() }, Modifier.fillMaxWidth().padding(top = 12.dp), icon = Sym.ThreeSixty, height = 48.dp)
+            }
+        }
+    }
+}
+
+private fun Modifier.graphicsRotation(deg: Float) = this.then(Modifier.rotate(deg))

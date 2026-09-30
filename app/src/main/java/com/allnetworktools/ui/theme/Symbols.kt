@@ -182,4 +182,6 @@ object Sym {
     const val Fullscreen = "fullscreen"
     const val FullscreenExit = "fullscreen_exit"
     const val ZoomIn = "zoom_in"
+    const val Navigation = "navigation"
+    const val ThreeSixty = "360"
 }

@@ -115,7 +115,33 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _nav = MutableStateFlow(NavState())
     val nav: StateFlow<NavState> = _nav.asStateFlow()
-    fun navigate(block: (NavState) -> NavState) = _nav.value.let { _nav.value = block(it) }
+
+    /** Pages visited inside the open network, so "back" returns to the previous screen. */
+    private val trail = ArrayDeque<Page>()
+
+    fun navigate(block: (NavState) -> NavState) {
+        val old = _nav.value
+        val new = block(old)
+        when {
+            new.network != old.network || new.page == Page.Home || old.page == Page.Home || old.page == Page.Settings || new.page == Page.Settings -> trail.clear()
+            new.page != old.page -> {
+                val i = trail.indexOf(new.page)
+                // Coming back to a page already in the trail: drop what was opened after it.
+                if (i >= 0) while (trail.size > i) trail.removeLast() else trail.addLast(old.page)
+                while (trail.size > 30) trail.removeFirst()
+            }
+        }
+        _nav.value = new
+    }
+
+    /** Where "back" leads from the current page: the previous screen, else [fallback] (the page's parent). */
+    fun backTarget(fallback: Page): Page = trail.lastOrNull() ?: fallback
+
+    fun back(fallback: Page) {
+        val prev = trail.removeLastOrNull()
+        _nav.value = _nav.value.copy(page = prev ?: fallback, switcherOpen = false)
+        if (prev == null && fallback == Page.Home) trail.clear()
+    }
 
     // ---- availability ---------------------------------------------------------------------
 

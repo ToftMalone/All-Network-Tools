@@ -147,7 +147,7 @@ private fun MainShell(vm: MainViewModel) {
 
     fun closePage() = vm.navigate { it.copy(page = Page.Home, switcherOpen = false) }
 
-    val closesToHome = pageOpen && parentPage(nav.page) == Page.Home && !nav.switcherOpen
+    val closesToHome = pageOpen && vm.backTarget(parentPage(nav.page)) == Page.Home && !nav.switcherOpen
     PredictiveBackHandler(enabled = closesToHome) { events ->
         var buzzed = false
         try {
@@ -166,7 +166,7 @@ private fun MainShell(vm: MainViewModel) {
     BackHandler(enabled = !closesToHome && (pageOpen || nav.network != null || nav.switcherOpen)) {
         when {
             nav.switcherOpen -> vm.navigate { it.copy(switcherOpen = false) }
-            pageOpen -> vm.navigate { it.copy(page = parentPage(it.page)) }
+            pageOpen -> vm.back(parentPage(nav.page))
             else -> vm.navigate { it.copy(network = null) }
         }
     }
@@ -223,10 +223,7 @@ private fun MainShell(vm: MainViewModel) {
                         .background(lerp(startBg, cs.surface, p)),
                 ) {
                     Box(Modifier.fillMaxSize().graphicsLayer { alpha = contentAlpha.value }) {
-                        PageHostContent(vm, s, onBack = {
-                            val parent = parentPage(s.page)
-                            vm.navigate { it.copy(page = parent) }
-                        })
+                        PageHostContent(vm, s, onBack = { vm.back(parentPage(s.page)) })
                     }
                 }
             }
