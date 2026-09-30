@@ -184,4 +184,8 @@ object Sym {
     const val ZoomIn = "zoom_in"
     const val Navigation = "navigation"
     const val ThreeSixty = "360"
+    const val Nfc = "nfc"
+    const val ContactlessPayment = "contactless"
+    const val WifiTethering = "wifi_tethering"
+    const val Android = "android"
 }

@@ -77,6 +77,16 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     Network.Gnss -> listOf(
         ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"), ToolEntry(Tool.Passes, "Passages de satellites", "Levers et couchers prévus"))),
     )
+    Network.Nfc -> listOf(
+        ToolGroup(
+            "Outils",
+            listOf(
+                ToolEntry(Tool.NfcWrite, "Écrire un tag", "Lien, texte, contact, téléphone, appli"),
+                ToolEntry(Tool.NfcErase, "Effacer et verrouiller", "Réinitialiser ou bloquer un tag"),
+                ToolEntry(Tool.NfcRange, "Test de lecture", "Fiabilité et portée de l'antenne"),
+            ),
+        ),
+    )
 }
 
 private fun featuredSubtitle(net: Network) = when (net) {
@@ -84,6 +94,7 @@ private fun featuredSubtitle(net: Network) = when (net) {
     Network.Bluetooth -> "Appareils à proximité, en direct, avec filtres"
     Network.Cellular -> "Cellules NR et LTE détectées par le modem"
     Network.Gnss -> "Sky plot et carte du monde des satellites"
+    Network.Nfc -> "Posez un tag, un badge ou une carte au dos du téléphone"
 }
 
 @Composable
@@ -92,6 +103,7 @@ private fun featuredBadge(net: Network, vm: MainViewModel): String? = when (net)
     Network.Bluetooth -> vm.ble.collectAsStateWithLifecycle().value.size.let { "$it ${plural(it, "appareil")}" }
     Network.Cellular -> vm.cell.collectAsStateWithLifecycle().value.state?.neighbors?.size?.let { "$it ${plural(it, "cellule")}" }
     Network.Gnss -> vm.gnss.collectAsStateWithLifecycle().value.let { "${it.used.size}/${it.visible.size} satellites" }
+    Network.Nfc -> null
 }
 
 @Composable

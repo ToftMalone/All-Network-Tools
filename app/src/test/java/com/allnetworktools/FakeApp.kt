@@ -247,6 +247,14 @@ class FakeApp : AntApplication() {
             override suspend fun check(autoInstall: Boolean, force: Boolean) = Unit
         }
     }
+    override val nfc by lazy {
+        object : com.allnetworktools.data.NfcRepository(this@FakeApp) {
+            override val hasNfc = true
+            override val enabled: Flow<Boolean> = flowOf(true)
+            override fun startReading(host: Context) = Unit
+            override fun stopReading(host: Context) = Unit
+        }
+    }
 }
 
 private fun Context.fakeUsage() = object : com.allnetworktools.data.UsageRepository(this@fakeUsage) {

@@ -182,6 +182,7 @@ private fun MainShell(vm: MainViewModel) {
                 ble = vm.ble.collectAsStateWithLifecycle().value,
                 cell = vm.cell.collectAsStateWithLifecycle().value,
                 gnss = vm.gnss.collectAsStateWithLifecycle().value,
+                nfc = vm.tools.nfcReader,
             )
             val actions = LocalActions.current
             HomeScreen(

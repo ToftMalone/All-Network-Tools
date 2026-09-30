@@ -98,6 +98,7 @@ class AppActions(
     fun openAirplaneSettings() = launch(Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS))
     fun openLocationSettings() = launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
     fun openNetworkSettings() = launch(Intent(Settings.ACTION_NETWORK_OPERATOR_SETTINGS))
+    fun openNfcSettings() = launch(Intent(Settings.ACTION_NFC_SETTINGS))
 
     fun enableBluetooth() {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
@@ -130,6 +131,7 @@ class AppActions(
         Blocker.LocationPermission -> request(PermGroup.Location)
         Blocker.LocationOff -> openLocationSettings()
         Blocker.NoHardware -> Unit
+        Blocker.NfcOff -> openNfcSettings()
     }
 }
 

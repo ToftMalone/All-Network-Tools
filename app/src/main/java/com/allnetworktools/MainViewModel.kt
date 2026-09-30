@@ -40,7 +40,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Why a network card or page is unavailable. */
-enum class Blocker { NoHardware, WifiOff, BluetoothOff, NearbyPermission, Airplane, PhonePermission, NoSim, LocationPermission, LocationOff }
+enum class Blocker { NoHardware, WifiOff, BluetoothOff, NearbyPermission, Airplane, PhonePermission, NoSim, LocationPermission, LocationOff, NfcOff }
 
 sealed interface Page {
     data object Home : Page
@@ -112,6 +112,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val bluetoothEnabled = g.radios.bluetoothEnabled.stateIn(viewModelScope, sharing, true)
     val airplane = g.radios.airplaneMode.stateIn(viewModelScope, sharing, false)
     val locationEnabled = g.radios.locationEnabled.stateIn(viewModelScope, sharing, true)
+    val nfcEnabled = g.nfc.enabled.stateIn(viewModelScope, sharing, true)
 
     private val _nav = MutableStateFlow(NavState())
     val nav: StateFlow<NavState> = _nav.asStateFlow()
@@ -145,9 +146,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- availability ---------------------------------------------------------------------
 
+    private data class CoreAvail(val p: PermissionSnapshot, val wifi: Boolean, val bt: Boolean, val plane: Boolean, val loc: Boolean)
+
     val blockers: StateFlow<Map<Network, Blocker?>> = combine(
-        permissions, wifiEnabled, bluetoothEnabled, airplane, locationEnabled,
-    ) { p, wifi, bt, plane, loc ->
+        combine(permissions, wifiEnabled, bluetoothEnabled, airplane, locationEnabled, ::CoreAvail),
+        nfcEnabled,
+    ) { a, nfc ->
+        val (p, wifi, bt, plane, loc) = a
         mapOf(
             Network.Wifi to when {
                 !g.radios.hasWifi -> Blocker.NoHardware
@@ -170,6 +175,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             Network.Gnss to when {
                 !p.location -> Blocker.LocationPermission
                 !loc -> Blocker.LocationOff
+                else -> null
+            },
+            Network.Nfc to when {
+                !g.nfc.hasNfc -> Blocker.NoHardware
+                !nfc -> Blocker.NfcOff
                 else -> null
             },
         )
@@ -291,6 +301,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }.stateIn(viewModelScope, sharing, GnssState())
 
     fun lastKnownLocation() = g.gnss.lastKnownLocation()
+
+    val nfc get() = g.nfc
 
     fun operatorPlmns() = g.cell.plmns()
 

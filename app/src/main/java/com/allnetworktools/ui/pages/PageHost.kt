@@ -173,6 +173,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Network.Bluetooth -> BtDashboard(vm)
             Network.Cellular -> CellDashboard(vm)
             Network.Gnss -> GnssDashboard(vm)
+            Network.Nfc -> com.allnetworktools.ui.pages.nfc.NfcDashboard(vm)
         }
         Page.Tools -> ToolsPage(net, vm)
         is Page.ToolPage -> when (page.tool) {
@@ -183,6 +184,10 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.PositionCompare -> com.allnetworktools.ui.pages.gnss.PositionCompareTool(vm)
             Tool.Passes -> com.allnetworktools.ui.pages.gnss.PassesTool(vm)
             Tool.TowerMap -> com.allnetworktools.ui.pages.cell.TowerMapTool(vm)
+            Tool.NfcReader -> com.allnetworktools.ui.pages.nfc.NfcReaderTool(vm.tools.nfcReader)
+            Tool.NfcWrite -> com.allnetworktools.ui.pages.nfc.NfcWriteTool(vm.tools.nfcWrite)
+            Tool.NfcErase -> com.allnetworktools.ui.pages.nfc.NfcEraseTool(vm.tools.nfcMaint)
+            Tool.NfcRange -> com.allnetworktools.ui.pages.nfc.NfcRangeTool(vm.tools.nfcRange)
             Tool.Gatt, Tool.Paired, Tool.Tracker, Tool.UnknownTrackers -> BtToolRoute(vm, page)
             Tool.DataUsage -> {
                 val perms by vm.permissions.collectAsStateWithLifecycle()

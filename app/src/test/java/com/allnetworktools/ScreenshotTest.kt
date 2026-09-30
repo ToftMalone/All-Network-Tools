@@ -78,6 +78,7 @@ class ScreenshotTest {
     @Test fun onboarding() = shot("01_onboarding", onboarding = true)
     @Test fun home() = shot("02_home")
     @Test fun homeSelected() = shot("03_home_wifi_selected", nav = NavState(Network.Wifi))
+    @Test fun dockSwitcher() = shot("06_dock_switcher", nav = NavState(Network.Wifi, Page.Dashboard, switcherOpen = true))
     @Test fun homeDark() = shot("04_home_gnss_dark", dark = true, nav = NavState(Network.Gnss))
     @Test fun homeAirplane() {
         Scenario.airplane = true
@@ -402,4 +403,40 @@ class ScreenshotTest {
             23, now - 6 * 60_000L,
         )
     }
+
+    private fun nfcTool(t: Tool) = NavState(Network.Nfc, Page.ToolPage(t))
+
+    @Test fun nfcReader() = shot("F0_nfc_reader", nav = nfcTool(Tool.NfcReader)) { vm ->
+        vm.tools.nfcReader.setForTest(
+            com.allnetworktools.data.NfcTagInfo(
+                uidHex = "04A2B3C4D5E680", techs = listOf("android.nfc.tech.NfcA", "android.nfc.tech.Ndef"),
+                techLabels = listOf("NFC-A (ISO 14443-3A)", "NDEF"), memoryBytes = 144,
+                ndefRecords = listOf(
+                    com.allnetworktools.data.NfcRecordInfo(com.allnetworktools.data.NfcRecordKind.Link, "https://allnetwork.tools/w/b7", null, 24),
+                    com.allnetworktools.data.NfcRecordInfo(com.allnetworktools.data.NfcRecordKind.Text, "Étagère B7 · Câbles USB-C", "Langue : fr", 30),
+                ),
+                ndefWritable = true, ndefCanLock = true, hasNdef = true,
+            ),
+        )
+    }
+    @Test fun nfcReaderEmpty() = shot("F1_nfc_reader_empty", dark = true, nav = nfcTool(Tool.NfcReader))
+    @Test fun nfcWrite() = shot("F2_nfc_write", nav = nfcTool(Tool.NfcWrite)) { vm ->
+        vm.tools.nfcWrite.url = "https://allnetwork.tools"
+    }
+    @Test fun nfcErase() = shot("F3_nfc_erase", dark = true, nav = nfcTool(Tool.NfcErase)) { vm ->
+        vm.tools.nfcMaint.setResultForTest(com.allnetworktools.ui.pages.nfc.NfcMaintAction.Erase, com.allnetworktools.data.NfcWriteResult.Success)
+    }
+    @Test fun nfcRange() = shot("F4_nfc_range", nav = nfcTool(Tool.NfcRange)) { vm ->
+        val now = System.currentTimeMillis()
+        vm.tools.nfcRange.setForTest(listOf(now - 400, now - 1600, now - 2900, now - 4100, now - 5400))
+    }
+    @Test fun nfcDashboard() = shot("F5_nfc_dashboard", nav = NavState(Network.Nfc, Page.Dashboard)) { vm ->
+        vm.tools.nfcReader.setForTest(
+            com.allnetworktools.data.NfcTagInfo(
+                uidHex = "04A2B3C4D5E680", techs = listOf("android.nfc.tech.NfcA"), techLabels = listOf("NFC-A (ISO 14443-3A)"),
+                memoryBytes = 144, ndefRecords = emptyList(), ndefWritable = true, ndefCanLock = true, hasNdef = true,
+            ),
+        )
+    }
+    @Test fun nfcTools() = shot("F6_nfc_tools", nav = NavState(Network.Nfc, Page.Tools))
 }

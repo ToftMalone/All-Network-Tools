@@ -7,6 +7,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -92,6 +94,7 @@ data class HomeData(
     val ble: List<BleDevice>,
     val cell: CellUi,
     val gnss: GnssState,
+    val nfc: com.allnetworktools.ui.pages.nfc.NfcReaderController,
 )
 
 /** Cycles 0,1,2 at 1 Hz, for the animated bar icons. */
@@ -118,7 +121,8 @@ fun HomeScreen(
     onSettings: () -> Unit,
 ) {
     val active = Network.entries.count { data.blockers[it] == null }
-    val needed = 4 - active
+    val total = Network.entries.size
+    val needed = total - active
     Box(
         Modifier
             .fillMaxSize()
@@ -132,8 +136,8 @@ fun HomeScreen(
                     Column(Modifier.weight(1f)) {
                         Text("All Network Tools", style = gs(32, 40, 500, -0.3f), color = cs.onSurface, maxLines = 1)
                         Text(
-                            if (needed == 0) "4 réseaux actifs · mesures en direct"
-                            else "$active sur 4 actifs · $needed ${plural(needed, "action requise", "actions requises")}",
+                            if (needed == 0) "$total réseaux actifs · mesures en direct"
+                            else "$active sur $total actifs · $needed ${plural(needed, "action requise", "actions requises")}",
                             Modifier.padding(top = 4.dp), style = rf(14, 20), color = cs.onSurfaceVariant,
                         )
                     }
@@ -143,15 +147,18 @@ fun HomeScreen(
                         bg = cs.surfaceContainerHigh, tint = cs.onSurfaceVariant,
                     )
                 }
+                val rows = Network.entries.chunked(2)
                 val gridTop = 92.dp
-                val cardH = ((availableHeight - gridTop - 124.dp - 12.dp) / 2).coerceIn(236.dp, 316.dp)
+                // A row height that fits every row on a typical screen; verticalScroll below is the safety net if it doesn't.
+                val cardH = ((availableHeight - gridTop - 124.dp - 12.dp * (rows.size - 1)) / rows.size).coerceIn(190.dp, 300.dp)
                 Column(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp),
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp)
+                        .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    listOf(Network.Wifi to Network.Bluetooth, Network.Cellular to Network.Gnss).forEach { (a, b) ->
+                    rows.forEach { pair ->
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            listOf(a, b).forEach { n ->
+                            pair.forEach { n ->
                                 NetworkCard(
                                     network = n,
                                     data = data,
@@ -165,6 +172,7 @@ fun HomeScreen(
                                         .onGloballyPositioned { cardBounds[n] = it.boundsInRoot() },
                                 )
                             }
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
                         }
                     }
                 }
@@ -217,6 +225,7 @@ private fun NetworkCard(
                         Network.Bluetooth -> BtCardContent(data.bluetooth, data.ble)
                         Network.Cellular -> CellCardContent(data.cell)
                         Network.Gnss -> GnssCardContent(data.gnss)
+                        Network.Nfc -> NfcCardContent(data.nfc)
                     }
                 }
             }
@@ -367,6 +376,28 @@ private fun ColumnScope.GnssCardContent(g: GnssState) {
     Row(Modifier.fillMaxWidth().padding(top = 6.dp).graphicsLayer { alpha = 0.85f }, horizontalArrangement = Arrangement.SpaceBetween) {
         consts.forEach { Text(it.short, style = rf(11, 16)) }
     }
+}
+
+@Composable
+private fun ColumnScope.NfcCardContent(c: com.allnetworktools.ui.pages.nfc.NfcReaderController) {
+    val roles = AntTheme.net.nfc
+    val spin = rememberSpin(20_000)
+    CardTop(
+        icon = {
+            Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(48.dp).clip(cookieShape()).spinning(spin).background(roles.accent))
+                Symbol(Sym.Nfc, size = 26.dp, filled = true, tint = roles.onAccent)
+            }
+        },
+        chip = { StatusChip("Prêt", AntTheme.net.good) },
+    )
+    val last = c.current
+    CardTexts("NFC", if (last == null) "Aucun tag lu" else last.techLabels.firstOrNull() ?: "Tag lu")
+    CardMetric(c.readCount.toString(), plural(c.readCount, "lecture"))
+    Text(
+        last?.uidHex ?: "Posez un tag contre le dos du téléphone",
+        Modifier.padding(top = 8.dp).graphicsLayer { alpha = 0.85f }, style = rf(13, 18, tnum = last != null), maxLines = 1,
+    )
 }
 
 @Composable

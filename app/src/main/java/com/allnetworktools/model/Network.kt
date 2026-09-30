@@ -15,6 +15,7 @@ enum class Network(
     Bluetooth("Bluetooth", Sym.Bluetooth, "BLE", LeadCorners(18f, 18f, 18f, 18f)),
     Cellular("Réseau mobile", Sym.CellBars3, "Cellules", LeadCorners(24f, 24f, 12f, 24f)),
     Gnss("GNSS", Sym.SatelliteAlt, "Ciel", LeadCorners(14f, 24f, 14f, 24f)),
+    Nfc("NFC", Sym.Nfc, "Lire", LeadCorners(24f, 14f, 24f, 14f)),
     ;
 
     // Getters rather than constructor arguments: Tool's entries reference Network, so eager
@@ -27,6 +28,7 @@ enum class Network(
             Bluetooth -> Tool.BleScan
             Cellular -> Tool.Neighbors
             Gnss -> Tool.Sky
+            Nfc -> Tool.NfcReader
         }
 
     /** Tool reachable directly from the dock. */
@@ -80,6 +82,11 @@ enum class Tool(
     Sky(Network.Gnss, "Ciel GNSS", Sym.SatelliteAlt, implemented = true),
     PositionCompare(Network.Gnss, "Comparer les positions", Sym.ShareLocation, Sym.Refresh),
     Passes(Network.Gnss, "Passages de satellites", Sym.Orbit, Sym.Refresh),
+
+    NfcReader(Network.Nfc, "Lecteur NFC", Sym.Nfc, implemented = true),
+    NfcWrite(Network.Nfc, "Écrire un tag", Sym.Edit),
+    NfcErase(Network.Nfc, "Effacer et verrouiller", Sym.Delete),
+    NfcRange(Network.Nfc, "Test de lecture", Sym.ContactlessPayment),
     ;
 
     val isDockShortcut: Boolean get() = network.dockShortcut == this

@@ -23,4 +23,5 @@ open class AntApplication : Application() {
     open val tles by lazy { com.allnetworktools.data.orbit.TleRepository(this) }
     open val towers by lazy { com.allnetworktools.data.TowerRepository() }
     open val usage by lazy { com.allnetworktools.data.UsageRepository(this) }
+    open val nfc by lazy { com.allnetworktools.data.NfcRepository(this) }
 }
