@@ -47,7 +47,7 @@ object SpeedTest {
 
     private fun open(path: String, timeout: Int = 10_000) = (URL("$BASE$path").openConnection() as HttpURLConnection).apply {
         connectTimeout = timeout; readTimeout = timeout
-        setRequestProperty("User-Agent", "AllNetworkTools")
+        setRequestProperty("User-Agent", "AllRadioTools")
     }
 
     fun run(): Flow<SpeedSample> = channelFlow {

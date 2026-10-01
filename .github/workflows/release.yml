@@ -61,7 +61,7 @@ jobs:
             -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
-          cp app/build/outputs/apk/release/app-release.apk "AllNetworkTools-${{ steps.tag.outputs.name }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "AllRadioTools-${{ steps.tag.outputs.name }}.apk"
           rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Publier la release
@@ -69,7 +69,7 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.name }}
           target_commitish: ${{ github.sha }}
-          name: All Network Tools ${{ steps.tag.outputs.name }}
+          name: All Radio Tools ${{ steps.tag.outputs.name }}
           body_path: .github/release-notes/${{ steps.tag.outputs.name }}.md
-          files: AllNetworkTools-${{ steps.tag.outputs.name }}.apk
+          files: AllRadioTools-${{ steps.tag.outputs.name }}.apk
           make_latest: true

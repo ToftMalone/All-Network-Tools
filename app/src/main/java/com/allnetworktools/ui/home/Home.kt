@@ -134,7 +134,7 @@ fun HomeScreen(
             Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 12.dp), verticalAlignment = Alignment.Top) {
                     Column(Modifier.weight(1f)) {
-                        Text("All Network Tools", style = gs(32, 40, 500, -0.3f), color = cs.onSurface, maxLines = 1)
+                        Text("All Radio Tools", style = gs(32, 40, 500, -0.3f), color = cs.onSurface, maxLines = 1)
                         Text(
                             if (needed == 0) "$total réseaux disponibles"
                             else "$active sur $total disponibles · $needed ${plural(needed, "action requise", "actions requises")}",

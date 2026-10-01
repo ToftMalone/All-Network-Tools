@@ -122,7 +122,7 @@ open class TowerRepository {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 10_000
         c.readTimeout = 30_000
-        c.setRequestProperty("User-Agent", "AllNetworkTools")
+        c.setRequestProperty("User-Agent", "AllRadioTools")
         try {
             if (c.responseCode != 200) throw java.io.IOException("L'ANFR a répondu ${c.responseCode}")
             parse(q, c.inputStream.bufferedReader().readText(), System.currentTimeMillis())

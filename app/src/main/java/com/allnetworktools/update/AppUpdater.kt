@@ -99,7 +99,7 @@ open class AppUpdater(
                 val c = URL("https://api.github.com/repos/$repo/releases/latest").openConnection() as HttpURLConnection
                 c.connectTimeout = 8000; c.readTimeout = 8000
                 c.setRequestProperty("Accept", "application/vnd.github+json")
-                c.setRequestProperty("User-Agent", "AllNetworkTools/$currentVersion")
+                c.setRequestProperty("User-Agent", "AllRadioTools/$currentVersion")
                 try {
                     when (c.responseCode) {
                         404 -> null // no release published yet
@@ -132,10 +132,10 @@ open class AppUpdater(
         val file = try {
             withContext(Dispatchers.IO) {
                 val dir = File(context.cacheDir, "updates").apply { deleteRecursively(); mkdirs() }
-                val out = File(dir, "AllNetworkTools-${info.tag}.apk")
+                val out = File(dir, "AllRadioTools-${info.tag}.apk")
                 val c = URL(info.apkUrl).openConnection() as HttpURLConnection
                 c.connectTimeout = 10_000; c.readTimeout = 20_000
-                c.setRequestProperty("User-Agent", "AllNetworkTools/$currentVersion")
+                c.setRequestProperty("User-Agent", "AllRadioTools/$currentVersion")
                 val digest = MessageDigest.getInstance("SHA-256")
                 try {
                     if (c.responseCode != 200) throw java.io.IOException("Téléchargement refusé (${c.responseCode})")

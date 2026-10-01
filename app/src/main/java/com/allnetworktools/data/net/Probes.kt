@@ -97,7 +97,7 @@ object Net {
     fun grabBanner(socket: Socket, port: Int, host: String): String? = runCatching {
         socket.soTimeout = 700
         if (port in HttpPorts) {
-            socket.getOutputStream().write("HEAD / HTTP/1.0\r\nHost: $host\r\nUser-Agent: AllNetworkTools\r\n\r\n".toByteArray())
+            socket.getOutputStream().write("HEAD / HTTP/1.0\r\nHost: $host\r\nUser-Agent: AllRadioTools\r\n\r\n".toByteArray())
         }
         val buf = ByteArray(512)
         val n = socket.getInputStream().read(buf)

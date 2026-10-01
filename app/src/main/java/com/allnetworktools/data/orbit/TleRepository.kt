@@ -37,7 +37,7 @@ open class TleRepository(context: Context?) {
         val c = URL(Url).openConnection() as HttpURLConnection
         c.connectTimeout = 10_000
         c.readTimeout = 20_000
-        c.setRequestProperty("User-Agent", "AllNetworkTools")
+        c.setRequestProperty("User-Agent", "AllRadioTools")
         try {
             if (c.responseCode != 200) throw java.io.IOException("CelesTrak a répondu ${c.responseCode}")
             val text = c.inputStream.bufferedReader().readText()

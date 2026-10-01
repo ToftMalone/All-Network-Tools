@@ -99,7 +99,7 @@ fun TopBarAction(icon: String, onClick: () -> Unit) {
 private fun titles(nav: NavState): Pair<String, String> {
     val net = nav.network ?: Network.Wifi
     return when (val p = nav.page) {
-        Page.Settings -> "Paramètres" to "All Network Tools ${com.allnetworktools.BuildConfig.VERSION_NAME}"
+        Page.Settings -> "Paramètres" to "All Radio Tools ${com.allnetworktools.BuildConfig.VERSION_NAME}"
         Page.Dashboard -> net.label to "Dashboard"
         Page.Tools -> net.label to "Outils"
         is Page.ToolPage -> p.tool.title to "${net.label} · Outils"

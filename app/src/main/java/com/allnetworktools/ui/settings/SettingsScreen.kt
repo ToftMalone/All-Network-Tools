@@ -137,7 +137,7 @@ fun SettingsScreen(vm: MainViewModel) {
                 Item(0, 3, Sym.History, "Historique conservé", if (s.historyDays == 0) "Illimité" else "${s.historyDays} jours", trailing = { LinkIcon(Sym.ChevronRight) }, onClick = { dialog = "history" })
                 Item(1, 3, Sym.IosShare, "Exporter toutes les mesures", "Historique au format JSON", trailing = { LinkIcon(Sym.ChevronRight) }, onClick = {
                     if (vm.history.isEmpty) actions.toast("Aucune mesure enregistrée pour l'instant")
-                    else scope.launch { actions.share("Mesures All Network Tools", vm.history.exportJson()) }
+                    else scope.launch { actions.share("Mesures All Radio Tools", vm.history.exportJson()) }
                 })
                 Item(2, 3, Sym.Delete, "Effacer toutes les données", "Journaux, traces et historiques", danger = true, trailing = { LinkIcon(Sym.ChevronRight) }, onClick = { dialog = "clear" })
             }
@@ -167,7 +167,7 @@ fun SettingsScreen(vm: MainViewModel) {
                 Item(2, 3, Sym.Shield, "Confidentialité", "Aucune donnée ne quitte l'appareil", trailing = { LinkIcon(Sym.OpenInNew) }, onClick = { dialog = "privacy" })
             }
             Text(
-                "All Network Tools ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · Toutes les mesures restent sur l'appareil.",
+                "All Radio Tools ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · Toutes les mesures restent sur l'appareil.",
                 Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp), style = rf(12, 18), color = cs.onSurfaceVariant, textAlign = TextAlign.Center,
             )
         }

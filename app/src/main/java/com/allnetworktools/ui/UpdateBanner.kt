@@ -89,7 +89,7 @@ fun UpdateBanner(vm: MainViewModel, modifier: Modifier = Modifier) {
                         Symbol(Sym.Shield, size = 24.dp, tint = fg)
                         Column(Modifier.weight(1f)) {
                             Text("Autoriser l'installation", style = rf(15, 20, 600), color = fg)
-                            Text("Version ${s.info.version} téléchargée. Android demande d'autoriser All Network Tools à installer des mises à jour.", style = rf(12, 16), color = fg)
+                            Text("Version ${s.info.version} téléchargée. Android demande d'autoriser All Radio Tools à installer des mises à jour.", style = rf(12, 16), color = fg)
                         }
                     }
                     PillButton("Ouvrir le réglage", { vm.updater.openInstallPermissionSettings() }, Modifier.fillMaxWidth(), height = 44.dp, bg = cs.inversePrimary, fg = cs.onSurface)
