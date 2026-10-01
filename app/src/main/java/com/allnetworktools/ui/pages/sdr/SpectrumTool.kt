@@ -49,7 +49,7 @@ import com.allnetworktools.ui.tools.ToolButton
 import com.allnetworktools.ui.tools.ToolButtons
 import java.util.Locale
 
-private fun mhzLabel(hz: Double) = "%.3f".format(Locale.FRANCE, hz / 1e6)
+internal fun mhzLabel(hz: Double) = "%.3f".format(Locale.FRANCE, hz / 1e6)
 
 @Composable
 fun SpectrumTool(vm: MainViewModel) {
@@ -125,7 +125,7 @@ fun SpectrumTool(vm: MainViewModel) {
 }
 
 @Composable
-private fun SpectrumView(db: FloatArray?, hold: FloatArray?, peakIdx: Int?) {
+internal fun SpectrumView(db: FloatArray?, hold: FloatArray?, peakIdx: Int?) {
     val line = AntTheme.accent.accent
     val grid = cs.outlineVariant
     val holdColor = AntTheme.net.fair

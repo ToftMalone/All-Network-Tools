@@ -190,6 +190,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.Sonde -> com.allnetworktools.ui.pages.sdr.SondeTool(vm)
             Tool.Fm -> com.allnetworktools.ui.pages.sdr.FmTool(vm)
             Tool.Ais -> com.allnetworktools.ui.pages.sdr.AisTool(vm)
+            Tool.Emitters -> com.allnetworktools.ui.pages.sdr.EmittersTool(vm)
             Tool.WifiDirect -> {
                 val perms by vm.permissions.collectAsStateWithLifecycle()
                 val actions = LocalActions.current

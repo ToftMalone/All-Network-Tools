@@ -503,6 +503,22 @@ class ScreenshotTest {
             total = 356,
         )
     }
+    @Test fun emitters() = shot("H10_emitters", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Emitters))) { vm ->
+        val db = FloatArray(2048) { i ->
+            var v = -92f + ((i * 37) % 7) * 0.6f
+            listOf(1128 to -45f, 1500 to -70f, 1750 to -58f).forEach { (k, p) -> val d = (i - k) / 3f; v = maxOf(v, p - 8 * d * d) }
+            for (k in 1670..1730) if (i == k) v = maxOf(v, -66f)
+            v
+        }
+        vm.tools.emitters.setForTest(
+            listOf(
+                com.allnetworktools.data.sdr.EmitterInfo(433_920_000.0, 12_000.0, -45f, -45f, 14, 1.2, 3, 0.0, true, com.allnetworktools.data.sdr.EmitterKind.Burst, "ISM 433,92 : télécommandes, stations météo, capteurs"),
+                com.allnetworktools.data.sdr.EmitterInfo(434_150_000.0, 125_000.0, -66f, -80f, 3, 0.4, 1, 8.0, false, com.allnetworktools.data.sdr.EmitterKind.Spread, "ISM 433 MHz"),
+                com.allnetworktools.data.sdr.EmitterInfo(433_315_000.0, 8_000.0, -58f, -58f, 1, 41.0, 96, 0.0, true, com.allnetworktools.data.sdr.EmitterKind.Carrier, null),
+            ),
+            db, FloatArray(2048) { -94f }, 433_000_000L,
+        )
+    }
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard)) { meshDemo(it) }
     @Test fun meshtasticMessages() = shot("H1_meshtastic_messages", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { meshDemo(it) }
     @Test fun meshtasticIdle() = shot("H2_meshtastic_idle", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic)))

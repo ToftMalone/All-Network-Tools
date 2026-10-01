@@ -323,6 +323,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         tools.sonde.stop()
         tools.fm.stop()
         tools.ais.stop()
+        tools.emitters.stop()
     }
 
     init {
