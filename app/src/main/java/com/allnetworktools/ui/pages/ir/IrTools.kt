@@ -47,6 +47,7 @@ import com.allnetworktools.ui.tools.HeroCard
 import com.allnetworktools.ui.tools.HeroChip
 import com.allnetworktools.ui.tools.HostInputField
 import com.allnetworktools.ui.tools.StartButton
+import com.allnetworktools.ui.tools.ToolError
 
 private fun ranges(list: List<IntRange>) =
     if (list.isEmpty()) "Non indiquées par le téléphone"
@@ -92,8 +93,9 @@ private fun RemoteKey(key: IrKey, enabled: Boolean, modifier: Modifier = Modifie
 }
 
 @Composable
-fun IrRemoteTool(c: IrController) {
+fun IrRemoteTool(c: IrController, onDetector: () -> Unit) {
     PageColumn {
+        if (!c.hasEmitter) { NoEmitterCard(onDetector); return@PageColumn }
         HeroCard {
             Text("Télécommande ${c.brand.label}", style = gs(24, 30, 500))
             Text(
@@ -125,9 +127,10 @@ fun IrRemoteTool(c: IrController) {
 }
 
 @Composable
-fun IrCustomTool(c: IrController) {
+fun IrCustomTool(c: IrController, onDetector: () -> Unit) {
     val (code, error) = c.customCode()
     PageColumn {
+        if (!c.hasEmitter) { NoEmitterCard(onDetector); return@PageColumn }
         HeroCard {
             Text("Code personnalisé", style = gs(24, 30, 500))
             Text(
@@ -168,8 +171,9 @@ fun IrCustomTool(c: IrController) {
 private fun hex(v: Int) = "0x" + v.toString(16).uppercase().padStart(2, '0')
 
 @Composable
-fun IrTestTool(c: IrController) {
+fun IrTestTool(c: IrController, onDetector: () -> Unit) {
     PageColumn {
+        if (!c.hasEmitter) { NoEmitterCard(onDetector); return@PageColumn }
         HeroCard {
             Text("Test de l'émetteur", style = gs(24, 30, 500))
             Text(
@@ -202,37 +206,65 @@ private fun InfoNote(text: String) {
     }
 }
 
+/** Shown instead of an emitter tool on phones that have no infrared emitter. */
+@Composable
+fun NoEmitterCard(onDetector: () -> Unit) {
+    ToolError(
+        Sym.SettingsRemote, "Pas d'émetteur infrarouge",
+        "Ce téléphone n'a pas l'émetteur infrarouge de télécommande qu'Android met à disposition des applications. " +
+            "Les capteurs infrarouges de l'appareil photo (profondeur, autofocus, proximité) ne peuvent que recevoir : " +
+            "ils ne savent pas envoyer de codes à un téléviseur. Le détecteur d'infrarouge, lui, fonctionne.",
+        "Détecteur", onDetector,
+    )
+}
+
 @Composable
 fun IrDashboard(vm: MainViewModel) {
     val roles = AntTheme.net.ir
     val c = vm.tools.ir
+    val emitter = c.hasEmitter
     val open = { t: Tool -> vm.navigate { it.copy(page = Page.ToolPage(t)) } }
+    val sensors = androidx.compose.runtime.remember { vm.irSensors() }
     PageColumn {
+        val hero = if (emitter) Tool.IrRemote else Tool.IrDetect
         Column(
             Modifier.fadeUp().fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(roles.container)
-                .clickable { open(Tool.IrRemote) }.padding(20.dp),
+                .clickable { open(hero) }.padding(20.dp),
         ) {
-            ShapeBadge(Sym.SettingsRemote, cookieShape(), 64.dp, roles.accent, roles.onAccent, 30.dp, spinMs = 20_000)
-            Text("Télécommande", Modifier.padding(top = 16.dp), style = gs(24, 30, 500), color = roles.onContainer)
+            ShapeBadge(if (emitter) Sym.SettingsRemote else Sym.Videocam, cookieShape(), 64.dp, roles.accent, roles.onAccent, 30.dp, spinMs = 20_000)
+            Text(if (emitter) "Télécommande" else "Détecteur d'infrarouge", Modifier.padding(top = 16.dp), style = gs(24, 30, 500), color = roles.onContainer)
             Text(
-                "Allumez, éteignez et réglez le son d'un téléviseur Samsung, LG, Sony ou Philips.",
+                if (emitter) "Allumez, éteignez et réglez le son d'un téléviseur Samsung, LG, Sony ou Philips."
+                else "Vérifiez qu'une télécommande émet bien : la caméra voit sa LED infrarouge, invisible à l'œil.",
                 Modifier.padding(top = 4.dp).graphicsLayer { alpha = 0.85f }, style = rf(14, 20), color = roles.onContainer,
             )
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.padding(end = 12.dp).size(48.dp).clip(CircleShape).background(roles.accent)
-                        .clickable { c.press(IrKey.Power) },
-                    contentAlignment = Alignment.Center,
-                ) { Symbol(Sym.PowerSettings, size = 26.dp, filled = true, tint = roles.onAccent) }
-                PillButton("Ouvrir", { open(Tool.IrRemote) }, icon = Sym.PlayArrow, height = 48.dp)
+                if (emitter) {
+                    Box(
+                        Modifier.padding(end = 12.dp).size(48.dp).clip(CircleShape).background(roles.accent)
+                            .clickable { c.press(IrKey.Power) },
+                        contentAlignment = Alignment.Center,
+                    ) { Symbol(Sym.PowerSettings, size = 26.dp, filled = true, tint = roles.onAccent) }
+                }
+                PillButton("Ouvrir", { open(hero) }, icon = Sym.PlayArrow, height = 48.dp)
             }
         }
         InfoList("Émetteur infrarouge") {
-            InfoRow("État", "Disponible")
-            InfoRow("Fréquences porteuses", ranges(c.ranges))
-            InfoRow("Protocoles", IrProtocol.entries.joinToString(", ") { it.label })
-            c.last?.let { InfoRow("Dernière émission", if (it.error == null) it.label else "Échec") }
+            InfoRow("État", if (emitter) "Disponible" else "Absent")
+            if (emitter) {
+                InfoRow("Fréquences porteuses", ranges(c.ranges))
+                InfoRow("Protocoles", IrProtocol.entries.joinToString(", ") { it.label })
+                c.last?.let { InfoRow("Dernière émission", if (it.error == null) it.label else "Échec") }
+            }
         }
-        InfoNote("L'infrarouge ne fonctionne qu'en ligne droite et à quelques mètres. Aucun réglage du système n'est nécessaire, et rien n'est émis sans que vous appuyiez sur un bouton.")
+        InfoList("Capteurs infrarouges") {
+            if (sensors.isEmpty()) InfoRow("Déclarés au système", "Aucun")
+            sensors.forEach { InfoRow(it.label, it.detail) }
+        }
+        InfoNote(
+            if (emitter) "L'infrarouge ne fonctionne qu'en ligne droite et à quelques mètres. Rien n'est émis sans que vous appuyiez sur un bouton."
+            else "Les capteurs infrarouges de l'appareil photo (profondeur, autofocus laser) et de proximité ne font que recevoir, et beaucoup de " +
+                "fabricants ne les déclarent même pas aux applications. Seul un émetteur infrarouge de télécommande, absent de ce téléphone, permet de piloter un téléviseur.",
+        )
     }
 }

@@ -51,6 +51,7 @@ class ScreenshotTest {
     @After
     fun reset() {
         Scenario.airplane = false
+        Scenario.irNoEmitter = false
         Scenario.gnssDenied = false
         Scenario.throttled = false
         Scenario.bleEmpty = false
@@ -509,5 +510,10 @@ class ScreenshotTest {
     @Test fun irCustom() = shot("G3_ir_custom", nav = irTool(Tool.IrCustom))
     @Test fun irTest() = shot("G4_ir_test", dark = true, nav = irTool(Tool.IrTest))
     @Test fun irTools() = shot("G5_ir_tools", nav = NavState(Network.Ir, Page.Tools))
+    @Test fun irNoEmitterDashboard() = shot("G7_ir_no_emitter_dashboard", nav = NavState(Network.Ir, Page.Dashboard)) { Scenario.irNoEmitter = true }
+    @Test fun irNoEmitterRemote() = shot("G8_ir_no_emitter_remote", dark = true, nav = irTool(Tool.IrRemote)) { Scenario.irNoEmitter = true }
+    @Test fun irDetector() = shot("G9_ir_detector", nav = irTool(Tool.IrDetect)) { vm ->
+        vm.tools.irDetector.setForTest(7, List(90) { i -> if (i % 9 in 3..4) 60 + (i % 5) * 4 else 4 + i % 3 }, flashing = true)
+    }
     @Test fun wifiDirect() = shot("G6_wifi_direct", nav = NavState(Network.Wifi, Page.ToolPage(Tool.WifiDirect)))
 }

@@ -38,6 +38,7 @@ class IrController(private val repo: IrRepository, private val scope: CoroutineS
     private var job: Job? = null
 
     val ranges: List<IntRange> by lazy { repo.carrierRanges() }
+    val hasEmitter: Boolean get() = repo.hasEmitter
 
     fun press(key: IrKey) {
         val code = brand.code(key) ?: return

@@ -196,9 +196,14 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
                     else "Android demande l'autorisation de localisation pour rechercher les appareils Wi-Fi Direct.",
                 ) { actions.request(if (modern) PermGroup.Nearby else PermGroup.Location) }
             }
-            Tool.IrRemote -> com.allnetworktools.ui.pages.ir.IrRemoteTool(vm.tools.ir)
-            Tool.IrCustom -> com.allnetworktools.ui.pages.ir.IrCustomTool(vm.tools.ir)
-            Tool.IrTest -> com.allnetworktools.ui.pages.ir.IrTestTool(vm.tools.ir)
+            Tool.IrRemote -> com.allnetworktools.ui.pages.ir.IrRemoteTool(vm.tools.ir) { vm.navigate { it.copy(page = Page.ToolPage(Tool.IrDetect)) } }
+            Tool.IrCustom -> com.allnetworktools.ui.pages.ir.IrCustomTool(vm.tools.ir) { vm.navigate { it.copy(page = Page.ToolPage(Tool.IrDetect)) } }
+            Tool.IrTest -> com.allnetworktools.ui.pages.ir.IrTestTool(vm.tools.ir) { vm.navigate { it.copy(page = Page.ToolPage(Tool.IrDetect)) } }
+            Tool.IrDetect -> {
+                val perms by vm.permissions.collectAsStateWithLifecycle()
+                val actions = LocalActions.current
+                com.allnetworktools.ui.pages.ir.IrDetectTool(vm.tools.irDetector, PermGroup.Camera in perms) { actions.request(PermGroup.Camera) }
+            }
             Tool.NfcReader -> com.allnetworktools.ui.pages.nfc.NfcReaderTool(vm.tools.nfcReader)
             Tool.NfcWrite -> com.allnetworktools.ui.pages.nfc.NfcWriteTool(vm.tools.nfcWrite)
             Tool.NfcErase -> com.allnetworktools.ui.pages.nfc.NfcEraseTool(vm.tools.nfcMaint)

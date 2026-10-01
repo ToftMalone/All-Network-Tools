@@ -90,4 +90,17 @@ class IrTest {
         assertNull(WifiDirect.category(null))
         assertNull(WifiDirect.category("garbage"))
     }
+
+    @Test fun flashDetectorSpotsBlinksButNotSteadyLight() {
+        val d = com.allnetworktools.data.IrFlashDetector()
+        val total = 76_800
+        // Steady lamp in the frame: never a flash.
+        repeat(30) { assertTrue(!d.feed(400, total)) }
+        // A remote's LED adds a bright spot for a couple of frames.
+        assertTrue(d.feed(400 + 300, total))
+        assertTrue(d.feed(400 + 300, total))
+        assertTrue(!d.feed(400, total))
+        // Small noise stays below the jump threshold.
+        assertTrue(!d.feed(430, total))
+    }
 }

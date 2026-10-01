@@ -182,7 +182,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 !nfc -> Blocker.NfcOff
                 else -> null
             },
-            Network.Ir to if (g.ir.hasEmitter) null else Blocker.NoHardware,
+            // The camera detector works without an emitter, so only a phone with neither is blocked.
+            Network.Ir to if (g.ir.hasEmitter || g.ir.hasCamera) null else Blocker.NoHardware,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
@@ -305,6 +306,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val nfc get() = g.nfc
     val wifiDirect get() = g.wifiDirect
+    fun irSensors() = g.ir.sensors()
 
     fun operatorPlmns() = g.cell.plmns()
 

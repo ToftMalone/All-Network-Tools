@@ -21,6 +21,7 @@ enum class PermGroup(val permissions: List<String>) {
         },
     ),
     Phone(listOf(Manifest.permission.READ_PHONE_STATE)),
+    Camera(listOf(Manifest.permission.CAMERA)),
 
     /** Special app-op, granted from the system "Usage access" screen. */
     UsageAccess(emptyList()),

@@ -235,7 +235,7 @@ private fun description(n: Network) = when (n) {
     Network.Cellular -> "Cellules, antennes de votre opérateur et données mobiles."
     Network.Gnss -> "Satellites, ciel, comparaison des positions et passages."
     Network.Nfc -> "Lecture et écriture de tags, badges et cartes sans contact."
-    Network.Ir -> "Télécommande TV, codes infrarouges et test de l'émetteur."
+    Network.Ir -> "Télécommande TV, détecteur par la caméra et capteurs infrarouges."
 }
 
 @Composable

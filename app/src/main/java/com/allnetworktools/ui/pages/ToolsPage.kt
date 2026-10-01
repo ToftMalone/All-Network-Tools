@@ -101,6 +101,7 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
             listOf(
                 ToolEntry(Tool.IrCustom, "Code personnalisé", "NEC, Samsung, Sony SIRC, Philips RC5"),
                 ToolEntry(Tool.IrTest, "Test de l'émetteur", "Vérifier la LED avec l'appareil photo"),
+                ToolEntry(Tool.IrDetect, "Détecteur d'infrarouge", "Voir si une télécommande émet, avec la caméra"),
             ),
         ),
     )

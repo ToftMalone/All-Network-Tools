@@ -97,6 +97,7 @@ enum class Tool(
     IrRemote(Network.Ir, "Télécommande", Sym.SettingsRemote, implemented = true),
     IrCustom(Network.Ir, "Code personnalisé", Sym.Tune),
     IrTest(Network.Ir, "Test de l'émetteur", Sym.PhotoCamera),
+    IrDetect(Network.Ir, "Détecteur d'infrarouge", Sym.Videocam),
     ;
 
     val isDockShortcut: Boolean get() = network.dockShortcut == this

@@ -53,5 +53,6 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val nfcWifi by lazy { com.allnetworktools.ui.pages.nfc.NfcWriteController(app.nfc, scope) }
     val nfcAnalyze by lazy { com.allnetworktools.ui.pages.nfc.NfcAnalyzeController(app.nfc, scope) }
     val ir by lazy { com.allnetworktools.ui.pages.ir.IrController(app.ir, scope) }
+    val irDetector by lazy { com.allnetworktools.ui.pages.ir.IrDetectorController(app.ir, scope) }
     val nfcEndurance by lazy { com.allnetworktools.ui.pages.nfc.NfcEnduranceController(app.nfc, scope) }
 }
