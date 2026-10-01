@@ -144,8 +144,10 @@ fun HomeScreen(
                 // Cards only hold an icon and a short description, so they stay compact.
                 val cardH = 184.dp
                 Column(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp)
-                        .verticalScroll(rememberScrollState()),
+                    // Padding sits inside the scroll area so the selection outline and scale are not clipped.
+                    Modifier.fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     rows.forEach { pair ->
