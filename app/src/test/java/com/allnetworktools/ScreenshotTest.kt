@@ -464,6 +464,17 @@ class ScreenshotTest {
         }
         vm.tools.spectrum.setForTest(db, 98_000_000L)
     }
+    @Test fun adsb() = shot("H6_adsb", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Adsb))) { vm ->
+        vm.tools.adsb.setForTest(
+            listOf(
+                com.allnetworktools.ui.pages.sdr.Plane(0x3944EF, "3944EF", "AFR1234", 36000, 452.0, 128.0, 0, 48.95, 2.70, 0, 412, -18.0),
+                com.allnetworktools.ui.pages.sdr.Plane(0x4CA2B1, "4CA2B1", "RYR8KZ", 11250, 296.0, 265.0, -1408, 48.71, 2.12, 1, 233, -24.0),
+                com.allnetworktools.ui.pages.sdr.Plane(0x3C6586, "3C6586", "DLH4AX", 38000, 471.0, 52.0, 64, 49.30, 2.41, 2, 168, -29.0),
+                com.allnetworktools.ui.pages.sdr.Plane(0x39CE80, "39CE80", null, 4500, null, null, null, null, null, 6, 12, -35.0),
+            ),
+            rate = 87,
+        )
+    }
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard)) { meshDemo(it) }
     @Test fun meshtasticMessages() = shot("H1_meshtastic_messages", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { meshDemo(it) }
     @Test fun meshtasticIdle() = shot("H2_meshtastic_idle", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic)))

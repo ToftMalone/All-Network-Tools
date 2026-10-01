@@ -78,7 +78,7 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
         ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"), ToolEntry(Tool.Passes, "Passages de satellites", "Levers et couchers prévus"))),
     )
     Network.Sdr -> listOf(
-        ToolGroup("Outils", listOf(ToolEntry(Tool.Spectrum, "Analyseur de spectre", "Spectre et chute d'eau, 1 MHz à 6 GHz"))),
+        ToolGroup("Outils", listOf(ToolEntry(Tool.Spectrum, "Analyseur de spectre", "Spectre et chute d'eau, 1 MHz à 6 GHz"), ToolEntry(Tool.Adsb, "Avions (ADS-B)", "Carte des avions sur 1090 MHz"))),
     )
 }
 

@@ -47,10 +47,13 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val unknownTrackers = com.allnetworktools.ui.pages.bt.UnknownTrackersController(app, scope)
     // One HackRF, one tool at a time: starting one stops the other.
     val meshtastic: com.allnetworktools.ui.pages.sdr.MeshtasticController by lazy {
-        com.allnetworktools.ui.pages.sdr.MeshtasticController(app.sdr, scope) { spectrum.stop() }
+        com.allnetworktools.ui.pages.sdr.MeshtasticController(app.sdr, scope) { spectrum.stop(); adsb.stop() }
     }
     val spectrum: com.allnetworktools.ui.pages.sdr.SpectrumController by lazy {
-        com.allnetworktools.ui.pages.sdr.SpectrumController(app.sdr, scope) { meshtastic.stop() }
+        com.allnetworktools.ui.pages.sdr.SpectrumController(app.sdr, scope) { meshtastic.stop(); adsb.stop() }
+    }
+    val adsb: com.allnetworktools.ui.pages.sdr.AdsbController by lazy {
+        com.allnetworktools.ui.pages.sdr.AdsbController(app.sdr, scope) { meshtastic.stop(); spectrum.stop() }
     }
     val skyView = androidx.compose.runtime.mutableStateOf(com.allnetworktools.ui.pages.gnss.SkyView.Sky)
 }

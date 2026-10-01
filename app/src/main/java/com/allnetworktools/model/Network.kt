@@ -82,6 +82,7 @@ enum class Tool(
 
     Meshtastic(Network.Sdr, "Meshtastic", Sym.Hub, Sym.Delete, implemented = true),
     Spectrum(Network.Sdr, "Analyseur de spectre", Sym.BarChart),
+    Adsb(Network.Sdr, "Avions (ADS-B)", Sym.Flight),
 
     ;
 
