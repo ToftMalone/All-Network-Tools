@@ -485,6 +485,12 @@ class ScreenshotTest {
             403_000_000L,
         )
     }
+    @Test fun fm() = shot("H8_fm", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fm))) { vm ->
+        vm.tools.fm.setForTest(
+            com.allnetworktools.data.sdr.RdsInfo(0xF201, "FRANCE I", "En ce moment : le journal de 18 h, avec toute l'actualité", 1, tp = true, ta = false, groups = 212),
+            104.3, -27.0,
+        )
+    }
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard)) { meshDemo(it) }
     @Test fun meshtasticMessages() = shot("H1_meshtastic_messages", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { meshDemo(it) }
     @Test fun meshtasticIdle() = shot("H2_meshtastic_idle", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic)))

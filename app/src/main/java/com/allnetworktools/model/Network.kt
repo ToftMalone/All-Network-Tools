@@ -84,6 +84,7 @@ enum class Tool(
     Spectrum(Network.Sdr, "Analyseur de spectre", Sym.BarChart),
     Adsb(Network.Sdr, "Avions (ADS-B)", Sym.Flight),
     Sonde(Network.Sdr, "Ballons-sondes", Sym.Cloud),
+    Fm(Network.Sdr, "Radio FM", Sym.Radio),
 
     ;
 

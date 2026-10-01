@@ -178,6 +178,8 @@ object Sym {
     const val Visibility = "visibility"
     const val PersonSearch = "person_search"
     const val Podcasts = "podcasts"
+    const val Radio = "radio"
+    const val VolumeOff = "volume_off"
     const val Height = "height"
     const val Event = "event"
     const val Fullscreen = "fullscreen"
