@@ -39,7 +39,6 @@ import kotlinx.coroutines.flow.onStart
 
 /** Scenario switches read by the fakes; set before the ViewModel is created. */
 object Scenario {
-    var irNoEmitter = false
     var airplane = false
     var gnssDenied = false
     var throttled = false
@@ -254,32 +253,6 @@ class FakeApp : AntApplication() {
     override val updater by lazy {
         object : com.allnetworktools.update.AppUpdater(this@FakeApp, "0.1") {
             override suspend fun check(autoInstall: Boolean, force: Boolean) = Unit
-        }
-    }
-    override val nfc by lazy {
-        object : com.allnetworktools.data.NfcRepository(this@FakeApp) {
-            override val hasNfc = true
-            override val enabled: Flow<Boolean> = flowOf(true)
-            override fun startReading(host: Context) = Unit
-            override fun stopReading(host: Context) = Unit
-        }
-    }
-    override val ir by lazy {
-        object : com.allnetworktools.data.IrRepository(this@FakeApp) {
-            override val hasEmitter get() = !Scenario.irNoEmitter
-            override val hasCamera = true
-            override fun carrierRanges() = listOf(30_000..57_000)
-            override fun sensors() = listOf(
-                com.allnetworktools.data.IrSensorInfo("Capteur de profondeur", "Caméra 4, arrière · mesure par infrarouge (temps de vol)"),
-                com.allnetworktools.data.IrSensorInfo("Capteur de proximité", "Proximity Sensor · Samsung"),
-            )
-            override fun detectorCameras() = listOf(
-                com.allnetworktools.data.IrCameraChoice("1", "Caméra avant", true, 270),
-                com.allnetworktools.data.IrCameraChoice("0", "Caméra arrière", false, 90),
-            )
-            override fun openDetector(cameraId: String, onFrame: (com.allnetworktools.data.IrFrame) -> Unit, onError: (String) -> Unit) =
-                com.allnetworktools.data.IrDetectorHandle { }
-            override fun transmit(signal: com.allnetworktools.data.IrSignal): String? = null
         }
     }
     override val wifiDirect by lazy {

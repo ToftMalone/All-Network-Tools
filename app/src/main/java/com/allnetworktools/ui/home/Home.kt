@@ -234,8 +234,6 @@ private fun description(n: Network) = when (n) {
     Network.Bluetooth -> "Appareils Bluetooth LE, traqueurs inconnus et recherche Chaud/Froid."
     Network.Cellular -> "Cellules, antennes de votre opérateur et données mobiles."
     Network.Gnss -> "Satellites, ciel, comparaison des positions et passages."
-    Network.Nfc -> "Lecture et écriture de tags, badges et cartes sans contact."
-    Network.Ir -> "Télécommande TV, détecteur par la caméra et capteurs infrarouges."
 }
 
 @Composable
@@ -264,52 +262,6 @@ private fun CardIcon(network: Network) {
                     drawCircle(roles.accent, size.minDimension / 2 - 1.dp.toPx(), style = Stroke(2.dp.toPx(), pathEffect = dash))
                 }
                 Symbol(Sym.SatelliteAlt, size = 26.dp, filled = true, tint = roles.onAccent)
-            }
-        }
-        Network.Nfc -> {
-            // A tag "tapping" the phone: the icon dips, then a wave leaves the badge.
-            val t = rememberInfiniteTransition(label = "nfcTap")
-            val tap by t.animateFloat(
-                1f, 1f,
-                infiniteRepeatable(
-                    keyframes {
-                        durationMillis = 2000
-                        1f at 0
-                        0.78f at 180 using FastOutSlowInEasing
-                        1.06f at 420 using FastOutSlowInEasing
-                        1f at 620
-                        1f at 2000
-                    },
-                ),
-                label = "nfcTapScale",
-            )
-            Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
-                PulseRing(roles.accent, 40.dp, periodMs = 2000)
-                Box(Modifier.size(48.dp).spinning(rememberSpin(20_000)).clip(cookieShape()).background(roles.accent))
-                Symbol(Sym.Nfc, Modifier.graphicsLayer { scaleX = tap; scaleY = tap }, size = 26.dp, filled = true, tint = roles.onAccent)
-            }
-        }
-        Network.Ir -> {
-            // The remote "fires": short beams flash out of the top of the badge.
-            val t = rememberInfiniteTransition(label = "irBeam")
-            val beam by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "irBeamPhase")
-            Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(48.dp).spinning(rememberSpin(26_000, reverse = true)).clip(RoundedCornerShape(16.dp)).background(roles.accent))
-                Canvas(Modifier.size(56.dp)) {
-                    val p = (beam * 2f).coerceAtMost(1f)
-                    val a = if (beam < 0.5f) 1f - p * 0.6f else 0f
-                    if (a > 0f) {
-                        val c = Offset(size.width / 2, size.height * 0.18f)
-                        for (k in 1..2) {
-                            val r = (6.dp.toPx() + k * 7.dp.toPx()) * (0.6f + 0.4f * p)
-                            drawArc(
-                                roles.accent.copy(alpha = a / k), 225f, 90f, false,
-                                Offset(c.x - r, c.y - r), Size(r * 2, r * 2), style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round),
-                            )
-                        }
-                    }
-                }
-                Symbol(Sym.SettingsRemote, size = 26.dp, filled = true, tint = roles.onAccent)
             }
         }
     }

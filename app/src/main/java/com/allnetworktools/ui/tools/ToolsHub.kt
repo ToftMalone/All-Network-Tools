@@ -46,13 +46,4 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val evilTwin = com.allnetworktools.ui.pages.wifi.EvilTwinController()
     val unknownTrackers = com.allnetworktools.ui.pages.bt.UnknownTrackersController(app, scope)
     val skyView = androidx.compose.runtime.mutableStateOf(com.allnetworktools.ui.pages.gnss.SkyView.Sky)
-    val nfcReader by lazy { com.allnetworktools.ui.pages.nfc.NfcReaderController(app.nfc, scope) }
-    val nfcWrite by lazy { com.allnetworktools.ui.pages.nfc.NfcWriteController(app.nfc, scope) }
-    val nfcMaint by lazy { com.allnetworktools.ui.pages.nfc.NfcMaintController(app.nfc, scope) }
-    val nfcAntenna by lazy { com.allnetworktools.ui.pages.nfc.NfcAntennaController(app.nfc, scope) }
-    val nfcWifi by lazy { com.allnetworktools.ui.pages.nfc.NfcWriteController(app.nfc, scope) }
-    val nfcAnalyze by lazy { com.allnetworktools.ui.pages.nfc.NfcAnalyzeController(app.nfc, scope) }
-    val ir by lazy { com.allnetworktools.ui.pages.ir.IrController(app.ir, scope) }
-    val irDetector by lazy { com.allnetworktools.ui.pages.ir.IrDetectorController(app.ir, scope) }
-    val nfcEndurance by lazy { com.allnetworktools.ui.pages.nfc.NfcEnduranceController(app.nfc, scope) }
 }

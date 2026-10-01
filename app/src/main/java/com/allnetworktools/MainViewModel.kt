@@ -40,7 +40,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Why a network card or page is unavailable. */
-enum class Blocker { NoHardware, WifiOff, BluetoothOff, NearbyPermission, Airplane, PhonePermission, NoSim, LocationPermission, LocationOff, NfcOff }
+enum class Blocker { NoHardware, WifiOff, BluetoothOff, NearbyPermission, Airplane, PhonePermission, NoSim, LocationPermission, LocationOff }
 
 sealed interface Page {
     data object Home : Page
@@ -112,7 +112,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val bluetoothEnabled = g.radios.bluetoothEnabled.stateIn(viewModelScope, sharing, true)
     val airplane = g.radios.airplaneMode.stateIn(viewModelScope, sharing, false)
     val locationEnabled = g.radios.locationEnabled.stateIn(viewModelScope, sharing, true)
-    val nfcEnabled = g.nfc.enabled.stateIn(viewModelScope, sharing, true)
 
     private val _nav = MutableStateFlow(NavState())
     val nav: StateFlow<NavState> = _nav.asStateFlow()
@@ -146,13 +145,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- availability ---------------------------------------------------------------------
 
-    private data class CoreAvail(val p: PermissionSnapshot, val wifi: Boolean, val bt: Boolean, val plane: Boolean, val loc: Boolean)
-
     val blockers: StateFlow<Map<Network, Blocker?>> = combine(
-        combine(permissions, wifiEnabled, bluetoothEnabled, airplane, locationEnabled, ::CoreAvail),
-        nfcEnabled,
-    ) { a, nfc ->
-        val (p, wifi, bt, plane, loc) = a
+        permissions, wifiEnabled, bluetoothEnabled, airplane, locationEnabled,
+    ) { p, wifi, bt, plane, loc ->
         mapOf(
             Network.Wifi to when {
                 !g.radios.hasWifi -> Blocker.NoHardware
@@ -177,13 +172,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 !loc -> Blocker.LocationOff
                 else -> null
             },
-            Network.Nfc to when {
-                !g.nfc.hasNfc -> Blocker.NoHardware
-                !nfc -> Blocker.NfcOff
-                else -> null
-            },
-            // The camera detector works without an emitter, so only a phone with neither is blocked.
-            Network.Ir to if (g.ir.hasEmitter || g.ir.hasCamera) null else Blocker.NoHardware,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
@@ -304,9 +292,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun lastKnownLocation() = g.gnss.lastKnownLocation()
 
-    val nfc get() = g.nfc
     val wifiDirect get() = g.wifiDirect
-    fun irSensors() = g.ir.sensors()
 
     fun operatorPlmns() = g.cell.plmns()
 

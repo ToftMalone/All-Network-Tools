@@ -51,7 +51,6 @@ class ScreenshotTest {
     @After
     fun reset() {
         Scenario.airplane = false
-        Scenario.irNoEmitter = false
         Scenario.gnssDenied = false
         Scenario.throttled = false
         Scenario.bleEmpty = false
@@ -432,88 +431,5 @@ class ScreenshotTest {
         )
     }
 
-    private fun nfcTool(t: Tool) = NavState(Network.Nfc, Page.ToolPage(t))
-
-    @Test fun nfcReader() = shot("F0_nfc_reader", nav = nfcTool(Tool.NfcReader)) { vm ->
-        vm.tools.nfcReader.setForTest(
-            com.allnetworktools.data.NfcTagInfo(
-                uidHex = "04A2B3C4D5E680", techs = listOf("android.nfc.tech.NfcA", "android.nfc.tech.Ndef"),
-                techLabels = listOf("NFC-A (ISO 14443-3A)", "NDEF"), memoryBytes = 144,
-                ndefRecords = listOf(
-                    com.allnetworktools.data.NfcRecordInfo(com.allnetworktools.data.NfcRecordKind.Link, "https://allnetwork.tools/w/b7", null, 24),
-                    com.allnetworktools.data.NfcRecordInfo(com.allnetworktools.data.NfcRecordKind.Text, "Étagère B7 · Câbles USB-C", "Langue : fr", 30),
-                ),
-                ndefWritable = true, ndefCanLock = true, hasNdef = true,
-            ),
-        )
-    }
-    @Test fun nfcReaderEmpty() = shot("F1_nfc_reader_empty", dark = true, nav = nfcTool(Tool.NfcReader))
-    @Test fun nfcWrite() = shot("F2_nfc_write", nav = nfcTool(Tool.NfcWrite)) { vm ->
-        vm.tools.nfcWrite.url = "https://allnetwork.tools"
-    }
-    @Test fun nfcErase() = shot("F3_nfc_erase", dark = true, nav = nfcTool(Tool.NfcErase)) { vm ->
-        vm.tools.nfcMaint.setResultForTest(com.allnetworktools.ui.pages.nfc.NfcMaintAction.Erase, com.allnetworktools.data.NfcWriteResult.Success)
-    }
-    @Test fun nfcRange() = shot("F4_nfc_range", nav = nfcTool(Tool.NfcRange)) { vm ->
-        vm.tools.nfcAntenna.setForTest(
-            mapOf(
-                1 to com.allnetworktools.data.LinkSample(120, 118, 9.5), 4 to com.allnetworktools.data.LinkSample(120, 92, 14.0),
-                3 to com.allnetworktools.data.LinkSample(120, 40, 22.0), 7 to com.allnetworktools.data.LinkSample(60, 0, null),
-            ),
-        )
-    }
-    @Test fun nfcWriteWifi() = shot("F7_nfc_write_wifi", dark = true, nav = nfcTool(Tool.NfcWrite)) { vm ->
-        vm.tools.nfcWrite.preset = com.allnetworktools.ui.pages.nfc.NfcWritePreset.Wifi
-        vm.tools.nfcWrite.wifiSsid = "Livebox-7A21"
-        vm.tools.nfcWrite.wifiKey = "correct horse battery"
-    }
-    @Test fun nfcWifiShare() = shot("F8_nfc_wifi_share", nav = nfcTool(Tool.NfcWifi))
-    @Test fun nfcAnalyze() = shot("F9_nfc_analyze", nav = nfcTool(Tool.NfcAnalyze)) { vm ->
-        vm.tools.nfcAnalyze.setForTest(
-            com.allnetworktools.data.NfcChipReport(
-                uidHex = "1DA2B3C4D5E680", uidBytes = 7, manufacturer = null, chip = "NTAG215", exact = true,
-                model = com.allnetworktools.data.NfcChipModel("NTAG215", 504, 4, 129),
-                techLabels = listOf("NFC-A (ISO 14443-3A)", "MIFARE Ultralight / NTAG", "NDEF"), atqa = "44 00", sak = "00", maxTransceive = 253,
-                ndefType = "org.nfcforum.ndef.type2", ndefCapacity = 496, ndefUsed = 38, ndefWritable = true, ndefCanLock = true,
-                capability = com.allnetworktools.data.NfcCapability(true, 0x10, 496, false), versionHex = "00 04 04 02 01 00 11 03",
-                anomalies = listOf("La puce se présente comme NXP mais son UID ne commence pas par 04 (code fabricant NXP) : copie ou clone probable."),
-            ),
-        )
-    }
-    @Test fun nfcEndurance() = shot("FA_nfc_endurance", dark = true, nav = nfcTool(Tool.NfcEndurance)) { vm ->
-        vm.tools.nfcEndurance.setForTest(
-            com.allnetworktools.data.EnduranceReport(
-                "NTAG213", true, 3, 36,
-                mapOf(17 to com.allnetworktools.data.PageFault.Mismatch, 18 to com.allnetworktools.data.PageFault.Mismatch),
-                4.2, 6.8, null, true,
-            ),
-        )
-    }
-    @Test fun nfcDashboard() = shot("F5_nfc_dashboard", nav = NavState(Network.Nfc, Page.Dashboard)) { vm ->
-        vm.tools.nfcReader.setForTest(
-            com.allnetworktools.data.NfcTagInfo(
-                uidHex = "04A2B3C4D5E680", techs = listOf("android.nfc.tech.NfcA"), techLabels = listOf("NFC-A (ISO 14443-3A)"),
-                memoryBytes = 144, ndefRecords = emptyList(), ndefWritable = true, ndefCanLock = true, hasNdef = true,
-            ),
-        )
-    }
-    @Test fun nfcTools() = shot("F6_nfc_tools", nav = NavState(Network.Nfc, Page.Tools))
-
-    private fun irTool(t: Tool) = NavState(Network.Ir, Page.ToolPage(t))
-    @Test fun irDashboard() = shot("G0_ir_dashboard", nav = NavState(Network.Ir, Page.Dashboard))
-    @Test fun irRemote() = shot("G1_ir_remote", nav = irTool(Tool.IrRemote)) { vm ->
-        vm.tools.ir.setLastForTest(com.allnetworktools.ui.pages.ir.IrSent("Samsung · Volume +", null, 0))
-    }
-    @Test fun irRemoteDark() = shot("G2_ir_remote_dark", dark = true, nav = irTool(Tool.IrRemote)) { vm ->
-        vm.tools.ir.brand = com.allnetworktools.data.IrBrand.Philips
-    }
-    @Test fun irCustom() = shot("G3_ir_custom", nav = irTool(Tool.IrCustom))
-    @Test fun irTest() = shot("G4_ir_test", dark = true, nav = irTool(Tool.IrTest))
-    @Test fun irTools() = shot("G5_ir_tools", nav = NavState(Network.Ir, Page.Tools))
-    @Test fun irNoEmitterDashboard() = shot("G7_ir_no_emitter_dashboard", nav = NavState(Network.Ir, Page.Dashboard)) { Scenario.irNoEmitter = true }
-    @Test fun irNoEmitterRemote() = shot("G8_ir_no_emitter_remote", dark = true, nav = irTool(Tool.IrRemote)) { Scenario.irNoEmitter = true }
-    @Test fun irDetector() = shot("G9_ir_detector", nav = irTool(Tool.IrDetect)) { vm ->
-        vm.tools.irDetector.setForTest(7, List(90) { i -> if (i % 9 in 3..4) 60 + (i % 5) * 4 else 4 + i % 3 }, flashing = true)
-    }
     @Test fun wifiDirect() = shot("G6_wifi_direct", nav = NavState(Network.Wifi, Page.ToolPage(Tool.WifiDirect)))
 }

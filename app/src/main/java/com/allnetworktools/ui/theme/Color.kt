@@ -104,16 +104,12 @@ data class NetworkColors(
     val beidou: Color,
     val qzss: Color,
     val shadow: Color,
-    val nfc: AccentRoles,
-    val ir: AccentRoles,
 ) {
     operator fun get(network: Network): AccentRoles = when (network) {
         Network.Wifi -> wifi
         Network.Bluetooth -> bt
         Network.Cellular -> cell
         Network.Gnss -> gnss
-        Network.Nfc -> nfc
-        Network.Ir -> ir
     }
 }
 
@@ -122,8 +118,6 @@ private val BaseAccents = mapOf(
     Network.Bluetooth to Color(0xFF5E4DB2),
     Network.Cellular to Color(0xFF2F6A3E),
     Network.Gnss to Color(0xFF7F5700),
-    Network.Nfc to Color(0xFF8E4A3E),
-    Network.Ir to Color(0xFF006A6A),
 )
 
 val NetworkColorsLight = NetworkColors(
@@ -135,8 +129,6 @@ val NetworkColorsLight = NetworkColors(
     gps = Color(0xFF3A5BA9), galileo = Color(0xFF5E4DB2), glonass = Color(0xFFB3261E),
     beidou = Color(0xFF2F6A3E), qzss = Color(0xFF8A5A00),
     shadow = Color(0x47461423),
-    nfc = AccentRoles(Color(0xFF8E4A3E), Color.White, Color(0xFFFFDAD1), Color(0xFF3A0B02)),
-    ir = AccentRoles(Color(0xFF006A6A), Color.White, Color(0xFF9CF1F0), Color(0xFF002020)),
 )
 
 val NetworkColorsDark = NetworkColors(
@@ -148,8 +140,6 @@ val NetworkColorsDark = NetworkColors(
     gps = Color(0xFFB1C5FF), galileo = Color(0xFFCBBEFF), glonass = Color(0xFFFFB4AB),
     beidou = Color(0xFF97D5A0), qzss = Color(0xFFF8BD49),
     shadow = Color(0x99000000),
-    nfc = AccentRoles(Color(0xFFFFB5A0), Color(0xFF5E1C0F), Color(0xFF773324), Color(0xFFFFDAD1)),
-    ir = AccentRoles(Color(0xFF80D5D4), Color(0xFF003737), Color(0xFF004F4F), Color(0xFF9CF1F0)),
 )
 
 /** Network accents shifted toward the dynamic primary, each expanded into its 4 Compose roles. */
@@ -165,8 +155,6 @@ fun harmonizedNetworkColors(primary: Color, dark: Boolean): NetworkColors {
         bt = roles(Network.Bluetooth),
         cell = roles(Network.Cellular),
         gnss = roles(Network.Gnss),
-        nfc = roles(Network.Nfc),
-        ir = roles(Network.Ir),
     )
 }
 

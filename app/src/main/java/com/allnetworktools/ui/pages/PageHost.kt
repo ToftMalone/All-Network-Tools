@@ -173,8 +173,6 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Network.Bluetooth -> BtDashboard(vm)
             Network.Cellular -> CellDashboard(vm)
             Network.Gnss -> GnssDashboard(vm)
-            Network.Nfc -> com.allnetworktools.ui.pages.nfc.NfcDashboard(vm)
-            Network.Ir -> com.allnetworktools.ui.pages.ir.IrDashboard(vm)
         }
         Page.Tools -> ToolsPage(net, vm)
         is Page.ToolPage -> when (page.tool) {
@@ -196,22 +194,6 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
                     else "Android demande l'autorisation de localisation pour rechercher les appareils Wi-Fi Direct.",
                 ) { actions.request(if (modern) PermGroup.Nearby else PermGroup.Location) }
             }
-            Tool.IrRemote -> com.allnetworktools.ui.pages.ir.IrRemoteTool(vm.tools.ir) { vm.navigate { it.copy(page = Page.ToolPage(Tool.IrDetect)) } }
-            Tool.IrCustom -> com.allnetworktools.ui.pages.ir.IrCustomTool(vm.tools.ir) { vm.navigate { it.copy(page = Page.ToolPage(Tool.IrDetect)) } }
-            Tool.IrTest -> com.allnetworktools.ui.pages.ir.IrTestTool(vm.tools.ir) { vm.navigate { it.copy(page = Page.ToolPage(Tool.IrDetect)) } }
-            Tool.IrDetect -> {
-                val perms by vm.permissions.collectAsStateWithLifecycle()
-                val actions = LocalActions.current
-                com.allnetworktools.ui.pages.ir.IrDetectTool(vm.tools.irDetector, PermGroup.Camera in perms) { actions.request(PermGroup.Camera) }
-            }
-            Tool.NfcReader -> com.allnetworktools.ui.pages.nfc.NfcReaderTool(vm.tools.nfcReader)
-            Tool.NfcWrite -> com.allnetworktools.ui.pages.nfc.NfcWriteTool(vm.tools.nfcWrite)
-            Tool.NfcErase -> com.allnetworktools.ui.pages.nfc.NfcEraseTool(vm.tools.nfcMaint)
-            Tool.NfcRange -> com.allnetworktools.ui.pages.nfc.NfcRangeTool(vm.tools.nfcAntenna)
-            Tool.NfcAnalyze -> com.allnetworktools.ui.pages.nfc.NfcAnalyzeTool(vm.tools.nfcAnalyze)
-            Tool.NfcEndurance -> com.allnetworktools.ui.pages.nfc.NfcEnduranceTool(vm.tools.nfcEndurance)
-            // Only this tool reads the Wi-Fi connection, to prefill the network name.
-            Tool.NfcWifi -> com.allnetworktools.ui.pages.nfc.NfcWifiShareTool(vm.tools.nfcWifi, vm.wifi.collectAsStateWithLifecycle().value.connection)
             Tool.Gatt, Tool.Paired, Tool.Tracker, Tool.UnknownTrackers -> BtToolRoute(vm, page)
             Tool.DataUsage -> {
                 val perms by vm.permissions.collectAsStateWithLifecycle()

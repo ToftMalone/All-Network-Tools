@@ -77,34 +77,6 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     Network.Gnss -> listOf(
         ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"), ToolEntry(Tool.Passes, "Passages de satellites", "Levers et couchers prévus"))),
     )
-    Network.Nfc -> listOf(
-        ToolGroup(
-            "Écriture",
-            listOf(
-                ToolEntry(Tool.NfcWrite, "Écrire un tag", "Lien, Wi-Fi, contact, SMS, e-mail, position…"),
-                ToolEntry(Tool.NfcWifi, "Rejoindre mon Wi-Fi", "Un tag pour inviter sans dicter le mot de passe"),
-                ToolEntry(Tool.NfcErase, "Effacer et verrouiller", "Réinitialiser ou bloquer un tag"),
-            ),
-        ),
-        ToolGroup(
-            "Diagnostic",
-            listOf(
-                ToolEntry(Tool.NfcAnalyze, "Analyse de la puce", "Modèle, fabricant, mémoire, contrefaçon"),
-                ToolEntry(Tool.NfcEndurance, "Test d'endurance", "Écrit et relit toute la mémoire"),
-                ToolEntry(Tool.NfcRange, "Zone de l'antenne", "Où lire le mieux au dos du téléphone"),
-            ),
-        ),
-    )
-    Network.Ir -> listOf(
-        ToolGroup(
-            "Outils",
-            listOf(
-                ToolEntry(Tool.IrCustom, "Code personnalisé", "NEC, Samsung, Sony SIRC, Philips RC5"),
-                ToolEntry(Tool.IrTest, "Test de l'émetteur", "Vérifier la LED avec l'appareil photo"),
-                ToolEntry(Tool.IrDetect, "Détecteur d'infrarouge", "Voir si une télécommande émet, avec la caméra"),
-            ),
-        ),
-    )
 }
 
 private fun featuredSubtitle(net: Network) = when (net) {
@@ -112,8 +84,6 @@ private fun featuredSubtitle(net: Network) = when (net) {
     Network.Bluetooth -> "Appareils à proximité, en direct, avec filtres"
     Network.Cellular -> "Cellules NR et LTE détectées par le modem"
     Network.Gnss -> "Sky plot et carte du monde des satellites"
-    Network.Nfc -> "Posez un tag, un badge ou une carte au dos du téléphone"
-    Network.Ir -> "Téléviseurs Samsung, LG, Sony et Philips"
 }
 
 @Composable
@@ -122,8 +92,6 @@ private fun featuredBadge(net: Network, vm: MainViewModel): String? = when (net)
     Network.Bluetooth -> vm.ble.collectAsStateWithLifecycle().value.size.let { "$it ${plural(it, "appareil")}" }
     Network.Cellular -> vm.cell.collectAsStateWithLifecycle().value.state?.neighbors?.size?.let { "$it ${plural(it, "cellule")}" }
     Network.Gnss -> vm.gnss.collectAsStateWithLifecycle().value.let { "${it.used.size}/${it.visible.size} satellites" }
-    Network.Nfc -> null
-    Network.Ir -> null
 }
 
 @Composable
