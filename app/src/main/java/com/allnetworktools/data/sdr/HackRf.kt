@@ -139,6 +139,14 @@ class HackRf private constructor(
         private const val TRANSFERS = 4
         private const val TRANSFER_SIZE = 131072
 
+        private val FILTERS = intArrayOf(
+            1_750_000, 2_500_000, 3_500_000, 5_000_000, 5_500_000, 6_000_000, 7_000_000, 8_000_000, 9_000_000,
+            10_000_000, 12_000_000, 14_000_000, 15_000_000, 20_000_000, 24_000_000, 28_000_000,
+        )
+
+        /** libhackrf's rule: the widest MAX2837 baseband filter no wider than 75 % of the sample rate. */
+        fun filterFor(sampleRateHz: Int): Int = FILTERS.lastOrNull { it <= sampleRateHz * 3L / 4 } ?: FILTERS.first()
+
         fun isHackRf(d: UsbDevice) = d.vendorId == VID && d.productId in PIDS
 
         fun name(d: UsbDevice) = PIDS[d.productId] ?: "HackRF"

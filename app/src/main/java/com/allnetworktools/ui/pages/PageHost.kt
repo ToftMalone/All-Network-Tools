@@ -185,6 +185,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.Passes -> com.allnetworktools.ui.pages.gnss.PassesTool(vm)
             Tool.TowerMap -> com.allnetworktools.ui.pages.cell.TowerMapTool(vm)
             Tool.Meshtastic -> com.allnetworktools.ui.pages.sdr.MeshtasticTool(vm)
+            Tool.Spectrum -> com.allnetworktools.ui.pages.sdr.SpectrumTool(vm)
             Tool.WifiDirect -> {
                 val perms by vm.permissions.collectAsStateWithLifecycle()
                 val actions = LocalActions.current

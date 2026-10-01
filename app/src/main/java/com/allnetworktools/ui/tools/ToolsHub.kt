@@ -45,6 +45,12 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val mitm by lazy { com.allnetworktools.ui.pages.wifi.MitmController(probes, links, scope) }
     val evilTwin = com.allnetworktools.ui.pages.wifi.EvilTwinController()
     val unknownTrackers = com.allnetworktools.ui.pages.bt.UnknownTrackersController(app, scope)
-    val meshtastic by lazy { com.allnetworktools.ui.pages.sdr.MeshtasticController(app.sdr, scope) }
+    // One HackRF, one tool at a time: starting one stops the other.
+    val meshtastic: com.allnetworktools.ui.pages.sdr.MeshtasticController by lazy {
+        com.allnetworktools.ui.pages.sdr.MeshtasticController(app.sdr, scope) { spectrum.stop() }
+    }
+    val spectrum: com.allnetworktools.ui.pages.sdr.SpectrumController by lazy {
+        com.allnetworktools.ui.pages.sdr.SpectrumController(app.sdr, scope) { meshtastic.stop() }
+    }
     val skyView = androidx.compose.runtime.mutableStateOf(com.allnetworktools.ui.pages.gnss.SkyView.Sky)
 }

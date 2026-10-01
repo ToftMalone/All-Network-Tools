@@ -37,6 +37,7 @@ object Sym {
     const val Check = "check"
     const val CheckCircle = "check_circle"
     const val ChevronRight = "chevron_right"
+    const val ChevronLeft = "chevron_left"
     const val Close = "close"
     const val Cloud = "cloud"
     const val CloudOff = "cloud_off"

@@ -316,13 +316,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val tools = com.allnetworktools.ui.tools.ToolsHub(g, viewModelScope)
 
+    private fun stopSdr() {
+        tools.meshtastic.stop()
+        tools.spectrum.stop()
+    }
+
     init {
         // The HackRF only receives while the SDR tab is open.
         viewModelScope.launch {
-            nav.map { it.network }.distinctUntilChanged().collect { if (it != Network.Sdr) tools.meshtastic.stop() }
+            nav.map { it.network }.distinctUntilChanged().collect { if (it != Network.Sdr) stopSdr() }
         }
         viewModelScope.launch {
-            sdrDevice.collect { if (it == null) tools.meshtastic.stop() }
+            sdrDevice.collect { if (it == null) stopSdr() }
         }
     }
     val history get() = g.history

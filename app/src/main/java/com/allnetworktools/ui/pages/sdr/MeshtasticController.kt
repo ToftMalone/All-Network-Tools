@@ -48,7 +48,7 @@ class MeshNode(val num: Long) {
  * Receive-only Meshtastic listener on a HackRF: 2 MS/s around the channel, decimated to 500 kS/s, LoRa
  * SF11 / 250 kHz / CR 4/5 (LongFast), sync word 0x2B, then the channel key.
  */
-class MeshtasticController(private val repo: SdrRepository, private val scope: CoroutineScope) {
+class MeshtasticController(private val repo: SdrRepository, private val scope: CoroutineScope, private val onAcquire: () -> Unit = {}) {
     var frequencyMhz by mutableStateOf("869.525")
     var keyBase64 by mutableStateOf("AQ==")
     var lnaGain by mutableIntStateOf(32)
@@ -103,6 +103,7 @@ class MeshtasticController(private val repo: SdrRepository, private val scope: C
         if (running || starting) return
         val (s, err) = settings()
         if (s == null) { error = err; return }
+        onAcquire()
         error = null
         starting = true
         scope.launch {

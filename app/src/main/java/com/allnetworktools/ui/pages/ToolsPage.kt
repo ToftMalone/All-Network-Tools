@@ -77,7 +77,9 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     Network.Gnss -> listOf(
         ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"), ToolEntry(Tool.Passes, "Passages de satellites", "Levers et couchers prévus"))),
     )
-    Network.Sdr -> emptyList()
+    Network.Sdr -> listOf(
+        ToolGroup("Outils", listOf(ToolEntry(Tool.Spectrum, "Analyseur de spectre", "Spectre et chute d'eau, 1 MHz à 6 GHz"))),
+    )
 }
 
 private fun featuredSubtitle(net: Network) = when (net) {

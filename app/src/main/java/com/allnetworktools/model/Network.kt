@@ -81,6 +81,7 @@ enum class Tool(
     Passes(Network.Gnss, "Passages de satellites", Sym.Orbit, Sym.Refresh),
 
     Meshtastic(Network.Sdr, "Meshtastic", Sym.Hub, Sym.Delete, implemented = true),
+    Spectrum(Network.Sdr, "Analyseur de spectre", Sym.BarChart),
 
     ;
 

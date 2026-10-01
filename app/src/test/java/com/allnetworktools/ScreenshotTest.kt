@@ -454,6 +454,16 @@ class ScreenshotTest {
         c.setStatsForTest(31, 2, true, 869_525_000L)
     }
 
+    @Test fun spectrum() = shot("H5_spectrum", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Spectrum))) { vm ->
+        // FM band: a few stations over a −95 dBFS floor.
+        val stations = mapOf(120 to -38f, 260 to -52f, 410 to -30f, 590 to -61f, 700 to -44f, 905 to -49f)
+        val db = FloatArray(1024) { i ->
+            var v = -95f + ((i * 37) % 7) * 0.8f
+            stations.forEach { (k, p) -> val d = (i - k) / 6f; v = maxOf(v, p - 12 * d * d) }
+            v
+        }
+        vm.tools.spectrum.setForTest(db, 98_000_000L)
+    }
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard)) { meshDemo(it) }
     @Test fun meshtasticMessages() = shot("H1_meshtastic_messages", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { meshDemo(it) }
     @Test fun meshtasticIdle() = shot("H2_meshtastic_idle", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic)))
