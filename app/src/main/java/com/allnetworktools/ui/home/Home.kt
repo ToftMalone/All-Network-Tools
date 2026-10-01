@@ -2,7 +2,12 @@ package com.allnetworktools.ui.home
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -258,9 +263,28 @@ private fun CardIcon(network: Network) {
                 Symbol(Sym.SatelliteAlt, size = 26.dp, filled = true, tint = roles.onAccent)
             }
         }
-        Network.Nfc -> Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(48.dp).clip(cookieShape()).spinning(rememberSpin(20_000)).background(roles.accent))
-            Symbol(Sym.Nfc, size = 26.dp, filled = true, tint = roles.onAccent)
+        Network.Nfc -> {
+            // A tag "tapping" the phone: the icon dips, then a wave leaves the badge.
+            val t = rememberInfiniteTransition(label = "nfcTap")
+            val tap by t.animateFloat(
+                1f, 1f,
+                infiniteRepeatable(
+                    keyframes {
+                        durationMillis = 2000
+                        1f at 0
+                        0.78f at 180 using FastOutSlowInEasing
+                        1.06f at 420 using FastOutSlowInEasing
+                        1f at 620
+                        1f at 2000
+                    },
+                ),
+                label = "nfcTapScale",
+            )
+            Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+                PulseRing(roles.accent, 40.dp, periodMs = 2000)
+                Box(Modifier.size(48.dp).spinning(rememberSpin(20_000)).clip(cookieShape()).background(roles.accent))
+                Symbol(Sym.Nfc, Modifier.graphicsLayer { scaleX = tap; scaleY = tap }, size = 26.dp, filled = true, tint = roles.onAccent)
+            }
         }
     }
 }
