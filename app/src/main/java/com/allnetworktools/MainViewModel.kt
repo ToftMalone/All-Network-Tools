@@ -322,6 +322,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         tools.adsb.stop()
         tools.sonde.stop()
         tools.fm.stop()
+        tools.ais.stop()
     }
 
     init {

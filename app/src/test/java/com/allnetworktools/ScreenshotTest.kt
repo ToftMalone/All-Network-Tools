@@ -491,6 +491,18 @@ class ScreenshotTest {
             104.3, -27.0,
         )
     }
+    @Test fun ais() = shot("H9_ais", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Ais))) { vm ->
+        vm.tools.ais.setForTest(
+            listOf(
+                com.allnetworktools.ui.pages.sdr.Ship(227123456, "BRETAGNE III", "FABC", 60, "BREST", 0, 48.38, -4.49, 12.3, 87.5, 90, 1, 214, false, false),
+                com.allnetworktools.ui.pages.sdr.Ship(244660001, "ROTTERDAM", "PD1234", 70, "BREST", 0, 48.31, -4.62, 9.8, 255.0, 254, 3, 96, false, false),
+                com.allnetworktools.ui.pages.sdr.Ship(227998877, "LA MOUETTE", null, 37, null, 5, 48.36, -4.52, 0.0, null, null, 20, 31, false, false),
+                com.allnetworktools.ui.pages.sdr.Ship(992271001, "BOUEE ROCHE", null, null, null, null, 48.34, -4.58, null, null, null, 45, 12, true, false),
+                com.allnetworktools.ui.pages.sdr.Ship(227555123, null, null, null, null, null, null, null, null, null, null, 6, 3, false, false),
+            ),
+            total = 356,
+        )
+    }
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard)) { meshDemo(it) }
     @Test fun meshtasticMessages() = shot("H1_meshtastic_messages", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { meshDemo(it) }
     @Test fun meshtasticIdle() = shot("H2_meshtastic_idle", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic)))

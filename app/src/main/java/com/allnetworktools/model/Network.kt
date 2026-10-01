@@ -85,6 +85,7 @@ enum class Tool(
     Adsb(Network.Sdr, "Avions (ADS-B)", Sym.Flight),
     Sonde(Network.Sdr, "Ballons-sondes", Sym.Cloud),
     Fm(Network.Sdr, "Radio FM", Sym.Radio),
+    Ais(Network.Sdr, "Navires (AIS)", Sym.Boat),
 
     ;
 
