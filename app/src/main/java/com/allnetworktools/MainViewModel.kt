@@ -53,7 +53,6 @@ sealed interface Page {
 data class NavState(
     val network: Network? = null,
     val page: Page = Page.Home,
-    val switcherOpen: Boolean = false,
 )
 
 data class WifiUi(val connection: WifiConnection?, val history: List<Float>)
@@ -139,7 +138,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun back(fallback: Page) {
         val prev = trail.removeLastOrNull()
-        _nav.value = _nav.value.copy(page = prev ?: fallback, switcherOpen = false)
+        _nav.value = _nav.value.copy(page = prev ?: fallback)
         if (prev == null && fallback == Page.Home) trail.clear()
     }
 

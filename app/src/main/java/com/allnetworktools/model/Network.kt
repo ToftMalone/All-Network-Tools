@@ -2,19 +2,15 @@ package com.allnetworktools.model
 
 import com.allnetworktools.ui.theme.Sym
 
-/** Corner radii (dp) of the dock's leading button: top-start, top-end, bottom-end, bottom-start. */
-data class LeadCorners(val ts: Float, val te: Float, val be: Float, val bs: Float)
-
 enum class Network(
     val label: String,
     val icon: String,
     val featuredShort: String,
-    val lead: LeadCorners,
 ) {
-    Wifi("Wi-Fi", Sym.Wifi, "Scan", LeadCorners(24f, 24f, 24f, 24f)),
-    Bluetooth("Bluetooth", Sym.Bluetooth, "BLE", LeadCorners(18f, 18f, 18f, 18f)),
-    Cellular("Réseau mobile", Sym.CellBars3, "Cellules", LeadCorners(24f, 24f, 12f, 24f)),
-    Gnss("GNSS", Sym.SatelliteAlt, "Ciel", LeadCorners(14f, 24f, 14f, 24f)),
+    Wifi("Wi-Fi", Sym.Wifi, "Scan"),
+    Bluetooth("Bluetooth", Sym.Bluetooth, "BLE"),
+    Cellular("Réseau mobile", Sym.CellBars3, "Cellules"),
+    Gnss("GNSS", Sym.SatelliteAlt, "Ciel"),
     ;
 
     // Getters rather than constructor arguments: Tool's entries reference Network, so eager

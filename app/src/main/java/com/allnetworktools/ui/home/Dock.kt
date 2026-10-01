@@ -54,18 +54,15 @@ fun activeTab(page: Page): DockTab? = when (page) {
 }
 
 /**
- * Floating toolbar: leading network button (shape morphs per network), then either the three tabs
- * or the network switcher, then a trailing close / back-to-grid action. Colors come from LocalAccent.
+ * Floating toolbar: a leading home button (back to the network grid, or deselect the card when already on
+ * it), then the network's three tabs. Colors come from LocalAccent.
  */
 @Composable
 fun FloatingDock(
     network: Network,
     page: Page,
-    switcherOpen: Boolean,
-    onToggleSwitcher: () -> Unit,
-    onNetwork: (Network) -> Unit,
     onTab: (DockTab) -> Unit,
-    onTrailing: () -> Unit,
+    onHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val acc = AntTheme.accent
@@ -88,68 +85,22 @@ fun FloatingDock(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        LeadButton(network, switcherOpen, onToggleSwitcher)
-        AnimatedContent(
-            targetState = switcherOpen,
-            transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(90)) },
-            label = "dockMiddle",
-        ) { open ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (open) {
-                    Network.entries.forEachIndexed { i, n ->
-                        val roles = AntTheme.net[n]
-                        Box(
-                            Modifier
-                                .pop(i * 40)
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(roles.accent)
-                                .then(if (n == network) Modifier.border(2.dp, acc.onContainer, CircleShape) else Modifier)
-                                .clickable { onNetwork(n) },
-                            contentAlignment = Alignment.Center,
-                        ) { Symbol(n.icon, size = 22.dp, filled = true, tint = roles.onAccent) }
-                    }
-                } else {
-                    val active = activeTab(page)
-                    // Outils is always the last tab, just before the trailing action.
-                    DockTab.entries.filter { it != DockTab.Featured || network.dockShortcut != null }.forEach { tab ->
-                        val (icon, label) = when (tab) {
-                            DockTab.Dashboard -> Sym.SpaceDashboard to "Dashboard"
-                            DockTab.Featured -> network.dockShortcut!!.icon to network.featuredShort
-                            DockTab.Tools -> Sym.Handyman to "Outils"
-                        }
-                        TabButton(icon, label, tab == active) { onTab(tab) }
-                    }
-                }
+        Box(
+            Modifier.size(48.dp).clip(CircleShape).clickable(onClick = onHome),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.pop(key = page == Page.Home)) {
+                Symbol(if (page == Page.Home) Sym.Close else Sym.GridView, size = 24.dp, tint = acc.onContainer)
             }
         }
-        Box(
-            Modifier.size(48.dp).clip(CircleShape).clickable(onClick = onTrailing),
-            contentAlignment = Alignment.Center,
-        ) { Symbol(if (page == Page.Home) Sym.Close else Sym.GridView, size = 24.dp, tint = acc.onContainer) }
-    }
-}
-
-@Composable
-private fun LeadButton(network: Network, switcherOpen: Boolean, onClick: () -> Unit) {
-    val acc = AntTheme.accent
-    val c = if (switcherOpen) com.allnetworktools.model.LeadCorners(24f, 24f, 24f, 24f) else network.lead
-    val spec = Motion.standard<androidx.compose.ui.unit.Dp>()
-    val ts by animateDpAsState(c.ts.dp, spec, label = "ts")
-    val te by animateDpAsState(c.te.dp, spec, label = "te")
-    val be by animateDpAsState(c.be.dp, spec, label = "be")
-    val bs by animateDpAsState(c.bs.dp, spec, label = "bs")
-    Box(
-        Modifier
-            .size(48.dp)
-            .clip(RoundedCornerShape(ts, te, be, bs))
-            .background(acc.accent)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        val key = if (switcherOpen) "close" else network.name
-        Box(Modifier.pop(key = key)) {
-            Symbol(if (switcherOpen) Sym.UnfoldLess else network.icon, size = 24.dp, filled = !switcherOpen, tint = acc.onAccent)
+        val active = activeTab(page)
+        DockTab.entries.filter { it != DockTab.Featured || network.dockShortcut != null }.forEach { tab ->
+            val (icon, label) = when (tab) {
+                DockTab.Dashboard -> Sym.SpaceDashboard to "Dashboard"
+                DockTab.Featured -> network.dockShortcut!!.icon to network.featuredShort
+                DockTab.Tools -> Sym.Handyman to "Outils"
+            }
+            TabButton(icon, label, tab == active) { onTab(tab) }
         }
     }
 }

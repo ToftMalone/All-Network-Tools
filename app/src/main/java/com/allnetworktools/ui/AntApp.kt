@@ -113,10 +113,10 @@ private fun MainShell(vm: MainViewModel) {
         val s = vm.nav.value
         if (s.network == n && s.page == Page.Home) {
             haptics.confirm()
-            vm.navigate { it.copy(page = Page.Dashboard, switcherOpen = false) }
+            vm.navigate { it.copy(page = Page.Dashboard) }
         } else {
             if (s.network != null && s.network != n) haptics.segment() else haptics.tick()
-            vm.navigate { it.copy(network = n, switcherOpen = false) }
+            vm.navigate { it.copy(network = n) }
         }
     }
 
@@ -145,9 +145,9 @@ private fun MainShell(vm: MainViewModel) {
     }
     LaunchedEffect(nav) { if (pageOpen) shown = nav }
 
-    fun closePage() = vm.navigate { it.copy(page = Page.Home, switcherOpen = false) }
+    fun closePage() = vm.navigate { it.copy(page = Page.Home) }
 
-    val closesToHome = pageOpen && vm.backTarget(parentPage(nav.page)) == Page.Home && !nav.switcherOpen
+    val closesToHome = pageOpen && vm.backTarget(parentPage(nav.page)) == Page.Home
     PredictiveBackHandler(enabled = closesToHome) { events ->
         var buzzed = false
         try {
@@ -163,9 +163,8 @@ private fun MainShell(vm: MainViewModel) {
             throw e
         }
     }
-    BackHandler(enabled = !closesToHome && (pageOpen || nav.network != null || nav.switcherOpen)) {
+    BackHandler(enabled = !closesToHome && (pageOpen || nav.network != null)) {
         when {
-            nav.switcherOpen -> vm.navigate { it.copy(switcherOpen = false) }
             pageOpen -> vm.back(parentPage(nav.page))
             else -> vm.navigate { it.copy(network = null) }
         }
@@ -184,8 +183,8 @@ private fun MainShell(vm: MainViewModel) {
                 onSettingsBounds = { settingsBounds = it },
                 onCard = ::select,
                 onBlockerAction = actions::resolve,
-                onDeselect = { vm.navigate { it.copy(network = null, switcherOpen = false) } },
-                onSettings = { vm.navigate { it.copy(network = null, switcherOpen = false, page = Page.Settings) } },
+                onDeselect = { vm.navigate { it.copy(network = null) } },
+                onSettings = { vm.navigate { it.copy(network = null, page = Page.Settings) } },
             )
         }
 
@@ -244,25 +243,17 @@ private fun DockLayer(vm: MainViewModel, nav: NavState, modifier: Modifier, onCl
         FloatingDock(
             network = lastNet,
             page = nav.page,
-            switcherOpen = nav.switcherOpen,
-            onToggleSwitcher = { haptics.tick(); vm.navigate { it.copy(switcherOpen = !it.switcherOpen) } },
-            onNetwork = { n ->
-                if (n != lastNet) haptics.segment()
-                vm.navigate { s ->
-                    val page = if (s.page is Page.ToolPage) Page.ToolPage(n.featured) else s.page
-                    s.copy(network = n, page = page, switcherOpen = false)
-                }
-            },
             onTab = { tab ->
                 val page = when (tab) {
                     DockTab.Dashboard -> Page.Dashboard
                     DockTab.Tools -> Page.Tools
                     DockTab.Featured -> lastNet.dockShortcut?.let { Page.ToolPage(it) } ?: Page.Tools
                 }
-                vm.navigate { it.copy(page = page, switcherOpen = false) }
+                vm.navigate { it.copy(page = page) }
             },
-            onTrailing = {
-                if (nav.page == Page.Home) vm.navigate { it.copy(network = null, switcherOpen = false) } else onClose()
+            onHome = {
+                haptics.tick()
+                if (nav.page == Page.Home) vm.navigate { it.copy(network = null) } else onClose()
             },
             modifier = modifier
                 .windowInsetsPadding(WindowInsets.navigationBars)

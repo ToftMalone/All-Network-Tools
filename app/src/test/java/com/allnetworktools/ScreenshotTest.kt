@@ -105,7 +105,7 @@ class ScreenshotTest {
         assertFalse("GNSS", Scenario.gnssStarted)
     }
     @Test fun homeSelected() = shot("03_home_wifi_selected", nav = NavState(Network.Wifi))
-    @Test fun dockSwitcher() = shot("06_dock_switcher", nav = NavState(Network.Wifi, Page.Dashboard, switcherOpen = true))
+    @Test fun dockOnTools() = shot("06_dock_tools", nav = NavState(Network.Wifi, Page.Tools))
     @Test fun homeDark() = shot("04_home_gnss_dark", dark = true, nav = NavState(Network.Gnss))
     @Test fun homeAirplane() {
         Scenario.airplane = true
