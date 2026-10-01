@@ -320,6 +320,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         tools.meshtastic.stop()
         tools.spectrum.stop()
         tools.adsb.stop()
+        tools.sonde.stop()
     }
 
     init {

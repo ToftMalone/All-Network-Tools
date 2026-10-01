@@ -475,6 +475,16 @@ class ScreenshotTest {
             rate = 87,
         )
     }
+    @Test fun sonde() = shot("H7_sonde", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Sonde))) { vm ->
+        val track = (0 until 40).map { 48.77 + it * 0.004 to 2.01 + it * 0.009 + (it % 7) * 0.001 }
+        vm.tools.sonde.setForTest(
+            listOf(
+                com.allnetworktools.ui.pages.sdr.SondeInfo("V3420117", track.last().first, track.last().second, 18_432.0, 18_432.0, 5.2, 14.0, 62.0, 2.9, 9, 3051, 3012, 0, track),
+                com.allnetworktools.ui.pages.sdr.SondeInfo("W1530842", 49.21, 1.62, 6_210.0, 33_870.0, -12.4, 9.0, 80.0, 2.6, 8, 7120, 640, 4, listOf(49.30 to 1.40, 49.25 to 1.50, 49.21 to 1.62)),
+            ),
+            403_000_000L,
+        )
+    }
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard)) { meshDemo(it) }
     @Test fun meshtasticMessages() = shot("H1_meshtastic_messages", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { meshDemo(it) }
     @Test fun meshtasticIdle() = shot("H2_meshtastic_idle", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic)))

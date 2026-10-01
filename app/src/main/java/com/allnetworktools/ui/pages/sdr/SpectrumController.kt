@@ -22,6 +22,7 @@ enum class SpectrumPreset(val label: String, val centerMhz: Double, val spanMhz:
     Fm("Radio FM", 98.0, 20),
     Air("Aviation", 127.5, 20),
     Ham2m("Radioamateurs 2 m", 145.0, 5),
+    Sondes("Sondes météo", 403.0, 5),
     Ism433("433 MHz", 433.92, 2),
     Ism868("868 MHz", 868.3, 2),
     Adsb("ADS-B 1090", 1090.0, 2),
