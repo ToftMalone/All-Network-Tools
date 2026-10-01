@@ -324,6 +324,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         tools.fm.stop()
         tools.ais.stop()
         tools.emitters.stop()
+        tools.aprs.stop()
     }
 
     init {

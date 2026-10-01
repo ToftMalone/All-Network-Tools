@@ -86,6 +86,7 @@ enum class Tool(
     Sonde(Network.Sdr, "Ballons-sondes", Sym.Cloud),
     Fm(Network.Sdr, "Radio FM", Sym.Radio),
     Ais(Network.Sdr, "Navires (AIS)", Sym.Boat),
+    Aprs(Network.Sdr, "Radioamateurs (APRS)", Sym.Radio),
     Emitters(Network.Sdr, "Détecteur d'émetteurs", Sym.Radar),
 
     ;

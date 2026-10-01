@@ -519,6 +519,19 @@ class ScreenshotTest {
             db, FloatArray(2048) { -94f }, 433_000_000L,
         )
     }
+    @Test fun aprs() = shot("H11_aprs", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Aprs))) { vm ->
+        vm.tools.aprs.setForTest(
+            listOf(
+                com.allnetworktools.ui.pages.sdr.AprsInfo("F4ABC-9", "F4ABC-9", false, 48.86, 2.35, 57.0, 251, 120.0, "/>", "En route vers le sud", null, null, "WIDE1-1", 14, 0, 12),
+                com.allnetworktools.ui.pages.sdr.AprsInfo("F5XYZ-13", "F5XYZ-13", false, 48.79, 2.12, null, null, null, "/_", null, null,
+                    com.allnetworktools.data.sdr.AprsWeather(220, 4, 5, 68, 52, 1013.2), "F1DIG", 9, 0, 140),
+                com.allnetworktools.ui.pages.sdr.AprsInfo("F1DIG", "F1DIG", false, 48.95, 2.28, null, null, null, "/#", "Digipeater Île-de-France", null, null, null, 31, 2, 35),
+                com.allnetworktools.ui.pages.sdr.AprsInfo("Object:BALISE", "BALISE", true, 48.70, 2.50, null, null, null, "/-", "Relais de rassemblement", null, null, "F1DIG", 3, 0, 300),
+                com.allnetworktools.ui.pages.sdr.AprsInfo("F6QRP", "F6QRP", false, null, null, null, null, null, null, null, "QRV 144,800", null, null, 2, 0, 410),
+            ),
+            total = 59,
+        )
+    }
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard)) { meshDemo(it) }
     @Test fun meshtasticMessages() = shot("H1_meshtastic_messages", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { meshDemo(it) }
     @Test fun meshtasticIdle() = shot("H2_meshtastic_idle", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic)))
