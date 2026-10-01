@@ -77,6 +77,7 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     Network.Gnss -> listOf(
         ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"), ToolEntry(Tool.Passes, "Passages de satellites", "Levers et couchers prévus"))),
     )
+    Network.Sdr -> emptyList()
 }
 
 private fun featuredSubtitle(net: Network) = when (net) {
@@ -84,6 +85,7 @@ private fun featuredSubtitle(net: Network) = when (net) {
     Network.Bluetooth -> "Appareils à proximité, en direct, avec filtres"
     Network.Cellular -> "Cellules NR et LTE détectées par le modem"
     Network.Gnss -> "Sky plot et carte du monde des satellites"
+    Network.Sdr -> "Réseau maillé LoRa, LongFast, canal par défaut"
 }
 
 @Composable
@@ -92,6 +94,7 @@ private fun featuredBadge(net: Network, vm: MainViewModel): String? = when (net)
     Network.Bluetooth -> vm.ble.collectAsStateWithLifecycle().value.size.let { "$it ${plural(it, "appareil")}" }
     Network.Cellular -> vm.cell.collectAsStateWithLifecycle().value.state?.neighbors?.size?.let { "$it ${plural(it, "cellule")}" }
     Network.Gnss -> vm.gnss.collectAsStateWithLifecycle().value.let { "${it.used.size}/${it.visible.size} satellites" }
+    Network.Sdr -> vm.tools.meshtastic.let { if (it.running) "${it.rows.size} ${plural(it.rows.size, "paquet")}" else null }
 }
 
 @Composable

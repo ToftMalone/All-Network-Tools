@@ -11,6 +11,7 @@ enum class Network(
     Bluetooth("Bluetooth", Sym.Bluetooth, "BLE"),
     Cellular("Réseau mobile", Sym.CellBars3, "Cellules"),
     Gnss("GNSS", Sym.SatelliteAlt, "Ciel"),
+    Sdr("SDR", Sym.Antenna, "Mesh"),
     ;
 
     // Getters rather than constructor arguments: Tool's entries reference Network, so eager
@@ -23,6 +24,7 @@ enum class Network(
             Bluetooth -> Tool.BleScan
             Cellular -> Tool.Neighbors
             Gnss -> Tool.Sky
+            Sdr -> Tool.Meshtastic
         }
 
     /** Tool reachable directly from the dock. */
@@ -77,6 +79,8 @@ enum class Tool(
     Sky(Network.Gnss, "Ciel GNSS", Sym.SatelliteAlt, implemented = true),
     PositionCompare(Network.Gnss, "Comparer les positions", Sym.ShareLocation, Sym.Refresh),
     Passes(Network.Gnss, "Passages de satellites", Sym.Orbit, Sym.Refresh),
+
+    Meshtastic(Network.Sdr, "Meshtastic", Sym.Hub, Sym.Delete, implemented = true),
 
     ;
 

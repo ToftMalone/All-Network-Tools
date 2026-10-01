@@ -40,7 +40,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Why a network card or page is unavailable. */
-enum class Blocker { NoHardware, WifiOff, BluetoothOff, NearbyPermission, Airplane, PhonePermission, NoSim, LocationPermission, LocationOff }
+enum class Blocker { NoHardware, WifiOff, BluetoothOff, NearbyPermission, Airplane, PhonePermission, NoSim, LocationPermission, LocationOff, SdrMissing }
 
 sealed interface Page {
     data object Home : Page
@@ -144,9 +144,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- availability ---------------------------------------------------------------------
 
+    private data class CoreAvail(val p: PermissionSnapshot, val wifi: Boolean, val bt: Boolean, val plane: Boolean, val loc: Boolean)
+
+    /** The plugged-in HackRF; USB enumeration only, the radio stays off until a tool starts it. */
+    val sdrDevice = g.sdr.device.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     val blockers: StateFlow<Map<Network, Blocker?>> = combine(
-        permissions, wifiEnabled, bluetoothEnabled, airplane, locationEnabled,
-    ) { p, wifi, bt, plane, loc ->
+        combine(permissions, wifiEnabled, bluetoothEnabled, airplane, locationEnabled, ::CoreAvail),
+        sdrDevice,
+    ) { (p, wifi, bt, plane, loc), sdr ->
         mapOf(
             Network.Wifi to when {
                 !g.radios.hasWifi -> Blocker.NoHardware
@@ -171,6 +177,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 !loc -> Blocker.LocationOff
                 else -> null
             },
+            Network.Sdr to if (sdr == null) Blocker.SdrMissing else null,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
@@ -308,6 +315,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun markAsked(group: PermGroup) = updateSettings { markAsked(group.name) }
 
     val tools = com.allnetworktools.ui.tools.ToolsHub(g, viewModelScope)
+
+    init {
+        // The HackRF only receives while the SDR tab is open.
+        viewModelScope.launch {
+            nav.map { it.network }.distinctUntilChanged().collect { if (it != Network.Sdr) tools.meshtastic.stop() }
+        }
+        viewModelScope.launch {
+            sdrDevice.collect { if (it == null) tools.meshtastic.stop() }
+        }
+    }
     val history get() = g.history
 
     init {

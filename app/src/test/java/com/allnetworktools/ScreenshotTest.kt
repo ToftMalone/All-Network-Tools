@@ -51,6 +51,7 @@ class ScreenshotTest {
     @After
     fun reset() {
         Scenario.airplane = false
+        Scenario.sdrDevice.value = com.allnetworktools.data.sdr.SdrDevice("HackRF One", null)
         Scenario.gnssDenied = false
         Scenario.throttled = false
         Scenario.bleEmpty = false
@@ -431,5 +432,32 @@ class ScreenshotTest {
         )
     }
 
+    private fun meshDemo(vm: MainViewModel) {
+        val c = vm.tools.meshtastic
+        val key = com.allnetworktools.data.sdr.Meshtastic.expandKey(byteArrayOf(1))!!
+        val now = System.currentTimeMillis()
+        fun pk(from: Long, id: Long, data: ByteArray, ago: Long, snr: Double, flags: Int = (3 shl 5) or 2, channel: Int = 8, to: Long = 0xFFFFFFFFL): com.allnetworktools.data.sdr.Meshtastic.Packet {
+            val h = ByteArray(16)
+            fun put(o: Int, v: Long) { for (k in 0 until 4) h[o + k] = (v shr (8 * k)).toByte() }
+            put(0, to); put(4, from); put(8, id); h[12] = flags.toByte(); h[13] = channel.toByte()
+            return com.allnetworktools.data.sdr.Meshtastic.decode(h + com.allnetworktools.data.sdr.Meshtastic.crypt(key, from, id, data), key, 8, now - ago, snr)!!
+        }
+        val a = 0x9e7655f0L
+        val b = 0x4c1d22a8L
+        c.recordForTest(pk(a, 1, Pb().int(1, 4).bytes(2, Pb().str(1, "!9e7655f0").str(2, "Relais Montmartre").str(3, "RMM").int(5, 43).build()).build(), 300_000, 6.2))
+        c.recordForTest(pk(b, 2, Pb().int(1, 4).bytes(2, Pb().str(1, "!4c1d22a8").str(2, "Camille T-Echo").str(3, "CAM").int(5, 7).build()).build(), 240_000, -4.1, flags = (3 shl 5) or 1))
+        c.recordForTest(pk(a, 3, Pb().int(1, 67).bytes(2, Pb().bytes(2, Pb().int(1, 101).float(2, 4.9f).float(3, 18.4f).build()).build()).build(), 120_000, 5.8))
+        c.recordForTest(pk(b, 4, Pb().int(1, 3).bytes(2, Pb().fixed32(1, 488_867_120).fixed32(2, 23_431_870).int(3, 128).build()).build(), 60_000, -3.7, flags = (3 shl 5) or 1))
+        c.recordForTest(pk(0x1188aaL, 5, Pb().int(1, 1).str(2, "x").build(), 40_000, -11.2, channel = 0x5c))
+        c.recordForTest(pk(b, 6, Pb().int(1, 1).str(2, "Quelqu'un capte le relais depuis Pigalle ?").build(), 20_000, -2.9, flags = (3 shl 5) or 1))
+        c.recordForTest(pk(a, 7, Pb().int(1, 1).str(2, "Oui, 5,8 dB de SNR ici 👍").build(), 5_000, 6.4))
+        c.setStatsForTest(31, 2, true, 869_525_000L)
+    }
+
+    @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard)) { meshDemo(it) }
+    @Test fun meshtasticMessages() = shot("H1_meshtastic_messages", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { meshDemo(it) }
+    @Test fun meshtasticIdle() = shot("H2_meshtastic_idle", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic)))
+    @Test fun sdrMissing() = shot("H3_sdr_missing", nav = NavState(Network.Sdr, Page.Dashboard)) { Scenario.sdrDevice.value = null }
+    @Test fun homeWithSdr() = shot("H4_home_sdr_missing") { Scenario.sdrDevice.value = null }
     @Test fun wifiDirect() = shot("G6_wifi_direct", nav = NavState(Network.Wifi, Page.ToolPage(Tool.WifiDirect)))
 }

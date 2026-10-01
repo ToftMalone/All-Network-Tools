@@ -187,4 +187,8 @@ object Sym {
     const val WifiTethering = "wifi_tethering"
     const val PhotoCamera = "photo_camera"
     const val ConnectedTv = "connected_tv"
+    const val Antenna = "settings_input_antenna"
+    const val Usb = "usb"
+    const val Forum = "forum"
+    const val Stream = "stream"
 }

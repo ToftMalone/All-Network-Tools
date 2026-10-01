@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.onStart
 
 /** Scenario switches read by the fakes; set before the ViewModel is created. */
 object Scenario {
+    val sdrDevice = kotlinx.coroutines.flow.MutableStateFlow<com.allnetworktools.data.sdr.SdrDevice?>(com.allnetworktools.data.sdr.SdrDevice("HackRF One", null))
     var airplane = false
     var gnssDenied = false
     var throttled = false
@@ -253,6 +254,11 @@ class FakeApp : AntApplication() {
     override val updater by lazy {
         object : com.allnetworktools.update.AppUpdater(this@FakeApp, "0.1") {
             override suspend fun check(autoInstall: Boolean, force: Boolean) = Unit
+        }
+    }
+    override val sdr by lazy {
+        object : com.allnetworktools.data.sdr.SdrRepository(this@FakeApp) {
+            override val device: Flow<com.allnetworktools.data.sdr.SdrDevice?> = Scenario.sdrDevice
         }
     }
     override val wifiDirect by lazy {

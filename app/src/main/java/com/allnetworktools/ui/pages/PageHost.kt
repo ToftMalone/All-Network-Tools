@@ -173,6 +173,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Network.Bluetooth -> BtDashboard(vm)
             Network.Cellular -> CellDashboard(vm)
             Network.Gnss -> GnssDashboard(vm)
+            Network.Sdr -> com.allnetworktools.ui.pages.sdr.SdrDashboard(vm)
         }
         Page.Tools -> ToolsPage(net, vm)
         is Page.ToolPage -> when (page.tool) {
@@ -183,6 +184,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.PositionCompare -> com.allnetworktools.ui.pages.gnss.PositionCompareTool(vm)
             Tool.Passes -> com.allnetworktools.ui.pages.gnss.PassesTool(vm)
             Tool.TowerMap -> com.allnetworktools.ui.pages.cell.TowerMapTool(vm)
+            Tool.Meshtastic -> com.allnetworktools.ui.pages.sdr.MeshtasticTool(vm)
             Tool.WifiDirect -> {
                 val perms by vm.permissions.collectAsStateWithLifecycle()
                 val actions = LocalActions.current

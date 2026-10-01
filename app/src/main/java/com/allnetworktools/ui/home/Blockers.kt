@@ -20,6 +20,7 @@ fun cardBlock(b: Blocker): CardBlock = when (b) {
     Blocker.LocationPermission -> CardBlock(Sym.LocationOff, "Position requise", "Autorisez la position précise pour lire les satellites.", "Autoriser", Sym.MyLocation)
     Blocker.LocationOff -> CardBlock(Sym.LocationOff, "Localisation désactivée", "Activez-la pour recevoir les satellites.", "Activer", Sym.PowerSettings)
     Blocker.NoHardware -> CardBlock(Sym.Block, "Non disponible", "Cet appareil n'a pas cette radio.", null, Sym.Block)
+    Blocker.SdrMissing -> CardBlock(Sym.Usb, "Aucun HackRF", "Branchez un HackRF en USB-C pour recevoir.", null, Sym.Usb)
 }
 
 fun pageBlock(network: Network, b: Blocker, permanentlyDenied: Boolean): PageBlock = when (b) {
@@ -45,4 +46,10 @@ fun pageBlock(network: Network, b: Blocker, permanentlyDenied: Boolean): PageBlo
     )
     Blocker.LocationOff -> PageBlock(Sym.LocationOff, "Localisation désactivée", "Activez la localisation de l'appareil pour recevoir les signaux GNSS.", "Activer la localisation", Sym.PowerSettings, null)
     Blocker.NoHardware -> PageBlock(Sym.Block, "${network.label} indisponible", "Cet appareil ne possède pas le matériel nécessaire.", null, Sym.Block, null)
+    Blocker.SdrMissing -> PageBlock(
+        Sym.Usb, "Branchez un HackRF",
+        "Reliez un HackRF One (ou rad1o, Jawbreaker, PortaPack en mode HackRF) au téléphone avec un câble USB-C OTG. " +
+            "L'application le détecte dès qu'il est branché.",
+        null, Sym.Usb, null,
+    )
 }

@@ -234,6 +234,7 @@ private fun description(n: Network) = when (n) {
     Network.Bluetooth -> "Appareils Bluetooth LE, traqueurs inconnus et recherche Chaud/Froid."
     Network.Cellular -> "Cellules, antennes de votre opérateur et données mobiles."
     Network.Gnss -> "Satellites, ciel, comparaison des positions et passages."
+    Network.Sdr -> "HackRF : réception et décodage du réseau Meshtastic."
 }
 
 @Composable
@@ -262,6 +263,14 @@ private fun CardIcon(network: Network) {
                     drawCircle(roles.accent, size.minDimension / 2 - 1.dp.toPx(), style = Stroke(2.dp.toPx(), pathEffect = dash))
                 }
                 Symbol(Sym.SatelliteAlt, size = 26.dp, filled = true, tint = roles.onAccent)
+            }
+        }
+        Network.Sdr -> {
+            // Waves leaving the antenna, under a slowly turning squircle.
+            Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+                PulseRing(roles.accent, 40.dp, periodMs = 1800)
+                Box(Modifier.size(48.dp).spinning(rememberSpin(24_000, reverse = true)).clip(RoundedCornerShape(16.dp)).background(roles.accent))
+                Symbol(Sym.Antenna, size = 26.dp, filled = true, tint = roles.onAccent)
             }
         }
     }

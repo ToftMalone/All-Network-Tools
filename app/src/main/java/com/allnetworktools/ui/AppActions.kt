@@ -129,7 +129,7 @@ class AppActions(
         Blocker.NoSim -> openNetworkSettings()
         Blocker.LocationPermission -> request(PermGroup.Location)
         Blocker.LocationOff -> openLocationSettings()
-        Blocker.NoHardware -> Unit
+        Blocker.NoHardware, Blocker.SdrMissing -> Unit
     }
 }
 
