@@ -49,5 +49,8 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val nfcReader by lazy { com.allnetworktools.ui.pages.nfc.NfcReaderController(app.nfc, scope) }
     val nfcWrite by lazy { com.allnetworktools.ui.pages.nfc.NfcWriteController(app.nfc, scope) }
     val nfcMaint by lazy { com.allnetworktools.ui.pages.nfc.NfcMaintController(app.nfc, scope) }
-    val nfcRange by lazy { com.allnetworktools.ui.pages.nfc.NfcRangeController(app.nfc, scope) }
+    val nfcAntenna by lazy { com.allnetworktools.ui.pages.nfc.NfcAntennaController(app.nfc, scope) }
+    val nfcWifi by lazy { com.allnetworktools.ui.pages.nfc.NfcWriteController(app.nfc, scope) }
+    val nfcAnalyze by lazy { com.allnetworktools.ui.pages.nfc.NfcAnalyzeController(app.nfc, scope) }
+    val nfcEndurance by lazy { com.allnetworktools.ui.pages.nfc.NfcEnduranceController(app.nfc, scope) }
 }

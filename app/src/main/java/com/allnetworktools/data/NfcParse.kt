@@ -8,6 +8,7 @@ enum class NfcRecordKind(val label: String) {
     Link("Lien"), Text("Texte"), Phone("Numéro de téléphone"), Contact("Contact"),
     WifiHandover("Configuration Wi-Fi"), App("Ouvrir une application"), SmartPoster("Smart Poster"),
     Mime("Données"), Unknown("Enregistrement non reconnu"),
+    Email("E-mail"), Sms("SMS"), Geo("Position"),
 }
 
 data class NfcRecordInfo(val kind: NfcRecordKind, val title: String, val detail: String?, val payloadSize: Int)
@@ -92,8 +93,7 @@ object NdefDecode {
         return when (r.tnf.toInt()) {
             NdefRecord.TNF_WELL_KNOWN.toInt() -> when (type) {
                 "U" -> decodeUri(r.payload)?.let { uri ->
-                    if (uri.startsWith("tel:")) NfcRecordInfo(NfcRecordKind.Phone, uri.removePrefix("tel:"), null, r.payload.size)
-                    else NfcRecordInfo(NfcRecordKind.Link, uri, null, r.payload.size)
+                    describeUri(uri, r.payload.size)
                 } ?: NfcRecordInfo(NfcRecordKind.Unknown, "URI illisible", null, r.payload.size)
                 "T" -> decodeText(r.payload)?.let { (lang, text) -> NfcRecordInfo(NfcRecordKind.Text, text, "Langue : $lang", r.payload.size) }
                     ?: NfcRecordInfo(NfcRecordKind.Unknown, "Texte illisible", null, r.payload.size)
@@ -109,8 +109,12 @@ object NdefDecode {
             NdefRecord.TNF_MIME_MEDIA.toInt() -> when {
                 type.equals("text/vcard", true) || type.equals("text/x-vcard", true) ->
                     NfcRecordInfo(NfcRecordKind.Contact, decodeVCard(String(r.payload, Charsets.UTF_8)), type, r.payload.size)
-                type.equals("application/vnd.wfa.wsc", true) ->
-                    NfcRecordInfo(NfcRecordKind.WifiHandover, "Identifiants Wi-Fi (Wi-Fi Simple Connect)", "Contenu chiffré, non décodé", r.payload.size)
+                type.equals(WscToken.MIME, true) -> WscToken.decode(r.payload)?.let { w ->
+                    NfcRecordInfo(
+                        NfcRecordKind.WifiHandover, "Réseau « ${w.ssid} »",
+                        w.security + if (w.hasKey) " · mot de passe enregistré (masqué)" else "", r.payload.size,
+                    )
+                } ?: NfcRecordInfo(NfcRecordKind.WifiHandover, "Identifiants Wi-Fi (Wi-Fi Simple Connect)", "Format non reconnu", r.payload.size)
                 else -> NfcRecordInfo(NfcRecordKind.Mime, type, "${r.payload.size} octets", r.payload.size)
             }
             NdefRecord.TNF_EXTERNAL_TYPE.toInt() -> when (type) {
@@ -123,6 +127,22 @@ object NdefDecode {
         }
     }
 
+    private fun query(uri: String, key: String) = uri.substringAfter('?', "").split('&')
+        .firstOrNull { it.startsWith("$key=") }?.substringAfter('=')?.let { android.net.Uri.decode(it) }?.takeIf { it.isNotBlank() }
+
+    fun describeUri(uri: String, size: Int): NfcRecordInfo = when {
+        uri.startsWith("tel:") -> NfcRecordInfo(NfcRecordKind.Phone, uri.removePrefix("tel:"), null, size)
+        uri.startsWith("mailto:") -> NfcRecordInfo(
+            NfcRecordKind.Email, android.net.Uri.decode(uri.removePrefix("mailto:").substringBefore('?')),
+            query(uri, "subject")?.let { "Objet : $it" }, size,
+        )
+        uri.startsWith("sms:") || uri.startsWith("smsto:") -> NfcRecordInfo(
+            NfcRecordKind.Sms, uri.substringAfter(':').substringBefore('?'), query(uri, "body"), size,
+        )
+        uri.startsWith("geo:") -> NfcRecordInfo(NfcRecordKind.Geo, uri.removePrefix("geo:").substringBefore('?').replace(",", ", "), null, size)
+        else -> NfcRecordInfo(NfcRecordKind.Link, uri, null, size)
+    }
+
     fun describe(message: NdefMessage): List<NfcRecordInfo> = message.records.map(::describeSingle)
 }
 
@@ -133,6 +153,10 @@ sealed interface NfcWriteRequest {
     data class Phone(val number: String) : NfcWriteRequest
     data class Contact(val name: String, val phone: String?, val email: String?) : NfcWriteRequest
     data class App(val packageName: String) : NfcWriteRequest
+    data class Wifi(val ssid: String, val key: String, val security: WifiTagSecurity) : NfcWriteRequest
+    data class Email(val to: String, val subject: String, val body: String) : NfcWriteRequest
+    data class Sms(val number: String, val body: String) : NfcWriteRequest
+    data class Geo(val lat: String, val lon: String) : NfcWriteRequest
 }
 
 object NdefBuild {
@@ -150,6 +174,25 @@ object NdefBuild {
             NdefMessage(NdefRecord.createMime("text/vcard", vcard.toByteArray(Charsets.UTF_8)))
         }
         is NfcWriteRequest.App -> NdefMessage(NdefRecord.createApplicationRecord(req.packageName))
+        is NfcWriteRequest.Wifi -> NdefMessage(NdefRecord.createMime(WscToken.MIME, WscToken.encode(req.ssid, req.key, req.security)))
+        is NfcWriteRequest.Email -> NdefMessage(NdefRecord.createUri(emailUri(req)))
+        is NfcWriteRequest.Sms -> NdefMessage(
+            NdefRecord.createUri("sms:" + cleanNumber(req.number) + (req.body.takeIf { it.isNotBlank() }?.let { "?body=" + android.net.Uri.encode(it) } ?: "")),
+        )
+        is NfcWriteRequest.Geo -> NdefMessage(NdefRecord.createUri("geo:${parseCoord(req.lat)},${parseCoord(req.lon)}"))
+    }
+
+    private fun cleanNumber(n: String) = n.filter { it.isDigit() || it == '+' }
+
+    /** Accepts "48,8566" as well as "48.8566". */
+    fun parseCoord(s: String): Double? = s.trim().replace(',', '.').toDoubleOrNull()
+
+    fun emailUri(req: NfcWriteRequest.Email): String {
+        val params = listOfNotNull(
+            req.subject.takeIf { it.isNotBlank() }?.let { "subject=" + android.net.Uri.encode(it) },
+            req.body.takeIf { it.isNotBlank() }?.let { "body=" + android.net.Uri.encode(it) },
+        )
+        return "mailto:" + req.to.trim() + if (params.isEmpty()) "" else "?" + params.joinToString("&")
     }
 
     /** True when [req] looks well-formed enough to write, without touching the tag. */
@@ -159,5 +202,18 @@ object NdefBuild {
         is NfcWriteRequest.Phone -> if (req.number.filter { it.isDigit() }.length < 4) "Numéro de téléphone incomplet" else null
         is NfcWriteRequest.Contact -> if (req.name.isBlank()) "Entrez un nom" else null
         is NfcWriteRequest.App -> if (!req.packageName.matches(Regex("""[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+"""))) "Nom de package invalide (ex. com.exemple.app)" else null
+        is NfcWriteRequest.Wifi -> WscToken.validate(req.ssid, req.key, req.security)
+        is NfcWriteRequest.Email -> if (!req.to.trim().matches(Regex("""[^@\s]+@[^@\s]+\.[^@\s]+"""))) "Adresse e-mail invalide" else null
+        is NfcWriteRequest.Sms -> if (req.number.filter { it.isDigit() }.length < 3) "Numéro de téléphone incomplet" else null
+        is NfcWriteRequest.Geo -> {
+            val lat = parseCoord(req.lat)
+            val lon = parseCoord(req.lon)
+            when {
+                lat == null || lon == null -> "Entrez une latitude et une longitude (ex. 48.8584 et 2.2945)"
+                lat !in -90.0..90.0 -> "La latitude doit être entre -90 et 90"
+                lon !in -180.0..180.0 -> "La longitude doit être entre -180 et 180"
+                else -> null
+            }
+        }
     }
 }

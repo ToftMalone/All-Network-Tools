@@ -187,7 +187,11 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.NfcReader -> com.allnetworktools.ui.pages.nfc.NfcReaderTool(vm.tools.nfcReader)
             Tool.NfcWrite -> com.allnetworktools.ui.pages.nfc.NfcWriteTool(vm.tools.nfcWrite)
             Tool.NfcErase -> com.allnetworktools.ui.pages.nfc.NfcEraseTool(vm.tools.nfcMaint)
-            Tool.NfcRange -> com.allnetworktools.ui.pages.nfc.NfcRangeTool(vm.tools.nfcRange)
+            Tool.NfcRange -> com.allnetworktools.ui.pages.nfc.NfcRangeTool(vm.tools.nfcAntenna)
+            Tool.NfcAnalyze -> com.allnetworktools.ui.pages.nfc.NfcAnalyzeTool(vm.tools.nfcAnalyze)
+            Tool.NfcEndurance -> com.allnetworktools.ui.pages.nfc.NfcEnduranceTool(vm.tools.nfcEndurance)
+            // Only this tool reads the Wi-Fi connection, to prefill the network name.
+            Tool.NfcWifi -> com.allnetworktools.ui.pages.nfc.NfcWifiShareTool(vm.tools.nfcWifi, vm.wifi.collectAsStateWithLifecycle().value.connection)
             Tool.Gatt, Tool.Paired, Tool.Tracker, Tool.UnknownTrackers -> BtToolRoute(vm, page)
             Tool.DataUsage -> {
                 val perms by vm.permissions.collectAsStateWithLifecycle()

@@ -188,4 +188,9 @@ object Sym {
     const val ContactlessPayment = "contactless"
     const val WifiTethering = "wifi_tethering"
     const val Android = "android"
+    const val Mail = "mail"
+    const val Sms = "sms"
+    const val Science = "science"
+    const val WifiPassword = "wifi_password"
+    const val DeveloperBoard = "developer_board"
 }

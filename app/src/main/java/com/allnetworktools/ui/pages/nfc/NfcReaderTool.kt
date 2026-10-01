@@ -56,6 +56,9 @@ private fun recordIcon(k: NfcRecordKind) = when (k) {
     NfcRecordKind.SmartPoster -> Sym.Link
     NfcRecordKind.Mime -> Sym.DataObject
     NfcRecordKind.Unknown -> Sym.Help
+    NfcRecordKind.Email -> Sym.Mail
+    NfcRecordKind.Sms -> Sym.Sms
+    NfcRecordKind.Geo -> Sym.LocationOn
 }
 
 @Composable

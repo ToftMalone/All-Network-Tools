@@ -79,11 +79,19 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     )
     Network.Nfc -> listOf(
         ToolGroup(
-            "Outils",
+            "Écriture",
             listOf(
-                ToolEntry(Tool.NfcWrite, "Écrire un tag", "Lien, texte, contact, téléphone, appli"),
+                ToolEntry(Tool.NfcWrite, "Écrire un tag", "Lien, Wi-Fi, contact, SMS, e-mail, position…"),
+                ToolEntry(Tool.NfcWifi, "Rejoindre mon Wi-Fi", "Un tag pour inviter sans dicter le mot de passe"),
                 ToolEntry(Tool.NfcErase, "Effacer et verrouiller", "Réinitialiser ou bloquer un tag"),
-                ToolEntry(Tool.NfcRange, "Test de lecture", "Fiabilité et portée de l'antenne"),
+            ),
+        ),
+        ToolGroup(
+            "Diagnostic",
+            listOf(
+                ToolEntry(Tool.NfcAnalyze, "Analyse de la puce", "Modèle, fabricant, mémoire, contrefaçon"),
+                ToolEntry(Tool.NfcEndurance, "Test d'endurance", "Écrit et relit toute la mémoire"),
+                ToolEntry(Tool.NfcRange, "Zone de l'antenne", "Où lire le mieux au dos du téléphone"),
             ),
         ),
     )

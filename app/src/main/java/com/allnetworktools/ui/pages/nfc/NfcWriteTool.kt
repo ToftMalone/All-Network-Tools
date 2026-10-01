@@ -2,6 +2,7 @@ package com.allnetworktools.ui.pages.nfc
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.allnetworktools.data.NdefBuild
 import com.allnetworktools.data.NfcWriteResult
 import com.allnetworktools.ui.components.SectionCard
-import com.allnetworktools.ui.components.SegmentedRow
+import com.allnetworktools.ui.components.AntFilterChip
 import com.allnetworktools.ui.components.Symbol
 import com.allnetworktools.ui.pages.PageColumn
 import com.allnetworktools.ui.theme.AntTheme
@@ -63,13 +64,9 @@ fun NfcWriteTool(c: NfcWriteController) {
                 Row(Modifier.padding(top = 12.dp)) { HeroChip("En attente d'un tag", AntTheme.net.fair, blink = true) }
             }
         }
-        SegmentedRow(
-            listOf(
-                NfcWritePreset.Link to "Lien", NfcWritePreset.Text to "Texte", NfcWritePreset.Contact to "Contact",
-                NfcWritePreset.Phone to "Téléphone", NfcWritePreset.App to "Appli",
-            ),
-            c.preset, { c.preset = it }, Modifier.fillMaxWidth(), height = 36.dp,
-        )
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            NfcWritePreset.entries.forEach { p -> AntFilterChip(p.label, c.preset == p, { c.preset = p }) }
+        }
         when (c.preset) {
             NfcWritePreset.Link -> HostInputField(c.url, { c.url = it }, "Lien (https://…)", Sym.Link, keyboardType = KeyboardType.Uri)
             NfcWritePreset.Text -> HostInputField(c.text, { c.text = it }, "Texte", Sym.Description)
@@ -80,6 +77,22 @@ fun NfcWriteTool(c: NfcWriteController) {
             }
             NfcWritePreset.Phone -> HostInputField(c.phone, { c.phone = it }, "Numéro de téléphone", Sym.Call, keyboardType = KeyboardType.Phone)
             NfcWritePreset.App -> HostInputField(c.packageName, { c.packageName = it }, "Package (ex. com.exemple.app)", Sym.Android, keyboardType = KeyboardType.Ascii)
+            NfcWritePreset.Wifi -> WifiTagFields(
+                c.wifiSsid, { c.wifiSsid = it }, c.wifiKey, { c.wifiKey = it }, c.wifiSecurity, { c.wifiSecurity = it },
+            )
+            NfcWritePreset.Sms -> {
+                HostInputField(c.smsNumber, { c.smsNumber = it }, "Destinataire", Sym.Call, keyboardType = KeyboardType.Phone)
+                HostInputField(c.smsBody, { c.smsBody = it }, "Message (facultatif)", Sym.Sms, keyboardType = KeyboardType.Text)
+            }
+            NfcWritePreset.Email -> {
+                HostInputField(c.emailTo, { c.emailTo = it }, "Destinataire", Sym.Mail, keyboardType = KeyboardType.Email)
+                HostInputField(c.emailSubject, { c.emailSubject = it }, "Objet (facultatif)", Sym.Description, keyboardType = KeyboardType.Text)
+                HostInputField(c.emailBody, { c.emailBody = it }, "Message (facultatif)", Sym.Description, keyboardType = KeyboardType.Text)
+            }
+            NfcWritePreset.Geo -> {
+                HostInputField(c.lat, { c.lat = it }, "Latitude (ex. 48.8584)", Sym.LocationOn, keyboardType = KeyboardType.Decimal)
+                HostInputField(c.lon, { c.lon = it }, "Longitude (ex. 2.2945)", Sym.LocationOn, keyboardType = KeyboardType.Decimal)
+            }
         }
         if (error != null && !c.armed) {
             SectionCard(color = cs.errorContainer) { Text(error, style = rf(13, 18), color = cs.onErrorContainer) }

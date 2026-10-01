@@ -86,7 +86,10 @@ enum class Tool(
     NfcReader(Network.Nfc, "Lecteur NFC", Sym.Nfc, implemented = true),
     NfcWrite(Network.Nfc, "Écrire un tag", Sym.Edit),
     NfcErase(Network.Nfc, "Effacer et verrouiller", Sym.Delete),
-    NfcRange(Network.Nfc, "Test de lecture", Sym.ContactlessPayment),
+    NfcWifi(Network.Nfc, "Rejoindre mon Wi-Fi", Sym.WifiPassword),
+    NfcAnalyze(Network.Nfc, "Analyse de la puce", Sym.DeveloperBoard),
+    NfcEndurance(Network.Nfc, "Test d'endurance", Sym.Science),
+    NfcRange(Network.Nfc, "Zone de l'antenne", Sym.ContactlessPayment, Sym.RestartAlt),
     ;
 
     val isDockShortcut: Boolean get() = network.dockShortcut == this

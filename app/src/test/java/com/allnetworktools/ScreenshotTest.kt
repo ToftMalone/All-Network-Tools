@@ -454,8 +454,39 @@ class ScreenshotTest {
         vm.tools.nfcMaint.setResultForTest(com.allnetworktools.ui.pages.nfc.NfcMaintAction.Erase, com.allnetworktools.data.NfcWriteResult.Success)
     }
     @Test fun nfcRange() = shot("F4_nfc_range", nav = nfcTool(Tool.NfcRange)) { vm ->
-        val now = System.currentTimeMillis()
-        vm.tools.nfcRange.setForTest(listOf(now - 400, now - 1600, now - 2900, now - 4100, now - 5400))
+        vm.tools.nfcAntenna.setForTest(
+            mapOf(
+                1 to com.allnetworktools.data.LinkSample(120, 118, 9.5), 4 to com.allnetworktools.data.LinkSample(120, 92, 14.0),
+                3 to com.allnetworktools.data.LinkSample(120, 40, 22.0), 7 to com.allnetworktools.data.LinkSample(60, 0, null),
+            ),
+        )
+    }
+    @Test fun nfcWriteWifi() = shot("F7_nfc_write_wifi", dark = true, nav = nfcTool(Tool.NfcWrite)) { vm ->
+        vm.tools.nfcWrite.preset = com.allnetworktools.ui.pages.nfc.NfcWritePreset.Wifi
+        vm.tools.nfcWrite.wifiSsid = "Livebox-7A21"
+        vm.tools.nfcWrite.wifiKey = "correct horse battery"
+    }
+    @Test fun nfcWifiShare() = shot("F8_nfc_wifi_share", nav = nfcTool(Tool.NfcWifi))
+    @Test fun nfcAnalyze() = shot("F9_nfc_analyze", nav = nfcTool(Tool.NfcAnalyze)) { vm ->
+        vm.tools.nfcAnalyze.setForTest(
+            com.allnetworktools.data.NfcChipReport(
+                uidHex = "1DA2B3C4D5E680", uidBytes = 7, manufacturer = null, chip = "NTAG215", exact = true,
+                model = com.allnetworktools.data.NfcChipModel("NTAG215", 504, 4, 129),
+                techLabels = listOf("NFC-A (ISO 14443-3A)", "MIFARE Ultralight / NTAG", "NDEF"), atqa = "44 00", sak = "00", maxTransceive = 253,
+                ndefType = "org.nfcforum.ndef.type2", ndefCapacity = 496, ndefUsed = 38, ndefWritable = true, ndefCanLock = true,
+                capability = com.allnetworktools.data.NfcCapability(true, 0x10, 496, false), versionHex = "00 04 04 02 01 00 11 03",
+                anomalies = listOf("La puce se présente comme NXP mais son UID ne commence pas par 04 (code fabricant NXP) : copie ou clone probable."),
+            ),
+        )
+    }
+    @Test fun nfcEndurance() = shot("FA_nfc_endurance", dark = true, nav = nfcTool(Tool.NfcEndurance)) { vm ->
+        vm.tools.nfcEndurance.setForTest(
+            com.allnetworktools.data.EnduranceReport(
+                "NTAG213", true, 3, 36,
+                mapOf(17 to com.allnetworktools.data.PageFault.Mismatch, 18 to com.allnetworktools.data.PageFault.Mismatch),
+                4.2, 6.8, null, true,
+            ),
+        )
     }
     @Test fun nfcDashboard() = shot("F5_nfc_dashboard", nav = NavState(Network.Nfc, Page.Dashboard)) { vm ->
         vm.tools.nfcReader.setForTest(
