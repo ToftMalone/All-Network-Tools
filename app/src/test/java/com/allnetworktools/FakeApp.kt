@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
 /** Scenario switches read by the fakes; set before the ViewModel is created. */
 object Scenario {
@@ -44,6 +45,12 @@ object Scenario {
     var bleEmpty = false
     var usageGranted = false
     var evilTwin = false
+
+    /** Set when a measurement flow starts being collected: the home screen must not start any. */
+    var wifiStarted = false
+    var bleStarted = false
+    var cellStarted = false
+    var gnssStarted = false
 }
 
 private fun Context.fakePermissions() = object : PermissionsRepository(this@fakePermissions) {
@@ -88,14 +95,13 @@ internal val twins = listOf(
 
 private fun Context.fakeWifi() = object : WifiRepository(this@fakeWifi) {
     private var rssi = -54
-    override val connection: Flow<WifiConnection?> = flowOf(
-        WifiConnection(
-            ssid = "Freebox-7A2C", bssid = "a4:3e:51:7c:2a:9f", rssi = -54, frequency = 5180, linkTx = 1201, linkRx = 960,
-            standard = ScanResult.WIFI_STANDARD_11AX, security = "WPA3-Personnel (SAE)", ipv4 = "192.168.1.42", prefix = 24,
-            gateway = "192.168.1.254", dns = listOf("192.168.1.254", "1.1.1.1"), ipv6 = "2a01:e0a:3c1:5e70::7f2e",
-            connectedAtElapsed = SystemClock.elapsedRealtime() - 8_040_000,
-        ),
+    private val wifiConn = WifiConnection(
+        ssid = "Freebox-7A2C", bssid = "a4:3e:51:7c:2a:9f", rssi = -54, frequency = 5180, linkTx = 1201, linkRx = 960,
+        standard = ScanResult.WIFI_STANDARD_11AX, security = "WPA3-Personnel (SAE)", ipv4 = "192.168.1.42", prefix = 24,
+        gateway = "192.168.1.254", dns = listOf("192.168.1.254", "1.1.1.1"), ipv6 = "2a01:e0a:3c1:5e70::7f2e",
+        connectedAtElapsed = SystemClock.elapsedRealtime() - 8_040_000,
     )
+    override val connection: Flow<WifiConnection?> = flowOf(wifiConn).onStart { Scenario.wifiStarted = true }
 
     override fun pollRssi(): com.allnetworktools.data.WifiPoll {
         rssi = (rssi + listOf(-3, -1, 0, 2, 3).random()).coerceIn(-64, -46)
@@ -145,7 +151,8 @@ private fun Context.fakeBluetooth() = object : BluetoothRepository(this@fakeBlue
         ),
     )
 
-    override fun bleScan(lowPower: Boolean, staleMs: Long): Flow<List<BleDevice>> = flowOf(if (Scenario.bleEmpty) emptyList() else bleDevices)
+    override fun bleScan(lowPower: Boolean, staleMs: Long): Flow<List<BleDevice>> =
+        flowOf(if (Scenario.bleEmpty) emptyList() else bleDevices).onStart { Scenario.bleStarted = true }
 }
 
 private fun cell(tech: RadioTech, band: String, pci: Int, label: String, arfcn: Int, level: Int, registered: Boolean = false) = CellMeasure(
@@ -158,7 +165,7 @@ private fun cell(tech: RadioTech, band: String, pci: Int, label: String, arfcn: 
 private fun Context.fakeCell() = object : CellRepository(this@fakeCell) {
     override val hasTelephony = true
     override fun simReady() = true
-    override fun cells(refreshMs: Long): Flow<CellState> = flowOf(Unit).map {
+    override fun cells(refreshMs: Long): Flow<CellState> = flowOf(Unit).onStart { Scenario.cellStarted = true }.map {
         CellState(
             operator = "Orange F", simSlot = 1, techLabel = "5G SA", techLong = "STANDALONE", techBig = "5G",
             roaming = false, voiceAndData = true,
@@ -205,7 +212,8 @@ private fun Context.fakeGnss() = object : GnssRepository(this@fakeGnss) {
     }
 
     override fun lastKnownLocation() = loc
-    override fun status(refreshMs: Long): Flow<GnssState> = flowOf(GnssState(sats, loc, FixType.Fix3D, 0.8f, 4100))
+    override fun status(refreshMs: Long): Flow<GnssState> =
+        flowOf(GnssState(sats, loc, FixType.Fix3D, 0.8f, 4100)).onStart { Scenario.gnssStarted = true }
 
     private fun at(provider: String, dLat: Double, dLon: Double, acc: Float) = Location(provider).apply {
         latitude = loc.latitude + dLat; longitude = loc.longitude + dLon; altitude = 47.0; accuracy = acc

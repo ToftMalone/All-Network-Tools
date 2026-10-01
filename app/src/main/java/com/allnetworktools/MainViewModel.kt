@@ -207,10 +207,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val wifi: StateFlow<WifiUi> = channelFlow {
         var conn: WifiConnection? = null
         var hist = emptyList<Float>()
+        // A new watching session starts from scratch: a gap must not look like a roaming event.
+        roamLast = null
         launch {
             wifiLive.sampledHistory(rate, 60) { it?.rssi?.toFloat() }.collect { hist = it; send(WifiUi(conn, hist)) }
         }
-        wifiLive.collect { conn = it; send(WifiUi(conn, if (it == null) emptyList() else hist)) }
+        wifiLive.collect { conn = it; trackRoam(it); send(WifiUi(conn, if (it == null) emptyList() else hist)) }
     }.stateIn(viewModelScope, sharing, WifiUi(null, emptyList()))
 
     private val _roams = MutableStateFlow<List<RoamEvent>>(emptyList())
@@ -224,27 +226,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _roams.value = list
     }
 
-    private fun trackRoaming() {
-        viewModelScope.launch {
-            var last: WifiConnection? = null
-            var lastSince = SystemClock.elapsedRealtime()
-            wifiLive.collect { c ->
-                val prev = last
-                last = c
-                if (c == null) return@collect
-                if (prev == null || prev.ssid != c.ssid || prev.connectedAtElapsed != c.connectedAtElapsed) {
-                    if (prev != null) _roams.value = emptyList()
-                    lastSince = SystemClock.elapsedRealtime()
-                    return@collect
-                }
-                val a = prev.bssid
-                val b = c.bssid
-                if (a != null && b != null && !a.equals(b, true)) {
-                    val now = SystemClock.elapsedRealtime()
-                    _roams.value = (listOf(RoamEvent(System.currentTimeMillis(), c.ssid, a, b, prev.frequency, c.frequency, prev.rssi, c.rssi, now - lastSince)) + _roams.value).take(50)
-                    lastSince = now
-                }
-            }
+    private var roamLast: WifiConnection? = null
+    private var roamSince = SystemClock.elapsedRealtime()
+
+    /** Called with each Wi-Fi sample while the Wi-Fi network is being watched; records access-point changes. */
+    private fun trackRoam(c: WifiConnection?) {
+        val prev = roamLast
+        roamLast = c
+        if (c == null) return
+        if (prev == null || prev.ssid != c.ssid || prev.connectedAtElapsed != c.connectedAtElapsed) {
+            if (prev != null) _roams.value = emptyList()
+            roamSince = SystemClock.elapsedRealtime()
+            return
+        }
+        val a = prev.bssid
+        val b = c.bssid
+        if (a != null && b != null && !a.equals(b, true)) {
+            val now = SystemClock.elapsedRealtime()
+            _roams.value = (listOf(RoamEvent(System.currentTimeMillis(), c.ssid, a, b, prev.frequency, c.frequency, prev.rssi, c.rssi, now - roamSince)) + _roams.value).take(50)
+            roamSince = now
         }
     }
 
@@ -322,7 +322,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val history get() = g.history
 
     init {
-        trackRoaming()
         viewModelScope.launch {
             // Once per launch and at most every 6 hours: a newer GitHub release is downloaded and installed.
             if (g.settings.settings.first().autoUpdate) runCatching { g.updater.check(autoInstall = true) }

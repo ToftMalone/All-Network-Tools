@@ -26,6 +26,8 @@ import com.allnetworktools.ui.pages.bt.NotifyLine
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,6 +56,10 @@ class ScreenshotTest {
         Scenario.bleEmpty = false
         Scenario.usageGranted = false
         Scenario.evilTwin = false
+        Scenario.wifiStarted = false
+        Scenario.bleStarted = false
+        Scenario.cellStarted = false
+        Scenario.gnssStarted = false
     }
 
     private fun shot(name: String, dark: Boolean = false, onboarding: Boolean = false, nav: NavState = NavState(), setup: (MainViewModel) -> Unit = {}) {
@@ -77,6 +83,27 @@ class ScreenshotTest {
 
     @Test fun onboarding() = shot("01_onboarding", onboarding = true)
     @Test fun home() = shot("02_home")
+    /** Neither the home screen nor picking a card may start a measurement: only a network's own pages do. */
+    @Test fun homeStartsNoMeasurement() {
+        shot("02b_home_idle")
+        assertFalse("Wi-Fi", Scenario.wifiStarted)
+        assertFalse("BLE", Scenario.bleStarted)
+        assertFalse("Cellulaire", Scenario.cellStarted)
+        assertFalse("GNSS", Scenario.gnssStarted)
+    }
+    @Test fun bluetoothDashboardStartsOnlyBluetooth() {
+        shot("20b_bt_dashboard_alone", nav = NavState(Network.Bluetooth, Page.Dashboard))
+        assertTrue("BLE", Scenario.bleStarted)
+        assertFalse("Wi-Fi", Scenario.wifiStarted)
+        assertFalse("Cellulaire", Scenario.cellStarted)
+        assertFalse("GNSS", Scenario.gnssStarted)
+    }
+    @Test fun toolsPageStartsOnlyItsNetwork() {
+        shot("11b_wifi_tools_alone", nav = NavState(Network.Wifi, Page.Tools))
+        assertFalse("BLE", Scenario.bleStarted)
+        assertFalse("Cellulaire", Scenario.cellStarted)
+        assertFalse("GNSS", Scenario.gnssStarted)
+    }
     @Test fun homeSelected() = shot("03_home_wifi_selected", nav = NavState(Network.Wifi))
     @Test fun dockSwitcher() = shot("06_dock_switcher", nav = NavState(Network.Wifi, Page.Dashboard, switcherOpen = true))
     @Test fun homeDark() = shot("04_home_gnss_dark", dark = true, nav = NavState(Network.Gnss))

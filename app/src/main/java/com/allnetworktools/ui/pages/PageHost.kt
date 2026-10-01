@@ -239,7 +239,8 @@ private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
         Tool.Whois -> com.allnetworktools.ui.pages.wifi.WhoisTool(tools.whois)
         Tool.Audit -> com.allnetworktools.ui.pages.wifi.AuditTool(tools.audit, conn, vm.wifiScan.collectAsStateWithLifecycle().value)
         Tool.PortalDns -> {
-            val cell = vm.cell.collectAsStateWithLifecycle().value.state
+            // The modem is only read when there is no Wi-Fi connection to name.
+            val cell = if (conn == null) vm.cell.collectAsStateWithLifecycle().value.state else null
             com.allnetworktools.ui.pages.wifi.PortalDnsTool(tools.portalDns, conn?.ssid ?: cell?.operator?.let { "$it (données mobiles)" } ?: "réseau actif")
         }
         Tool.Mitm -> com.allnetworktools.ui.pages.wifi.MitmTool(tools.mitm, conn)
@@ -248,7 +249,7 @@ private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
             onFixLocation = { if (!perms.location) actions.request(PermGroup.Location) else actions.openLocationSettings() },
         )
         Tool.Speed -> {
-            val cell = vm.cell.collectAsStateWithLifecycle().value.state
+            val cell = if (conn == null) vm.cell.collectAsStateWithLifecycle().value.state else null
             val (label, icon) = when {
                 conn != null -> listOfNotNull(conn.ssid, standardLabel(conn.standard)?.first, "${conn.band.label} GHz").joinToString(" · ") to Sym.Wifi
                 cell != null -> listOfNotNull(cell.operator, cell.techLabel).joinToString(" · ") to Sym.CellBars3

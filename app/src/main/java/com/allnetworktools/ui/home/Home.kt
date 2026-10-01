@@ -87,14 +87,9 @@ import com.allnetworktools.util.plural
 import com.allnetworktools.util.signalValue
 import kotlinx.coroutines.delay
 
+/** What the home screen needs: which networks are available. No measurement runs from here. */
 data class HomeData(
     val blockers: Map<Network, Blocker?>,
-    val wifi: WifiUi,
-    val bluetooth: BluetoothSnapshot,
-    val ble: List<BleDevice>,
-    val cell: CellUi,
-    val gnss: GnssState,
-    val nfc: com.allnetworktools.ui.pages.nfc.NfcReaderController,
 )
 
 /** Cycles 0,1,2 at 1 Hz, for the animated bar icons. */
@@ -130,14 +125,13 @@ fun HomeScreen(
             .clickable(interactionSource = null, indication = null, onClick = onDeselect),
     ) {
         BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars)) {
-            val availableHeight = maxHeight
             Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 12.dp), verticalAlignment = Alignment.Top) {
                     Column(Modifier.weight(1f)) {
                         Text("All Network Tools", style = gs(32, 40, 500, -0.3f), color = cs.onSurface, maxLines = 1)
                         Text(
-                            if (needed == 0) "$total réseaux actifs · mesures en direct"
-                            else "$active sur $total actifs · $needed ${plural(needed, "action requise", "actions requises")}",
+                            if (needed == 0) "$total réseaux disponibles"
+                            else "$active sur $total disponibles · $needed ${plural(needed, "action requise", "actions requises")}",
                             Modifier.padding(top = 4.dp), style = rf(14, 20), color = cs.onSurfaceVariant,
                         )
                     }
@@ -148,9 +142,8 @@ fun HomeScreen(
                     )
                 }
                 val rows = Network.entries.chunked(2)
-                val gridTop = 92.dp
-                // A row height that fits every row on a typical screen; verticalScroll below is the safety net if it doesn't.
-                val cardH = ((availableHeight - gridTop - 124.dp - 12.dp * (rows.size - 1)) / rows.size).coerceIn(190.dp, 300.dp)
+                // Cards only hold an icon and a short description, so they stay compact.
+                val cardH = 184.dp
                 Column(
                     Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp)
                         .verticalScroll(rememberScrollState()),
@@ -220,128 +213,42 @@ private fun NetworkCard(
         } else {
             CompositionLocalProvider(LocalContentColor provides roles.onContainer) {
                 Column(Modifier.fillMaxSize().padding(16.dp)) {
-                    when (network) {
-                        Network.Wifi -> WifiCardContent(data.wifi)
-                        Network.Bluetooth -> BtCardContent(data.bluetooth, data.ble)
-                        Network.Cellular -> CellCardContent(data.cell)
-                        Network.Gnss -> GnssCardContent(data.gnss)
-                        Network.Nfc -> NfcCardContent(data.nfc)
-                    }
+                    NetworkCardContent(network)
                 }
             }
         }
     }
 }
 
-@Composable
-private fun CardTop(icon: @Composable () -> Unit, chip: @Composable () -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-        icon(); chip()
-    }
+/** Static description of each network: nothing here reads the radio. */
+private fun description(n: Network) = when (n) {
+    Network.Wifi -> "Réseaux alentour, canaux, débit, diagnostic et sécurité du Wi-Fi."
+    Network.Bluetooth -> "Appareils Bluetooth LE, traqueurs inconnus et recherche Chaud/Froid."
+    Network.Cellular -> "Cellules, antennes de votre opérateur et données mobiles."
+    Network.Gnss -> "Satellites, ciel, comparaison des positions et passages."
+    Network.Nfc -> "Lecture et écriture de tags, badges et cartes sans contact."
 }
 
 @Composable
-private fun ColumnScope.CardTexts(name: String, subtitle: String) {
-    Spacer(Modifier.weight(1f))
-    Text(name, style = rf(16, 22, 600), maxLines = 1)
-    Text(subtitle, Modifier.graphicsLayer { alpha = 0.85f }, style = rf(14, 20), maxLines = 1, overflow = TextOverflow.Ellipsis)
-}
-
-@Composable
-private fun CardMetric(value: String, unit: String) {
-    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(value, style = gs(48, 52, 500, -1f, tnum = true), maxLines = 1)
-        Text(unit, Modifier.padding(bottom = 7.dp), style = rf(14, 18, 500), maxLines = 1)
-    }
-}
-
-private fun sparkRange(values: List<Float>): Pair<Float, Float> {
-    if (values.isEmpty()) return -90f to -30f
-    val lo = values.min(); val hi = values.max()
-    val mid = (lo + hi) / 2
-    val span = maxOf(hi - lo + 6f, 14f)
-    return mid - span / 2 to mid + span / 2
-}
-
-@Composable
-private fun ColumnScope.WifiCardContent(wifi: WifiUi) {
-    val roles = AntTheme.net.wifi
-    val c = wifi.connection
-    val phase = rememberBarsPhase()
-    val settings = AntTheme.settings
-    CardTop(
-        icon = {
-            ShapeBadge(
-                listOf(Sym.Wifi1Bar, Sym.Wifi2Bar, Sym.Wifi)[phase], cookieShape(), 56.dp, roles.accent, roles.onAccent, 28.dp, spinMs = 30_000,
-            )
-        },
-        chip = { if (c != null) StatusChip("Connecté", AntTheme.net.good) else StatusChip("Déconnecté", cs.outline) },
-    )
-    CardTexts("Wi-Fi", if (c == null) "Aucun réseau" else "${c.ssid ?: "SSID masqué"} · ${c.band.label} GHz")
-    val v: SignalValue = signalValue(c?.rssi, settings, -100f, -30f)
-    CardMetric(v.text, v.unit)
-    val hist = wifi.history.takeLast(30)
-    val (lo, hi) = sparkRange(hist)
-    Sparkline(hist, lo, hi, roles.accent, Modifier.padding(top = 8.dp).fillMaxWidth().height(44.dp), morphMs = settings.refreshMillis.toInt())
-}
-
-@Composable
-private fun ColumnScope.BtCardContent(bt: BluetoothSnapshot, ble: List<BleDevice>) {
-    val roles = AntTheme.net.bt
-    CardTop(
-        icon = {
-            Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(48.dp).spinning(rememberSpin(30_000)).clip(RoundedCornerShape(18.dp)).background(roles.accent))
-                PulseRing(roles.accent, 40.dp, periodMs = 2400)
-                Symbol(Sym.Bluetooth, size = 28.dp, filled = true, tint = roles.onAccent)
-            }
-        },
-        chip = { StatusChip("Actif", AntTheme.net.good) },
-    )
-    val connected = bt.connected.size
-    CardTexts("Bluetooth", "$connected ${plural(connected, "connecté")}")
-    CardMetric(ble.size.toString(), "à proximité")
-    Row(Modifier.padding(top = 8.dp).fillMaxWidth().height(44.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        val top = ble.take(7)
-        repeat(7) { i ->
-            val d = top.getOrNull(i)
-            val f = if (d == null) 0.12f else ((d.rssi + 100) / 60f).coerceIn(0.12f, 1f)
-            val h by animateFloatAsState(f, Motion.standard(), label = "btBar")
-            Box(
-                Modifier.weight(1f).fillMaxHeight(h)
-                    .graphicsLayer { alpha = if (d == null) 0.2f else 0.35f + 0.65f * f }
-                    .clip(RoundedCornerShape(4.dp)).background(roles.accent),
-            )
+private fun CardIcon(network: Network) {
+    val roles = AntTheme.net[network]
+    when (network) {
+        Network.Wifi -> {
+            val phase = rememberBarsPhase()
+            ShapeBadge(listOf(Sym.Wifi1Bar, Sym.Wifi2Bar, Sym.Wifi)[phase], cookieShape(), 56.dp, roles.accent, roles.onAccent, 28.dp, spinMs = 30_000)
         }
-    }
-}
-
-@Composable
-private fun ColumnScope.CellCardContent(cell: CellUi) {
-    val roles = AntTheme.net.cell
-    val s = cell.state
-    val phase = rememberBarsPhase()
-    val settings = AntTheme.settings
-    CardTop(
-        icon = { ShapeBadge(listOf(Sym.CellBars1, Sym.CellBars2, Sym.CellBars3)[phase], cloverShape(), 56.dp, roles.accent, roles.onAccent, 28.dp, spinMs = 40_000, reverse = true) },
-        chip = { TechChip(s?.techLabel ?: "—", roles.accent, roles.onAccent) },
-    )
-    val sub = listOfNotNull(s?.operator, s?.serving?.band).joinToString(" · ").ifEmpty { if (s?.hasService == false) "Hors service" else "Recherche…" }
-    CardTexts("Réseau mobile", sub)
-    val v = signalValue(s?.serving?.level, settings, -125f, -70f)
-    CardMetric(v.text, v.unit)
-    val hist = cell.history.takeLast(30)
-    val (lo, hi) = sparkRange(hist)
-    Sparkline(hist, lo, hi, roles.accent, Modifier.padding(top = 8.dp).fillMaxWidth().height(44.dp), areaAlpha = 0.18f, morphMs = settings.refreshMillis.toInt())
-}
-
-@Composable
-private fun ColumnScope.GnssCardContent(g: GnssState) {
-    val roles = AntTheme.net.gnss
-    val spin = rememberSpin(8_000)
-    val dash = remember { PathEffect.dashPathEffect(floatArrayOf(10f, 8f)) }
-    CardTop(
-        icon = {
+        Network.Bluetooth -> Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(48.dp).spinning(rememberSpin(30_000)).clip(RoundedCornerShape(18.dp)).background(roles.accent))
+            PulseRing(roles.accent, 40.dp, periodMs = 2400)
+            Symbol(Sym.Bluetooth, size = 28.dp, filled = true, tint = roles.onAccent)
+        }
+        Network.Cellular -> {
+            val phase = rememberBarsPhase()
+            ShapeBadge(listOf(Sym.CellBars1, Sym.CellBars2, Sym.CellBars3)[phase], cloverShape(), 56.dp, roles.accent, roles.onAccent, 28.dp, spinMs = 40_000, reverse = true)
+        }
+        Network.Gnss -> {
+            val spin = rememberSpin(8_000)
+            val dash = remember { PathEffect.dashPathEffect(floatArrayOf(10f, 8f)) }
             Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
                 Box(Modifier.size(44.dp).clip(CircleShape).background(roles.accent))
                 Canvas(Modifier.size(56.dp).spinning(spin)) {
@@ -349,55 +256,20 @@ private fun ColumnScope.GnssCardContent(g: GnssState) {
                 }
                 Symbol(Sym.SatelliteAlt, size = 26.dp, filled = true, tint = roles.onAccent)
             }
-        },
-        chip = {
-            val fix = g.fix != FixType.None
-            StatusChip(if (fix) g.fix.label else "Recherche…", if (fix) AntTheme.net.good else AntTheme.net.fair, blink = true)
-        },
-    )
-    val acc = g.location?.takeIf { it.hasAccuracy() }?.accuracy
-    val sub = buildString {
-        append(if (acc != null) "±${com.allnetworktools.util.fmt(acc, 1)} m" else "Précision —")
-        append(" · ${g.constellationCount} ${plural(g.constellationCount, "constellation")}")
-    }
-    CardTexts("GNSS", sub)
-    CardMetric(g.used.size.toString(), "/ ${g.visible.size} fixés")
-    val consts = listOf(Constellation.GPS, Constellation.Galileo, Constellation.Glonass, Constellation.BeiDou, Constellation.QZSS)
-    Row(
-        Modifier.padding(top = 14.dp).fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)).background(cs.surface),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        consts.forEach { c ->
-            val count = g.used.count { it.constellation == c }
-            val w by animateFloatAsState(maxOf(0.2f, count.toFloat()), Motion.standard(), label = "seg")
-            Box(Modifier.weight(w).fillMaxHeight().background(constellationColor(c)))
         }
-    }
-    Row(Modifier.fillMaxWidth().padding(top = 6.dp).graphicsLayer { alpha = 0.85f }, horizontalArrangement = Arrangement.SpaceBetween) {
-        consts.forEach { Text(it.short, style = rf(11, 16)) }
+        Network.Nfc -> Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(48.dp).clip(cookieShape()).spinning(rememberSpin(20_000)).background(roles.accent))
+            Symbol(Sym.Nfc, size = 26.dp, filled = true, tint = roles.onAccent)
+        }
     }
 }
 
 @Composable
-private fun ColumnScope.NfcCardContent(c: com.allnetworktools.ui.pages.nfc.NfcReaderController) {
-    val roles = AntTheme.net.nfc
-    val spin = rememberSpin(20_000)
-    CardTop(
-        icon = {
-            Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(48.dp).clip(cookieShape()).spinning(spin).background(roles.accent))
-                Symbol(Sym.Nfc, size = 26.dp, filled = true, tint = roles.onAccent)
-            }
-        },
-        chip = { StatusChip("Prêt", AntTheme.net.good) },
-    )
-    val last = c.current
-    CardTexts("NFC", if (last == null) "Aucun tag lu" else last.techLabels.firstOrNull() ?: "Tag lu")
-    CardMetric(c.readCount.toString(), plural(c.readCount, "lecture"))
-    Text(
-        last?.uidHex ?: "Posez un tag contre le dos du téléphone",
-        Modifier.padding(top = 8.dp).graphicsLayer { alpha = 0.85f }, style = rf(13, 18, tnum = last != null), maxLines = 1,
-    )
+private fun ColumnScope.NetworkCardContent(network: Network) {
+    CardIcon(network)
+    Spacer(Modifier.weight(1f))
+    Text(network.label, style = rf(18, 24, 600), maxLines = 1)
+    Text(description(network), Modifier.padding(top = 4.dp).graphicsLayer { alpha = 0.85f }, style = rf(13, 18), maxLines = 3, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable

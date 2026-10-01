@@ -175,15 +175,7 @@ private fun MainShell(vm: MainViewModel) {
     Box(Modifier.fillMaxSize().onSizeChanged { rootSize = it }) {
         val homeVisible = shown == null || progress.value < 1f || back.value > 0f || progress.isRunning
         if (homeVisible) {
-            val data = HomeData(
-                blockers = vm.blockers.collectAsStateWithLifecycle().value,
-                wifi = vm.wifi.collectAsStateWithLifecycle().value,
-                bluetooth = vm.bluetooth.collectAsStateWithLifecycle().value,
-                ble = vm.ble.collectAsStateWithLifecycle().value,
-                cell = vm.cell.collectAsStateWithLifecycle().value,
-                gnss = vm.gnss.collectAsStateWithLifecycle().value,
-                nfc = vm.tools.nfcReader,
-            )
+            val data = HomeData(blockers = vm.blockers.collectAsStateWithLifecycle().value)
             val actions = LocalActions.current
             HomeScreen(
                 data = data,

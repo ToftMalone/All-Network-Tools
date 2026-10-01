@@ -110,8 +110,9 @@ private fun featuredBadge(net: Network, vm: MainViewModel): String? = when (net)
 fun ToolsPage(net: Network, vm: MainViewModel) {
     val acc = AntTheme.accent
     val open = { tool: Tool -> vm.navigate { it.copy(page = Page.ToolPage(tool)) } }
-    val connected = vm.bluetooth.collectAsStateWithLifecycle().value.connected.firstOrNull()?.name
-    val serving = vm.cell.collectAsStateWithLifecycle().value.state?.serving
+    // Only the network being shown is read: opening Wi-Fi tools must not start Bluetooth or the modem.
+    val connected = if (net == Network.Bluetooth) vm.bluetooth.collectAsStateWithLifecycle().value.connected.firstOrNull()?.name else null
+    val serving = if (net == Network.Cellular) vm.cell.collectAsStateWithLifecycle().value.state?.serving else null
     val servingLabel = serving?.let { s -> listOfNotNull(s.pci?.let { "PCI $it" }, s.band).joinToString(" · ").ifEmpty { null } }
     val badge = featuredBadge(net, vm)
     PageColumn {
