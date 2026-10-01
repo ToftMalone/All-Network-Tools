@@ -263,6 +263,25 @@ class FakeApp : AntApplication() {
             override fun stopReading(host: Context) = Unit
         }
     }
+    override val ir by lazy {
+        object : com.allnetworktools.data.IrRepository(this@FakeApp) {
+            override val hasEmitter = true
+            override fun carrierRanges() = listOf(30_000..57_000)
+            override fun transmit(signal: com.allnetworktools.data.IrSignal): String? = null
+        }
+    }
+    override val wifiDirect by lazy {
+        object : com.allnetworktools.data.WifiDirectRepository(this@FakeApp) {
+            override val supported = true
+            override fun peers(): Flow<List<com.allnetworktools.data.P2pPeer>> = flowOf(
+                listOf(
+                    com.allnetworktools.data.P2pPeer("[TV] Samsung Q80 Series", "7a:bd:3c:11:4e:02", "7-0050F204-1", com.allnetworktools.data.P2pStatus.Available, false, true),
+                    com.allnetworktools.data.P2pPeer("DIRECT-6B-HP OfficeJet 8020", "fa:da:0c:51:9a:6b", "3-0050F204-1", com.allnetworktools.data.P2pStatus.Available, true, true),
+                    com.allnetworktools.data.P2pPeer("Pixel 9", "3e:11:aa:90:c2:7f", "10-0050F204-5", com.allnetworktools.data.P2pStatus.Unavailable, false, false),
+                ),
+            )
+        }
+    }
 }
 
 private fun Context.fakeUsage() = object : com.allnetworktools.data.UsageRepository(this@fakeUsage) {

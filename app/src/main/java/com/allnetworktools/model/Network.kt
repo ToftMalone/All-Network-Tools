@@ -16,6 +16,7 @@ enum class Network(
     Cellular("Réseau mobile", Sym.CellBars3, "Cellules", LeadCorners(24f, 24f, 12f, 24f)),
     Gnss("GNSS", Sym.SatelliteAlt, "Ciel", LeadCorners(14f, 24f, 14f, 24f)),
     Nfc("NFC", Sym.Nfc, "Lire", LeadCorners(24f, 14f, 24f, 14f)),
+    Ir("Infrarouge", Sym.SettingsRemote, "Zapper", LeadCorners(14f, 14f, 24f, 24f)),
     ;
 
     // Getters rather than constructor arguments: Tool's entries reference Network, so eager
@@ -29,6 +30,7 @@ enum class Network(
             Cellular -> Tool.Neighbors
             Gnss -> Tool.Sky
             Nfc -> Tool.NfcReader
+            Ir -> Tool.IrRemote
         }
 
     /** Tool reachable directly from the dock. */
@@ -67,6 +69,7 @@ enum class Tool(
     Audit(Network.Wifi, "Audit du réseau", Sym.Shield, Sym.Refresh),
     PortalDns(Network.Wifi, "Portail captif et DNS", Sym.Language, Sym.Refresh),
     Mitm(Network.Wifi, "Homme du milieu", Sym.SwapHoriz, Sym.RestartAlt),
+    WifiDirect(Network.Wifi, "Wi-Fi Direct", Sym.WifiTethering),
 
     BleScan(Network.Bluetooth, "Scanner BLE", Sym.BluetoothSearching, implemented = true),
     Gatt(Network.Bluetooth, "Appareil BLE", Sym.AccountTree, Sym.MoreVert),
@@ -90,6 +93,10 @@ enum class Tool(
     NfcAnalyze(Network.Nfc, "Analyse de la puce", Sym.DeveloperBoard),
     NfcEndurance(Network.Nfc, "Test d'endurance", Sym.Science),
     NfcRange(Network.Nfc, "Zone de l'antenne", Sym.ContactlessPayment, Sym.RestartAlt),
+
+    IrRemote(Network.Ir, "Télécommande", Sym.SettingsRemote, implemented = true),
+    IrCustom(Network.Ir, "Code personnalisé", Sym.Tune),
+    IrTest(Network.Ir, "Test de l'émetteur", Sym.PhotoCamera),
     ;
 
     val isDockShortcut: Boolean get() = network.dockShortcut == this

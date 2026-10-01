@@ -24,4 +24,6 @@ open class AntApplication : Application() {
     open val towers by lazy { com.allnetworktools.data.TowerRepository() }
     open val usage by lazy { com.allnetworktools.data.UsageRepository(this) }
     open val nfc by lazy { com.allnetworktools.data.NfcRepository(this) }
+    open val wifiDirect by lazy { com.allnetworktools.data.WifiDirectRepository(this) }
+    open val ir by lazy { com.allnetworktools.data.IrRepository(this) }
 }

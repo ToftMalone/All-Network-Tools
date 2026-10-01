@@ -8,6 +8,7 @@
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.consumerir" android:required="false" />
 
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -25,6 +26,7 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.TRANSMIT_IR" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 

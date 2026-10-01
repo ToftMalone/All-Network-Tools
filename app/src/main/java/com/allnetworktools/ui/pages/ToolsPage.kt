@@ -45,7 +45,7 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     Network.Wifi -> listOf(
         ToolGroup("Analyse", listOf(ToolEntry(Tool.Channels, "Analyseur de canaux", "Canal recommandé"), ToolEntry(Tool.Speed, "Test de débit", "Ping, download, upload"))),
         ToolGroup("Réseau local", listOf(ToolEntry(Tool.Lan, "Appareils du LAN", "Découverte des hôtes"), ToolEntry(Tool.Ports, "Scan de ports", "TCP, ports courants"))),
-        ToolGroup("Découverte", listOf(ToolEntry(Tool.Upnp, "Scanner UPnP", "Box, TV, NAS, SSDP"), ToolEntry(Tool.Bonjour, "Scanner Bonjour", "Services mDNS / DNS-SD"))),
+        ToolGroup("Découverte", listOf(ToolEntry(Tool.Upnp, "Scanner UPnP", "Box, TV, NAS, SSDP"), ToolEntry(Tool.Bonjour, "Scanner Bonjour", "Services mDNS / DNS-SD"), ToolEntry(Tool.WifiDirect, "Wi-Fi Direct", "Appareils en connexion directe"))),
         ToolGroup(
             "Diagnostic",
             listOf(ToolEntry(Tool.Ping, "Ping", "Latence, gigue, pertes"), ToolEntry(Tool.Trace, "Traceroute", "Sauts jusqu'à l'hôte"), ToolEntry(Tool.Dns, "DNS Lookup", "A, AAAA, MX, TXT, NS"), ToolEntry(Tool.Whois, "Whois", "Domaine ou adresse IP")),
@@ -95,6 +95,15 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
             ),
         ),
     )
+    Network.Ir -> listOf(
+        ToolGroup(
+            "Outils",
+            listOf(
+                ToolEntry(Tool.IrCustom, "Code personnalisé", "NEC, Samsung, Sony SIRC, Philips RC5"),
+                ToolEntry(Tool.IrTest, "Test de l'émetteur", "Vérifier la LED avec l'appareil photo"),
+            ),
+        ),
+    )
 }
 
 private fun featuredSubtitle(net: Network) = when (net) {
@@ -103,6 +112,7 @@ private fun featuredSubtitle(net: Network) = when (net) {
     Network.Cellular -> "Cellules NR et LTE détectées par le modem"
     Network.Gnss -> "Sky plot et carte du monde des satellites"
     Network.Nfc -> "Posez un tag, un badge ou une carte au dos du téléphone"
+    Network.Ir -> "Téléviseurs Samsung, LG, Sony et Philips"
 }
 
 @Composable
@@ -112,6 +122,7 @@ private fun featuredBadge(net: Network, vm: MainViewModel): String? = when (net)
     Network.Cellular -> vm.cell.collectAsStateWithLifecycle().value.state?.neighbors?.size?.let { "$it ${plural(it, "cellule")}" }
     Network.Gnss -> vm.gnss.collectAsStateWithLifecycle().value.let { "${it.used.size}/${it.visible.size} satellites" }
     Network.Nfc -> null
+    Network.Ir -> null
 }
 
 @Composable

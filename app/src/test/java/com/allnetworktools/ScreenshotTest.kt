@@ -497,4 +497,17 @@ class ScreenshotTest {
         )
     }
     @Test fun nfcTools() = shot("F6_nfc_tools", nav = NavState(Network.Nfc, Page.Tools))
+
+    private fun irTool(t: Tool) = NavState(Network.Ir, Page.ToolPage(t))
+    @Test fun irDashboard() = shot("G0_ir_dashboard", nav = NavState(Network.Ir, Page.Dashboard))
+    @Test fun irRemote() = shot("G1_ir_remote", nav = irTool(Tool.IrRemote)) { vm ->
+        vm.tools.ir.setLastForTest(com.allnetworktools.ui.pages.ir.IrSent("Samsung · Volume +", null, 0))
+    }
+    @Test fun irRemoteDark() = shot("G2_ir_remote_dark", dark = true, nav = irTool(Tool.IrRemote)) { vm ->
+        vm.tools.ir.brand = com.allnetworktools.data.IrBrand.Philips
+    }
+    @Test fun irCustom() = shot("G3_ir_custom", nav = irTool(Tool.IrCustom))
+    @Test fun irTest() = shot("G4_ir_test", dark = true, nav = irTool(Tool.IrTest))
+    @Test fun irTools() = shot("G5_ir_tools", nav = NavState(Network.Ir, Page.Tools))
+    @Test fun wifiDirect() = shot("G6_wifi_direct", nav = NavState(Network.Wifi, Page.ToolPage(Tool.WifiDirect)))
 }

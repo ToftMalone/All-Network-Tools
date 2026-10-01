@@ -182,6 +182,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 !nfc -> Blocker.NfcOff
                 else -> null
             },
+            Network.Ir to if (g.ir.hasEmitter) null else Blocker.NoHardware,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
@@ -303,6 +304,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun lastKnownLocation() = g.gnss.lastKnownLocation()
 
     val nfc get() = g.nfc
+    val wifiDirect get() = g.wifiDirect
 
     fun operatorPlmns() = g.cell.plmns()
 

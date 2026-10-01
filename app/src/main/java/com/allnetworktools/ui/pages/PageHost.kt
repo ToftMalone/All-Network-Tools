@@ -174,6 +174,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Network.Cellular -> CellDashboard(vm)
             Network.Gnss -> GnssDashboard(vm)
             Network.Nfc -> com.allnetworktools.ui.pages.nfc.NfcDashboard(vm)
+            Network.Ir -> com.allnetworktools.ui.pages.ir.IrDashboard(vm)
         }
         Page.Tools -> ToolsPage(net, vm)
         is Page.ToolPage -> when (page.tool) {
@@ -184,6 +185,20 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.PositionCompare -> com.allnetworktools.ui.pages.gnss.PositionCompareTool(vm)
             Tool.Passes -> com.allnetworktools.ui.pages.gnss.PassesTool(vm)
             Tool.TowerMap -> com.allnetworktools.ui.pages.cell.TowerMapTool(vm)
+            Tool.WifiDirect -> {
+                val perms by vm.permissions.collectAsStateWithLifecycle()
+                val actions = LocalActions.current
+                // Android 13+ gates Wi-Fi Direct behind "Appareils à proximité"; earlier versions behind precise location.
+                val modern = android.os.Build.VERSION.SDK_INT >= 33
+                com.allnetworktools.ui.pages.wifi.WifiDirectTool(
+                    vm.wifiDirect, if (modern) perms.nearby else perms.location,
+                    if (modern) "Android demande l'autorisation « Appareils à proximité » pour rechercher les appareils Wi-Fi Direct."
+                    else "Android demande l'autorisation de localisation pour rechercher les appareils Wi-Fi Direct.",
+                ) { actions.request(if (modern) PermGroup.Nearby else PermGroup.Location) }
+            }
+            Tool.IrRemote -> com.allnetworktools.ui.pages.ir.IrRemoteTool(vm.tools.ir)
+            Tool.IrCustom -> com.allnetworktools.ui.pages.ir.IrCustomTool(vm.tools.ir)
+            Tool.IrTest -> com.allnetworktools.ui.pages.ir.IrTestTool(vm.tools.ir)
             Tool.NfcReader -> com.allnetworktools.ui.pages.nfc.NfcReaderTool(vm.tools.nfcReader)
             Tool.NfcWrite -> com.allnetworktools.ui.pages.nfc.NfcWriteTool(vm.tools.nfcWrite)
             Tool.NfcErase -> com.allnetworktools.ui.pages.nfc.NfcEraseTool(vm.tools.nfcMaint)

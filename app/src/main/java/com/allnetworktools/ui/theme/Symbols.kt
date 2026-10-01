@@ -193,4 +193,13 @@ object Sym {
     const val Science = "science"
     const val WifiPassword = "wifi_password"
     const val DeveloperBoard = "developer_board"
+    const val SettingsRemote = "settings_remote"
+    const val VolumeDown = "volume_down"
+    const val VolumeOff = "volume_off"
+    const val ExpandLess = "expand_less"
+    const val ExpandMore = "expand_more"
+    const val Input = "input"
+    const val PhotoCamera = "photo_camera"
+    const val Send = "send"
+    const val ConnectedTv = "connected_tv"
 }
