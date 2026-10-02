@@ -10,6 +10,9 @@ import com.allnetworktools.data.sdr.Decimator
 import com.allnetworktools.data.sdr.HackRf
 import com.allnetworktools.data.sdr.LoraFrame
 import com.allnetworktools.data.sdr.LoraReceiver
+import com.allnetworktools.data.sdr.MeshPreset
+import com.allnetworktools.data.sdr.MeshRadio
+import com.allnetworktools.data.sdr.MeshRegion
 import com.allnetworktools.data.sdr.Meshtastic
 import com.allnetworktools.data.sdr.SdrDevice
 import com.allnetworktools.data.sdr.SdrRepository
@@ -45,11 +48,17 @@ class MeshNode(val num: Long) {
 }
 
 /**
- * Receive-only Meshtastic listener on a HackRF: 2 MS/s around the channel, decimated to 500 kS/s, LoRa
- * SF11 / 250 kHz / CR 4/5 (LongFast), sync word 0x2B, then the channel key.
+ * Receive-only Meshtastic listener on a HackRF: 2 MS/s around the channel, decimated to two samples per chip, then LoRa
+ * demodulation with the spreading factor and bandwidth of the chosen modem preset (LongFast by default), sync word
+ * 0x2B, then the channel key.
  */
 class MeshtasticController(private val repo: SdrRepository, private val scope: CoroutineScope, private val onAcquire: () -> Unit = {}) {
     var frequencyMhz by mutableStateOf("869.525")
+    var preset by mutableStateOf(MeshPreset.LongFast)
+        private set
+    var region by mutableStateOf(MeshRegion.Eu868)
+        private set
+    var settingsOpen by mutableStateOf(false)
     var keyBase64 by mutableStateOf("AQ==")
     var lnaGain by mutableIntStateOf(32)
     var vgaGain by mutableIntStateOf(30)
@@ -86,6 +95,21 @@ class MeshtasticController(private val repo: SdrRepository, private val scope: C
     private var dsp: Thread? = null
     @Volatile private var dspRunning = false
 
+    /** The channel plan's default frequency for the current region and preset, if the preset fits the band. */
+    val planMhz: Double? get() = MeshRadio.frequencyMhz(region, preset)
+
+    fun selectPreset(p: MeshPreset) {
+        if (running || starting) return
+        preset = p
+        planMhz?.let { frequencyMhz = "%.3f".format(java.util.Locale.US, it) }
+    }
+
+    fun selectRegion(r: MeshRegion) {
+        if (running || starting) return
+        region = r
+        planMhz?.let { frequencyMhz = "%.3f".format(java.util.Locale.US, it) }
+    }
+
     /** Parsed settings, or why they cannot be used. */
     fun settings(): Pair<Settings?, String?> {
         val mhz = frequencyMhz.trim().replace(',', '.').toDoubleOrNull() ?: return null to "Fréquence invalide"
@@ -94,10 +118,10 @@ class MeshtasticController(private val repo: SdrRepository, private val scope: C
             ?: return null to "Clé invalide : elle doit être en Base64 (ex. AQ==)"
         if (psk.size !in listOf(0, 1, 16, 32)) return null to "La clé doit faire 1, 16 ou 32 octets une fois décodée"
         val key = Meshtastic.expandKey(psk)
-        return Settings((mhz * 1e6).toLong(), key, Meshtastic.channelHash(CHANNEL_NAME, key)) to null
+        return Settings((mhz * 1e6).toLong(), key, Meshtastic.channelHash(preset.channelName, key), preset) to null
     }
 
-    class Settings(val hz: Long, val key: ByteArray?, val hash: Int)
+    class Settings(val hz: Long, val key: ByteArray?, val hash: Int, val preset: MeshPreset)
 
     fun start(device: SdrDevice) {
         if (running || starting) return
@@ -143,9 +167,12 @@ class MeshtasticController(private val repo: SdrRepository, private val scope: C
         val free = ArrayBlockingQueue<ByteArray>(POOL)
         val full = ArrayBlockingQueue<Pair<ByteArray, Int>>(POOL)
         repeat(POOL) { free.add(ByteArray(131072)) }
-        val decimator = Decimator(4, 0.07, taps = 48)
-        val rx = LoraReceiver(11, 250_000.0, s.hz.toDouble(), 0x2B) { f -> onFrame(f, s) }
-        val outRe = FloatArray(131072 / 2 / 4 + 8)
+        // Two samples per chip. The filter passes the band plus a little margin, with the same relative transition width
+        // whatever the decimation.
+        val decim = s.preset.decimation
+        val decimator = Decimator(decim, 0.56 * s.preset.bandwidthHz / SAMPLE_RATE, taps = 12 * decim)
+        val rx = LoraReceiver(s.preset.sf, s.preset.bandwidthHz.toDouble(), s.hz.toDouble(), 0x2B) { f -> onFrame(f, s) }
+        val outRe = FloatArray(131072 / 2 / decim + 8)
         val outIm = FloatArray(outRe.size)
         dspRunning = true
         dsp = Thread({
@@ -238,13 +265,14 @@ class MeshtasticController(private val repo: SdrRepository, private val scope: C
 
     internal fun recordForTest(p: Meshtastic.Packet) = record(p)
 
+    internal fun setPresetForTest(p: MeshPreset, r: MeshRegion) { preset = p; region = r; planMhz?.let { frequencyMhz = "%.3f".format(java.util.Locale.US, it) } }
+
     internal fun setStatsForTest(ok: Int, bad: Int, running: Boolean, hz: Long?) {
         framesOk = ok; framesBad = bad; this.running = running; listeningHz = hz
         board = "HackRF One (r9)"; firmware = "2024.02.1"
     }
 
     companion object {
-        const val CHANNEL_NAME = "LongFast"
         private const val SAMPLE_RATE = 2_000_000
         private const val POOL = 48
         private const val MAX_ROWS = 300

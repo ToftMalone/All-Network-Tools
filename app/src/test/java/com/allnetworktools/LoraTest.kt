@@ -19,7 +19,7 @@ import org.junit.Test
 
 /** Transmit chain ported from gr-lora_sdr (whitening, header, add_crc, hamming_enc, interleaver, gray_demap, modulate). */
 object LoraTx {
-    fun symbols(payload: ByteArray, sf: Int, cr: Int, hasCrc: Boolean = true): IntArray {
+    fun symbols(payload: ByteArray, sf: Int, cr: Int, hasCrc: Boolean = true, ldro: Boolean = false): IntArray {
         val nib = ArrayList<Int>()
         // header
         val len = payload.size
@@ -59,7 +59,7 @@ object LoraTx {
         var i = 0
         var first = true
         while (i < nib.size) {
-            val sfApp = if (first) sf - 2 else sf
+            val sfApp = if (first || ldro) sf - 2 else sf
             val crApp = if (first) 4 else cr
             val cwLen = crApp + 4
             val cw = IntArray(sfApp) { k -> if (i + k < nib.size) ham(nib[i + k], crApp) else 0 }
@@ -67,7 +67,7 @@ object LoraTx {
             for (s in 0 until cwLen) {
                 val bits = IntArray(sf)
                 for (j in 0 until sfApp) bits[j] = (cw[Math.floorMod(s - j - 1, sfApp)] shr (cwLen - 1 - s)) and 1
-                if (first) bits[sfApp] = bits.take(sfApp).sum() % 2
+                if (first || ldro) bits[sfApp] = bits.take(sfApp).sum() % 2
                 var v = 0
                 for (j in 0 until sf) v = (v shl 1) or bits[j]
                 // gray demap then +1

@@ -37,6 +37,7 @@ class LoraReceiver(
     bandwidthHz: Double,
     private val centerHz: Double,
     syncWord: Int,
+    private val ldro: Boolean = LoraPhy.lowDataRate(sf, bandwidthHz),
     private val onFrame: (LoraFrame) -> Unit,
 ) {
     private val n = 1 shl sf
@@ -205,7 +206,7 @@ class LoraReceiver(
         next += window
         recent.addLast(p)
         if (recent.size > PREAMBLE_WINDOWS) recent.removeFirst()
-        if (recent.size == PREAMBLE_WINDOWS && recent.all { it.ratio > DETECT_RATIO && abs(circDiff(it.bin, recent.last().bin)) <= 1 }) {
+        if (recent.size == PREAMBLE_WINDOWS && recent.all { it.ratio > DETECT_RATIO && abs(circDiff(it.bin, recent.last().bin)) <= BIN_TOLERANCE }) {
             preamble = recent.toMutableList()
             recent.clear()
             downs.clear()
@@ -227,7 +228,7 @@ class LoraReceiver(
         } else if (downs.isNotEmpty()) {
             synchronise()
             return true
-        } else if (up.ratio > DETECT_RATIO && abs(circDiff(up.bin, preamble.last().bin)) <= 1) {
+        } else if (up.ratio > DETECT_RATIO && abs(circDiff(up.bin, preamble.last().bin)) <= BIN_TOLERANCE) {
             preamble += up
         }
         if (downs.size >= 3) { synchronise(); return true }
@@ -337,14 +338,14 @@ class LoraReceiver(
             framesSeen++
             header = h
             nibbles.addAll(nib.drop(5))
-            needed = 8 + LoraPhy.payloadSymbols(sf, h.payloadLen, h.cr, h.hasCrc)
+            needed = 8 + LoraPhy.payloadSymbols(sf, h.payloadLen, h.cr, h.hasCrc, ldro)
         } else if (symbols.size > 8) {
             val h = header!!
             val block = h.cr + 4
             if ((symbols.size - 8) % block == 0) {
                 val from = symbols.size - block
-                val vals = IntArray(block) { LoraPhy.binToValue(symbols[from + it], sf, reduced = false) }
-                LoraPhy.deinterleave(vals, sf, block).forEach { nibbles += LoraPhy.hammingDecode(it, h.cr) }
+                val vals = IntArray(block) { LoraPhy.binToValue(symbols[from + it], sf, reduced = ldro) }
+                LoraPhy.deinterleave(vals, if (ldro) sf - 2 else sf, block).forEach { nibbles += LoraPhy.hammingDecode(it, h.cr) }
             }
         }
         if (header != null && symbols.size >= needed) {
@@ -376,6 +377,13 @@ class LoraReceiver(
         const val OS = 2
         private const val PREAMBLE_WINDOWS = 5
         private const val DETECT_RATIO = 10.0
+
+        /**
+         * Preamble windows may peak this many bins apart. A fractional timing offset puts a phase jump in the
+         * dechirped tone where the chirp folds; with the fold near the middle of the window the peak splits into two
+         * lobes one bin either side of the true bin, and the stronger one flips from window to window.
+         */
+        private const val BIN_TOLERANCE = 2
         private const val INTERP_PHASES = 64
     }
 }

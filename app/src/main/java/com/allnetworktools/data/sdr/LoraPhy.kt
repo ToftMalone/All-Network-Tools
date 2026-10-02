@@ -103,10 +103,17 @@ object LoraPhy {
         return crc16(payload, n - 2) xor (payload[n - 1].toInt() and 0xFF) xor ((payload[n - 2].toInt() and 0xFF) shl 8)
     }
 
-    /** Number of payload symbols after the 8 header symbols. */
-    fun payloadSymbols(sf: Int, payloadLen: Int, cr: Int, hasCrc: Boolean): Int {
+    /**
+     * Number of payload symbols after the 8 header symbols. With the low-data-rate optimisation ([ldro]) every
+     * block carries sf − 2 codewords, like the header block.
+     */
+    fun payloadSymbols(sf: Int, payloadLen: Int, cr: Int, hasCrc: Boolean, ldro: Boolean = false): Int {
         val nibbles = 5 + 2 * payloadLen + (if (hasCrc) 4 else 0)
         val rest = nibbles - (sf - 2)
-        return if (rest <= 0) 0 else ((rest + sf - 1) / sf) * (cr + 4)
+        val rows = if (ldro) sf - 2 else sf
+        return if (rest <= 0) 0 else ((rest + rows - 1) / rows) * (cr + 4)
     }
+
+    /** Semtech chips switch the low-data-rate optimisation on when a symbol lasts 16 ms or more. */
+    fun lowDataRate(sf: Int, bandwidthHz: Double): Boolean = (1 shl sf) / bandwidthHz >= 0.016
 }

@@ -87,7 +87,7 @@ private fun featuredSubtitle(net: Network) = when (net) {
     Network.Bluetooth -> "Appareils à proximité, en direct, avec filtres"
     Network.Cellular -> "Cellules NR et LTE détectées par le modem"
     Network.Gnss -> "Sky plot et carte du monde des satellites"
-    Network.Sdr -> "Réseau maillé LoRa, LongFast, canal par défaut"
+    Network.Sdr -> "Réseau maillé LoRa, tous les préréglages, canal par défaut"
 }
 
 @Composable

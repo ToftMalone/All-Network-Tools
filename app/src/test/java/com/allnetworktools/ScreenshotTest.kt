@@ -532,6 +532,10 @@ class ScreenshotTest {
             total = 59,
         )
     }
+    @Test fun meshtasticPresets() = shot("H12_meshtastic_presets", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { vm ->
+        vm.tools.meshtastic.setPresetForTest(com.allnetworktools.data.sdr.MeshPreset.LongModerate, com.allnetworktools.data.sdr.MeshRegion.Us)
+        vm.tools.meshtastic.settingsOpen = true
+    }
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard)) { meshDemo(it) }
     @Test fun meshtasticMessages() = shot("H1_meshtastic_messages", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { meshDemo(it) }
     @Test fun meshtasticIdle() = shot("H2_meshtastic_idle", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic)))

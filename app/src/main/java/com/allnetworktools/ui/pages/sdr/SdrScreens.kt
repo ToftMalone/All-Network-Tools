@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.allnetworktools.MainViewModel
 import com.allnetworktools.Page
+import com.allnetworktools.data.sdr.MeshPreset
+import com.allnetworktools.data.sdr.MeshRegion
 import com.allnetworktools.data.sdr.Meshtastic
 import com.allnetworktools.model.Tool
 import com.allnetworktools.ui.components.AntFilterChip
@@ -82,7 +84,7 @@ fun SdrDashboard(vm: MainViewModel) {
             Text("Meshtastic", Modifier.padding(top = 16.dp), style = gs(24, 30, 500), color = roles.onContainer)
             Text(
                 if (c.running) "${c.rows.size} ${plural(c.rows.size, "paquet")} · ${c.nodes.size} ${plural(c.nodes.size, "nœud")} sur ${c.listeningHz?.let(::mhz) ?: "—"}"
-                else "Écoute du réseau maillé LoRa en LongFast sur le canal par défaut.",
+                else "Écoute du réseau maillé LoRa en ${c.preset.channelName} sur le canal par défaut.",
                 Modifier.padding(top = 4.dp).graphicsLayer { alpha = 0.85f }, style = rf(14, 20), color = roles.onContainer,
             )
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.End) {
@@ -116,14 +118,13 @@ fun MeshtasticTool(vm: MainViewModel) {
     val c = vm.tools.meshtastic
     val device by vm.sdrDevice.collectAsStateWithLifecycle()
     var view by remember { mutableStateOf(MeshView.Messages) }
-    var showSettings by remember { mutableStateOf(false) }
     TopBarAction(Sym.Delete) { c.clear() }
     val (_, settingsError) = c.settings()
     PageColumn {
         HeroCard {
             Text(if (c.running) "En écoute" else "Meshtastic", style = gs(28, 34, 500))
             Text(
-                "LongFast · SF11 · 250 kHz · ${c.listeningHz?.let(::mhz) ?: c.frequencyMhz.replace('.', ',') + " MHz"}",
+                "${c.preset.channelName} · ${c.preset.description} · ${c.listeningHz?.let(::mhz) ?: c.frequencyMhz.replace('.', ',') + " MHz"}",
                 Modifier.padding(top = 2.dp), style = rf(14, 20),
             )
             FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -146,15 +147,30 @@ fun MeshtasticTool(vm: MainViewModel) {
         }
         SectionCard(padding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 6.dp)) {
             Row(
-                Modifier.fillMaxWidth().clickable { showSettings = !showSettings }.padding(vertical = 10.dp),
+                Modifier.fillMaxWidth().clickable { c.settingsOpen = !c.settingsOpen }.padding(vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Symbol(Sym.Tune, size = 20.dp, tint = AntTheme.accent.accent)
                 Text("Réglages", Modifier.weight(1f), style = rf(14, 20, 600))
-                Text("Clé ${c.keyBase64.ifBlank { "—" }} · LNA ${c.lnaGain} · VGA ${c.vgaGain}${if (c.amp) " · ampli" else ""}", style = rf(12, 16), color = cs.onSurfaceVariant, maxLines = 1)
+                Text("${c.preset.channelName} · ${c.region.label}", style = rf(12, 16), color = cs.onSurfaceVariant, maxLines = 1)
             }
-            if (showSettings) {
+            if (c.settingsOpen) {
                 Column(Modifier.padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Préréglage du réseau", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MeshPreset.entries.forEach { p -> AntFilterChip(p.channelName, c.preset == p, { c.selectPreset(p) }) }
+                    }
+                    Text("${c.preset.label} · ${c.preset.description}", style = rf(12, 16), color = cs.onSurfaceVariant)
+                    Text("Région", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MeshRegion.entries.forEach { r -> AntFilterChip(r.label, c.region == r, { c.selectRegion(r) }) }
+                    }
+                    val plan = c.planMhz
+                    Text(
+                        if (plan != null) "Fréquence par défaut : ${"%.3f".format(Locale.FRANCE, plan)} MHz (calculée d'après la région et le préréglage)."
+                        else "Ce préréglage (${c.preset.bandwidthHz / 1000} kHz) ne tient pas dans la bande de cette région : saisissez la fréquence à la main.",
+                        style = rf(12, 16), color = if (plan != null) cs.onSurfaceVariant else cs.error,
+                    )
                     HostInputField(c.frequencyMhz, { c.frequencyMhz = it }, "Fréquence (MHz)", Sym.Stream, keyboardType = KeyboardType.Decimal)
                     HostInputField(c.keyBase64, { c.keyBase64 = it }, "Clé du canal (Base64)", Sym.Key, keyboardType = KeyboardType.Ascii)
                     if (settingsError != null) Text(settingsError, style = rf(13, 18), color = cs.error)
@@ -168,7 +184,8 @@ fun MeshtasticTool(vm: MainViewModel) {
                     }
                     AntFilterChip("Ampli RF +14 dB", c.amp, { c.amp = !c.amp })
                     Text(
-                        "Les réglages s'appliquent au prochain lancement. Par défaut : canal LongFast, clé AQ== (clé publique du canal par défaut).",
+                        "Les réglages s'appliquent au prochain lancement. Par défaut : canal LongFast, clé AQ== (clé publique du canal par défaut). " +
+                            "Un seul préréglage est écouté à la fois : si rien n'arrive, essayez un autre préréglage ou la fréquence réellement utilisée par le réseau.",
                         style = rf(12, 16), color = cs.onSurfaceVariant,
                     )
                 }
@@ -197,7 +214,7 @@ fun MeshtasticTool(vm: MainViewModel) {
                 Text(
                     "Réception seule : rien n'est émis. Seuls les paquets du canal dont vous avez la clé sont lisibles ; " +
                         "les messages privés (chiffrés pour un destinataire) et les autres canaux restent chiffrés. " +
-                        "En Europe, la fréquence par défaut de LongFast est 869,525 MHz.",
+                        "En Europe, la fréquence par défaut de LongFast est 869,525 MHz ; les autres préréglages et régions sont dans les réglages.",
                     style = rf(13, 18), color = cs.onSurfaceVariant,
                 )
             }
