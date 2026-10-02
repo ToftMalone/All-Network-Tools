@@ -238,6 +238,21 @@ class LoraTest {
         assertTrue(receive(re, im).isEmpty())
     }
 
+    /** A network with another sync word is not decoded, but the receiver says it heard one and which. */
+    @Test fun reportsTheSyncWordOfOtherNetworks() {
+        for (other in listOf(0x34, 0x12)) {
+            val frame = LoraTx.frame(LoraTx.symbols("LoRaWAN".toByteArray(), sf, 1), other)
+            val (re, im) = LoraTx.waveform(frame, sf, bw, 2 * bw, delay = 0.01, cfoHz = 3000.0, ppm = 0.0, snrDb = 10.0)
+            val rx = LoraReceiver(sf, bw, fc, 0x2B) { }
+            var i = 0
+            while (i < re.size) { val n = minOf(4096, re.size - i); rx.feed(re.copyOfRange(i, i + n), im.copyOfRange(i, i + n), n); i += n }
+            assertEquals(1, rx.preambles)
+            assertEquals(1, rx.syncMismatches)
+            assertEquals(0, rx.framesSeen)
+            assertEquals("sync 0x${other.toString(16)}", other, rx.lastSyncSeen)
+        }
+    }
+
     @Test fun fullChainFromHackRfSamples() {
         // 2 Msps, channel at +500 kHz from the tuned frequency, 8-bit quantised like the HackRF.
         val payload = meshPacket("Reçu par le HackRF")

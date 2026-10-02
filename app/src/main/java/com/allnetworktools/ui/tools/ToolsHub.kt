@@ -47,7 +47,7 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val unknownTrackers = com.allnetworktools.ui.pages.bt.UnknownTrackersController(app, scope)
     // One HackRF, one tool at a time: starting one stops the other.
     val meshtastic: com.allnetworktools.ui.pages.sdr.MeshtasticController by lazy {
-        com.allnetworktools.ui.pages.sdr.MeshtasticController(app.sdr, scope) { spectrum.stop(); adsb.stop(); sonde.stop(); fm.stop(); ais.stop(); emitters.stop(); aprs.stop(); meteor.stop() }
+        com.allnetworktools.ui.pages.sdr.MeshtasticController(app.sdr, scope, com.allnetworktools.ui.pages.sdr.MeshStore(app)) { spectrum.stop(); adsb.stop(); sonde.stop(); fm.stop(); ais.stop(); emitters.stop(); aprs.stop(); meteor.stop() }
     }
     val spectrum: com.allnetworktools.ui.pages.sdr.SpectrumController by lazy {
         com.allnetworktools.ui.pages.sdr.SpectrumController(app.sdr, scope) { meshtastic.stop(); adsb.stop(); sonde.stop(); fm.stop(); ais.stop(); emitters.stop(); aprs.stop(); meteor.stop() }

@@ -104,6 +104,18 @@ class LoraReceiver(
     var framesSeen = 0
         private set
 
+    /** Diagnostics: preambles found, those whose sync word did not match, headers that failed their checksum. */
+    var preambles = 0
+        private set
+    var syncMismatches = 0
+        private set
+    var headerErrors = 0
+        private set
+
+    /** The sync word read off the air the last time it did not match (e.g. 0x34 for LoRaWAN), or −1. */
+    var lastSyncSeen = -1
+        private set
+
     private class Peak(val bin: Int, val frac: Double, val power: Double, val energy3: Double, val ratio: Double, val snrDb: Double)
 
     fun feed(re: FloatArray, im: FloatArray, count: Int) {
@@ -211,6 +223,7 @@ class LoraReceiver(
             recent.clear()
             downs.clear()
             seekCount = 0
+            preambles++
             state = State.SeekSfd
         }
         return true
@@ -305,6 +318,13 @@ class LoraReceiver(
             !d1 && !d2 && abs(circDiff(v1, sync1)) <= 1 && abs(circDiff(v2, sync2)) <= 1
         }
         if (s0 == null) {
+            syncMismatches++
+            // What sync word is on the air? Read the two symbols before the first downchirp.
+            listOf(g - symLen, g - 2 * symLen, g).firstOrNull { b -> sym(b).first }?.let { b ->
+                val v1 = sym(b - 2 * symLen).second
+                val v2 = sym(b - symLen).second
+                lastSyncSeen = (((v1 + 4) / 8) and 0xF shl 4) or (((v2 + 4) / 8) and 0xF)
+            }
             restart(wDown + window)
             return
         }
@@ -332,6 +352,7 @@ class LoraReceiver(
             val nib = cws.map { LoraPhy.hammingDecode(it, 4) }
             val h = LoraPhy.header(nib.take(5).toIntArray())
             if (h == null) {
+                headerErrors++
                 restart(end)
                 return true
             }

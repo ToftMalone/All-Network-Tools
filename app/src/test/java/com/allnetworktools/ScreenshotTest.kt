@@ -451,7 +451,9 @@ class ScreenshotTest {
         c.recordForTest(pk(0x1188aaL, 5, Pb().int(1, 1).str(2, "x").build(), 40_000, -11.2, channel = 0x5c))
         c.recordForTest(pk(b, 6, Pb().int(1, 1).str(2, "Quelqu'un capte le relais depuis Pigalle ?").build(), 20_000, -2.9, flags = (3 shl 5) or 1))
         c.recordForTest(pk(a, 7, Pb().int(1, 1).str(2, "Oui, 5,8 dB de SNR ici 👍").build(), 5_000, 6.4))
+        c.recordForTest(pk(a, 8, Pb().int(1, 3).bytes(2, Pb().fixed32(1, 488_738_000).fixed32(2, 22_950_000).int(3, 60).build()).build(), 90_000, 5.1))
         c.setStatsForTest(31, 2, true, 869_525_000L)
+        c.setDiagForTest(4.0, -41.0, -52.0, 36, 3, 1, 0x34)
     }
 
     @Test fun spectrum() = shot("H5_spectrum", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Spectrum))) { vm ->
@@ -534,7 +536,9 @@ class ScreenshotTest {
     }
     @Test fun meshtasticPresets() = shot("H12_meshtastic_presets", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { vm ->
         vm.tools.meshtastic.setPresetForTest(com.allnetworktools.data.sdr.MeshPreset.LongModerate, com.allnetworktools.data.sdr.MeshRegion.Us)
-        vm.tools.meshtastic.settingsOpen = true
+        vm.tools.meshtastic.page = com.allnetworktools.ui.pages.sdr.MeshPage.Channels
+        vm.tools.meshtastic.addChannel()
+        vm.tools.meshtastic.setChannel(1, com.allnetworktools.ui.pages.sdr.MeshChannel("Paris", "1PG7OiApB1nwvP+rz05pAQ=="))
     }
     @Test fun meteor() = shot("H13_meteor", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meteor))) { vm ->
         // A made-up picture of clouds over a coast: a few strips of smooth noise.
@@ -565,6 +569,15 @@ class ScreenshotTest {
     @Test fun sdrTools() = shot("H14_sdr_tools", nav = NavState(Network.Sdr, Page.Tools))
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard)) { meshDemo(it) }
     @Test fun meshtasticMessages() = shot("H1_meshtastic_messages", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { meshDemo(it) }
+    @Test fun meshtasticNodes() = shot("H15_mesh_nodes", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { vm ->
+        meshDemo(vm); vm.tools.meshtastic.page = com.allnetworktools.ui.pages.sdr.MeshPage.Nodes
+    }
+    @Test fun meshtasticMap() = shot("H16_mesh_map", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { vm ->
+        meshDemo(vm); vm.tools.meshtastic.page = com.allnetworktools.ui.pages.sdr.MeshPage.Map
+    }
+    @Test fun meshtasticNode() = shot("H17_mesh_node", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { vm ->
+        meshDemo(vm); vm.tools.meshtastic.page = com.allnetworktools.ui.pages.sdr.MeshPage.Node
+    }
     @Test fun meshtasticIdle() = shot("H2_meshtastic_idle", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic)))
     @Test fun sdrMissing() = shot("H3_sdr_missing", nav = NavState(Network.Sdr, Page.Dashboard)) { Scenario.sdrDevice.value = null }
     @Test fun homeWithSdr() = shot("H4_home_sdr_missing") { Scenario.sdrDevice.value = null }
