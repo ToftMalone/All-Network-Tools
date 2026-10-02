@@ -1,5 +1,6 @@
 package com.allnetworktools
 
+import androidx.compose.ui.graphics.asImageBitmap
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
@@ -582,4 +583,27 @@ class ScreenshotTest {
     @Test fun sdrMissing() = shot("H3_sdr_missing", nav = NavState(Network.Sdr, Page.Dashboard)) { Scenario.sdrDevice.value = null }
     @Test fun homeWithSdr() = shot("H4_home_sdr_missing") { Scenario.sdrDevice.value = null }
     @Test fun wifiDirect() = shot("G6_wifi_direct", nav = NavState(Network.Wifi, Page.ToolPage(Tool.WifiDirect)))
+
+    private fun fpvDemo(vm: MainViewModel, watching: Boolean = false, digital: Boolean = false) {
+        val ch = com.allnetworktools.data.sdr.FpvChannels
+        val now = System.currentTimeMillis()
+        fun r(n: String, db: Double, q: Double, std: String?) = com.allnetworktools.ui.pages.sdr.FpvResult(ch.byName(n)!!, db, q, if (q > 0.5) 900 else 12, std, now)
+        val img = if (watching) {
+            val w = com.allnetworktools.ui.pages.sdr.FpvController.PIC_W; val h = com.allnetworktools.ui.pages.sdr.FpvController.PIC_H
+            val px = IntArray(w * h) { i -> val x = i % w; val y = i / w; val g = (255 * (0.15 + 0.7 * x / w) * (if ((y / 72 + x / 52) % 2 == 0) 1.0 else 0.8)).toInt().coerceIn(0, 255); (0xFF shl 24) or (g shl 16) or (g shl 8) or g }
+            android.graphics.Bitmap.createBitmap(px, w, h, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
+        } else null
+        vm.tools.fpv.setForTest(
+            listOf(r("F4", -38.0, 0.97, "PAL"), r("R2", -52.0, 0.91, "PAL"), r("E1", -61.0, 0.1, null), r("A3", -70.0, 0.05, null), r("B5", -74.0, 0.0, null)),
+            if (digital) listOf(
+                com.allnetworktools.ui.pages.sdr.DroneHit(2435.0, 6, true, 9.0, 24.0, now),
+                com.allnetworktools.ui.pages.sdr.DroneHit(5760.0, 1, false, 9.1, 12.0, now - 20000),
+            ) else emptyList(),
+            running = true, watching = if (watching) ch.byName("F4") else null, image = img,
+        )
+        if (digital) vm.tools.fpv.tab = com.allnetworktools.ui.pages.sdr.FpvTab.Digital
+    }
+    @Test fun fpvAnalog() = shot("H18_fpv_analog", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it) }
+    @Test fun fpvVideo() = shot("H19_fpv_video", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, watching = true) }
+    @Test fun fpvDigital() = shot("H20_fpv_digital", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, digital = true) }
 }

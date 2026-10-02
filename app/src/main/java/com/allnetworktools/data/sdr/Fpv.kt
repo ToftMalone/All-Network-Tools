@@ -69,8 +69,8 @@ class VideoStats {
 
     val standard: String? get() = when {
         lineUs <= 0 -> null
-        abs(lineUs - 64.0) < 0.5 -> "PAL"
-        abs(lineUs - 63.56) < 0.35 -> "NTSC"
+        lineUs > 63.78 && lineUs < 64.4 -> "PAL"
+        lineUs > 63.1 && lineUs <= 63.78 -> "NTSC"
         else -> null
     }
 }
@@ -78,15 +78,15 @@ class VideoStats {
 /**
  * Analogue FPV video: the signal is frequency-modulated, with the picture as the baseband. From complex I/Q (signed
  * bytes) at 8 or 16 MS/s, centred on the channel: FM discriminator, 3.2 MHz low-pass (drops the colour subcarrier and keeps
- * luminance), decimation to 8 MS/s, then line and field synchronisation from the sync pulses (4.7 µs each line, half-line
- * wide pulses at the field). Colour is not decoded; the picture is the luminance, [WIDTH] pixels per line.
+ * luminance), decimation to 8 MS/s, then line and field synchronisation from the sync pulses (4.7 µs each line, broad
+ * pulses at the field). Colour is not decoded; the picture is the luminance, [WIDTH] pixels per line.
  */
 class AnalogVideoDecoder(
     private val inputRate: Double,
     private val onLine: (field: Int, line: Int, pixels: ByteArray) -> Unit = { _, _, _ -> },
     private val onField: () -> Unit = {},
 ) {
-    private val dec = (inputRate / RATE).toInt()
+    private val dec = (inputRate / RATE).toInt().coerceAtLeast(1)
     private val taps = if (dec == 2) 31 else 15
     private val h: FloatArray = FloatArray(taps).also { c ->
         val fc = 3.2e6 / inputRate
@@ -111,27 +111,21 @@ class AnalogVideoDecoder(
 
     val stats = VideoStats()
 
-    // The 8 MS/s luminance stream is analysed in blocks.
-    private val block = FloatArray(BLOCK + 2 * LINE)
+    // The 8 MS/s demodulated stream is analysed in blocks; the tail is kept so a line is never cut.
+    private val block = FloatArray(BLOCK + KEEP + 1024)
     private var fill = 0
+    private var scanPos = 0
     private var absStart = 0L // absolute index of block[0]
+    private var blocks = 0
 
     private var polarity = 0
-    private var lastPulseEnd = -1L
     private var lastHStart = -1L
     private var broadCount = 0
     private var lastBroadEnd = -1L
     private var fieldLine = -1
     private var field = 0
     private val pixels = ByteArray(WIDTH)
-    private var black = 0f
-    private var white = 1f
-
-    /** The last demodulated level range, used to scale pixels; exposed for diagnostics. */
-    var lo = 0f
-        private set
-    var hi = 1f
-        private set
+    private val sortBuf = FloatArray(BLOCK / 8 + 8)
 
     fun feed(buf: ByteArray, len: Int) {
         var i = 0
@@ -141,7 +135,7 @@ class AnalogVideoDecoder(
             i += 2
             dcI += (re - dcI) * 1e-4f; dcQ += (im - dcQ) * 1e-4f
             re -= dcI; im -= dcQ
-            // Frequency: phase step between consecutive samples, in units of the input rate / 2π.
+            // Instantaneous frequency: the phase step between consecutive samples.
             val d = fastAtan2(im * prevI - re * prevQ, re * prevI + im * prevQ)
             prevI = re; prevQ = im
             hist[hPos] = d; hist[hPos + taps] = d
@@ -151,56 +145,48 @@ class AnalogVideoDecoder(
                 phase = 0
                 var acc = 0f
                 for (k in 0 until taps) acc += h[k] * hist[hPos + k]
-                push(acc)
+                block[fill++] = acc
+                if (fill >= BLOCK + KEEP) analyse()
             }
         }
     }
 
-    private fun push(v: Float) {
-        block[fill++] = v
-        if (fill == BLOCK + LINE) analyse()
-    }
-
-    private val sortBuf = FloatArray(BLOCK / 8)
-
-    /** Cuts the block into sync pulses and lines; keeps the last line's worth of samples for the next block. */
     private fun analyse() {
         val n = fill
-        // Levels from a subsample of the block.
         var k = 0
         var j = 0
         while (j < n && k < sortBuf.size) { sortBuf[k++] = block[j]; j += 8 }
         java.util.Arrays.sort(sortBuf, 0, k)
         val p2 = sortBuf[(k * 0.02).toInt()]
         val p98 = sortBuf[(k * 0.98).toInt().coerceAtMost(k - 1)]
-        if (p98 - p2 < 1e-3f) { carry(n); return } // nothing but noise or a carrier
-        if (polarity == 0 || (absStart / BLOCK) % 200 == 0L) polarity = choosePolarity(n, p2, p98)
-        val sgn = polarity.toFloat().let { if (it == 0f) 1f else it }
+        if (p98 - p2 < 1e-3f) { carry(n, n); return } // a carrier or noise, nothing modulated
+        if (polarity == 0 || blocks % 100 == 0) polarity = choosePolarity(n, p2, p98)
+        blocks++
+        val sgn = if (polarity == 0) 1f else polarity.toFloat()
         stats.polarity = polarity
-        // Work on s = sgn·z: sync tips are the lowest values.
         val sLo = if (sgn > 0) p2 else -p98
         val sHi = if (sgn > 0) p98 else -p2
-        lo = sLo; hi = sHi
         val thr = sLo + 0.25f * (sHi - sLo)
-        var idx = 0
-        while (idx < n) {
+        var idx = scanPos
+        val limit = n - KEEP // the pixels of a line are read up to 600 samples after its pulse
+        while (idx < limit) {
             if (sgn * block[idx] < thr) {
                 var e = idx
                 while (e < n && sgn * block[e] < thr) e++
-                if (e >= n) break // pulse continues in the next block: stop before it
-                pulse(idx, e - idx, sgn, sLo, sHi)
+                if (e >= n) break
+                pulse(idx, e - idx, sgn, sHi)
                 idx = e
             } else idx++
         }
-        carry(n)
+        carry(n, idx)
     }
 
-    private fun carry(n: Int) {
-        val keep = LINE + 64
-        val from = max(0, n - keep)
+    private fun carry(n: Int, scanned: Int) {
+        val from = maxOf(0, n - KEEP)
         System.arraycopy(block, from, block, 0, n - from)
         absStart += from
         fill = n - from
+        scanPos = maxOf(0, scanned - from)
     }
 
     private fun choosePolarity(n: Int, p2: Float, p98: Float): Int {
@@ -216,8 +202,7 @@ class AnalogVideoDecoder(
                 if (sg * block[idx] < thr) {
                     var e = idx
                     while (e < n && sg * block[e] < thr) e++
-                    val us = (e - idx) / 8.0
-                    if (us in 3.3..6.5) count++
+                    if ((e - idx) / 8.0 in 3.3..6.5) count++
                     idx = e
                 } else idx++
             }
@@ -226,59 +211,59 @@ class AnalogVideoDecoder(
         return if (bestScore >= 8) best else polarity
     }
 
-    private fun pulse(start: Int, width: Int, sgn: Float, sLo: Float, sHi: Float) {
+    private fun pulse(start: Int, width: Int, sgn: Float, sHi: Float) {
         val us = width / 8.0
         val s = absStart + start
         when {
-            us in 3.3..6.5 -> hSync(start, s, sgn, sLo, sHi)
+            us in 3.3..6.5 -> hSync(start, s, sgn, sHi)
             us in 18.0..36.0 -> {
-                // Broad pulses of the field sync: three or more close together mean a new field.
+                // The broad pulses of the field sync: three close together mean a new field.
                 if (broadCount == 0 || s - lastBroadEnd > 700) broadCount = 0
                 broadCount++
                 lastBroadEnd = s + width
                 if (broadCount == 3) {
                     stats.vSyncs++
                     if (fieldLine > 100) { stats.linesPerField = fieldLine; stats.fields++; field++; onField() }
-                    fieldLine = -1 // the next normal line is line 0
+                    fieldLine = -1
                 }
             }
         }
     }
 
-    private fun hSync(start: Int, s: Long, sgn: Float, sLo: Float, sHi: Float) {
+    private fun hSync(start: Int, s: Long, sgn: Float, sHi: Float) {
         stats.hPulses++
         val gap = if (lastHStart >= 0) (s - lastHStart) / 8.0 else 0.0
-        // Ignore the half-line pulses of the field sync, which are not at line spacing.
+        val previous = lastHStart
+        lastHStart = s
         val atLine = gap in 62.0..66.0
         if (atLine) {
             stats.hSpaced++
             stats.lineUs += (gap - stats.lineUs) * (if (stats.lineUs == 0.0) 1.0 else 0.02)
         }
-        lastHStart = s
-        if (!atLine && lastHStart >= 0 && gap > 0 && gap < 62.0) return
-        if (fieldLine < 0) fieldLine = 0 else fieldLine++
-        // The line's pixels follow the sync and the back porch: 10.5 µs after the start of the pulse.
+        // Pulses at the half-line spacing belong to the field sync, not to a picture line.
+        if (previous >= 0 && gap < 62.0) return
+        // A lost pulse leaves a hole of a whole number of lines.
+        val missed = if (previous >= 0 && gap > 66.0 && gap < 330.0) Math.round(gap / 64.0).toInt() - 1 else 0
+        fieldLine = if (fieldLine < 0) 0 else fieldLine + 1 + missed
         val first = start + (10.5 * 8).toInt()
-        if (first + WIDTH <= fill) {
-            val level = 0.0f
-            // Black level from the back porch, white from the top of the range.
-            val bpStart = start + (6.0 * 8).toInt()
-            var bp = 0f
-            for (q in 0 until 24) bp += sgn * block[bpStart + q]
-            black = bp / 24
-            white = max(sHi, black + 1e-3f)
-            for (x in 0 until WIDTH) {
-                val v = (sgn * block[first + x] - black) / (white - black)
-                pixels[x] = (v.coerceIn(0f, 1f) * 255f + level).toInt().toByte()
-            }
-            onLine(field, fieldLine, pixels)
+        if (first + WIDTH > fill) return
+        // Black level from the back porch, white from the top of the demodulated range.
+        val bpStart = start + (6.5 * 8).toInt()
+        var bp = 0f
+        for (q in 0 until 20) bp += sgn * block[bpStart + q]
+        val black = bp / 20
+        val white = maxOf(sHi, black + 1e-3f)
+        for (x in 0 until WIDTH) {
+            val v = (sgn * block[first + x] - black) / (white - black)
+            pixels[x] = (v.coerceIn(0f, 1f) * 255f).toInt().toByte()
         }
+        onLine(field, fieldLine, pixels)
     }
 
     companion object {
         const val RATE = 8e6
         const val WIDTH = 416 // 52 µs of picture at 8 MS/s
-        private const val LINE = 512 // 64 µs
+        private const val KEEP = 1024
         private const val BLOCK = 32768 // 4 ms
     }
 }

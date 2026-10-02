@@ -318,6 +318,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun stopSdr() {
         tools.meshtastic.stop()
+        tools.fpv.stop()
         tools.spectrum.stop()
         tools.adsb.stop()
         tools.sonde.stop()

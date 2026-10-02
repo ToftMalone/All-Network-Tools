@@ -89,6 +89,7 @@ enum class Tool(
     Aprs(Network.Sdr, "Radioamateurs (APRS)", Sym.Radio),
     Meteor(Network.Sdr, "Satellites météo (Meteor-M)", Sym.SatelliteAlt),
     Emitters(Network.Sdr, "Détecteur d'émetteurs", Sym.Radar),
+    Fpv(Network.Sdr, "Drones FPV", Sym.Videocam),
 
     ;
 
