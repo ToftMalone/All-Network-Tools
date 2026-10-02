@@ -91,7 +91,8 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
     var lnaGain by mutableIntStateOf(24)
     var vgaGain by mutableIntStateOf(24)
     var amp by mutableStateOf(false)
-    var band by mutableIntStateOf(0) // 24, 58 or 0 for both
+    var band by mutableIntStateOf(0) // DroneID: 24, 58 or 0 for both
+    var analogBand by mutableIntStateOf(58) // analogue scan: 24, 58 or 0 for both
 
     var running by mutableStateOf(false)
         private set
@@ -288,7 +289,7 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
             } else {
                 tunedTo = null
                 val fresh = ArrayList<FpvResult>()
-                for (ch in FpvChannels.byFrequency) {
+                for (ch in FpvChannels.scan(analogBand)) {
                     if (!dspRunning || mode !== m) break
                     scope.launch { scanning = ch.name }
                     tune(r, ch.mhz.toDouble(), pipe)
@@ -405,7 +406,7 @@ fun FpvTool(vm: MainViewModel) {
                     Text(plural(videos.size, "vidéo analogique", "vidéos analogiques"), Modifier.padding(bottom = 8.dp), style = rf(18, 24, 500))
                 }
                 Text(
-                    c.scanning?.let { "Balayage des 48 canaux · en ce moment $it" } ?: if (c.sweeps > 0) "${c.sweeps} ${plural(c.sweeps, "balayage terminé", "balayages terminés")}" else "5,8 GHz, bandes A B E F R L",
+                    c.scanning?.let { "Balayage en cours · canal $it" } ?: if (c.sweeps > 0) "${c.sweeps} ${plural(c.sweeps, "balayage terminé", "balayages terminés")}" else when (c.analogBand) { 24 -> "2,4 GHz, de 2360 à 2520 MHz"; 0 -> "2,4 et 5,8 GHz"; else -> "5,8 GHz, bandes A B E F R L" },
                     style = rf(14, 20, tnum = true),
                 )
             } else {
@@ -421,7 +422,7 @@ fun FpvTool(vm: MainViewModel) {
                     c.starting -> HeroChip("Démarrage du HackRF…", AntTheme.net.fair, blink = true)
                     c.running && digital && probable -> HeroChip("Signal compatible DJI DroneID", AntTheme.net.good, blink = true)
                     c.running && digital -> HeroChip(if (c.hits.isEmpty()) "Aucun signal de ce type" else "Rafale isolée, à confirmer", AntTheme.net.fair, blink = true)
-                    c.running && c.watching != null -> HeroChip("Vidéo ${c.watching!!.name} · ${c.watching!!.mhz} MHz", AntTheme.net.good, blink = true)
+                    c.running && c.watching != null -> HeroChip("Vidéo ${c.watching!!.mhz} MHz", AntTheme.net.good, blink = true)
                     c.running -> HeroChip(if (videos.isEmpty()) "Aucune vidéo pour l'instant" else "${videos.size} ${plural(videos.size, "vidéo", "vidéos")} trouvée", if (videos.isEmpty()) AntTheme.net.fair else AntTheme.net.good, blink = true)
                     d == null -> HeroChip("Aucun HackRF branché", AntTheme.net.poor)
                     else -> HeroChip("${d.name} prêt", AntTheme.net.good)
@@ -430,10 +431,16 @@ fun FpvTool(vm: MainViewModel) {
         }
         SegmentedRow(FpvTab.entries.map { it to it.label }, c.tab, { if (!c.running && !c.starting) c.tab = it }, Modifier.fillMaxWidth(), height = 36.dp)
         if (c.running || c.starting) StartButton("Arrêter", Sym.Stop) { c.stop() }
-        else StartButton(if (digital) "Chercher un drone DJI" else "Balayer les 5,8 GHz", Sym.PlayArrow, enabled = d != null) { d?.let(c::start) }
+        else StartButton(if (digital) "Chercher un drone DJI" else "Balayer la bande", Sym.PlayArrow, enabled = d != null) { d?.let(c::start) }
         if (!digital) AnalogPage(c, d, videos) else DigitalPage(c)
         SectionCard {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (!digital) {
+                    Text("Bande à balayer", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(58 to "5,8 GHz", 24 to "2,4 GHz", 0 to "Les deux").forEach { (b, l) -> AntFilterChip(l, c.analogBand == b, { if (!c.running) c.analogBand = b }) }
+                    }
+                }
                 if (digital) {
                     Text("Bande", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -459,9 +466,9 @@ fun FpvTool(vm: MainViewModel) {
                             "ou O4 et la liaison vidéo numérique n'est pas décodée. Mesuré sur des captures de Mini 2 et de Mavic Air 2 ; les modèles récents " +
                             "n'ont pas été vérifiés. La rafale ne passe que sur une fréquence à la fois : laisse tourner quelques balayages. Le Wi-Fi n'est pas détecté."
                     else
-                        "Le balayage mesure les 48 canaux et reconnaît une vraie vidéo à ses impulsions de synchronisation (PAL ou NTSC), pas à sa seule puissance. " +
+                        "Le balayage mesure les canaux (5,8 GHz) ou une grille de fréquences (2,4 GHz, où les émetteurs n'ont pas de plan de canaux commun) et reconnaît une vraie vidéo à ses impulsions de synchronisation (PAL ou NTSC), pas à sa seule puissance. " +
                             "L'image est la luminance en noir et blanc. Réserve l'affichage à tes propres drones ou à une surveillance autorisée : rien n'est enregistré. " +
-                            "Les liaisons numériques (DJI O3, O4, DJI FPV, HDZero, Walksnail) ne sont pas décodées. Réception seule.",
+                            "Le Wi-Fi à 2,4 GHz n'est pas pris pour de la vidéo : seule la synchro compte. Les liaisons numériques (DJI O3, O4, DJI FPV, HDZero, Walksnail) ne sont pas décodées. Réception seule.",
                     style = rf(13, 18), color = cs.onSurfaceVariant,
                 )
             }
@@ -485,7 +492,7 @@ private fun AnalogPage(c: FpvController, d: SdrDevice?, videos: List<FpvResult>)
                     } else Text("Recherche de l'image…", style = rf(13, 18), color = Color.White.copy(alpha = 0.7f))
                 }
                 Text(
-                    "${w.name} · ${w.mhz} MHz" + (c.videoStandard?.let { " · $it" } ?: "") + " · synchro %.0f %%".format(Locale.FRANCE, c.videoQuality * 100) +
+                    (if (w.band == 'G') "${w.mhz} MHz" else "${w.name} · ${w.mhz} MHz") + (c.videoStandard?.let { " · $it" } ?: "") + " · synchro %.0f %%".format(Locale.FRANCE, c.videoQuality * 100) +
                         (c.watchLevelDb?.let { " · %.0f dBFS".format(Locale.FRANCE, it) } ?: ""),
                     style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant,
                 )
@@ -494,10 +501,10 @@ private fun AnalogPage(c: FpvController, d: SdrDevice?, videos: List<FpvResult>)
         }
     }
     if (c.results.isEmpty()) {
-        if (!c.running) Empty("Lance le balayage : les 48 canaux sont mesurés en une dizaine de secondes, puis la liste des vidéos apparaît ici.")
+        if (!c.running) Empty("Lance le balayage : la bande choisie est mesurée en quelques secondes (48 canaux à 5,8 GHz, 17 fréquences à 2,4 GHz), puis la liste des vidéos apparaît ici.")
         return
     }
-    val rows = c.results.sortedByDescending { it.powerDb }.take(12)
+    val rows = c.results.sortedByDescending { it.powerDb }.take(14)
     SectionCard(padding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)) {
         rows.forEachIndexed { i, r ->
             if (i > 0) Hairline()
@@ -518,7 +525,7 @@ private fun ChannelRow(r: FpvResult, onWatch: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) { Symbol(if (r.isVideo) Sym.Videocam else Sym.Radar, size = 22.dp, tint = if (r.isVideo) AntTheme.accent.onAccent else AntTheme.accent.onContainer) }
         Column(Modifier.weight(1f)) {
-            Text("${r.channel.name} · ${r.channel.mhz} MHz", style = rf(15, 20, 600, tnum = true), maxLines = 1)
+            Text(if (r.channel.band == 'G') "${r.channel.mhz} MHz · 2,4 GHz" else "${r.channel.name} · ${r.channel.mhz} MHz", style = rf(15, 20, 600, tnum = true), maxLines = 1)
             Text(
                 if (r.isVideo) "Vidéo ${r.standard ?: "analogique"} · synchro %.0f %%".format(Locale.FRANCE, r.syncQuality * 100) else "Signal sans synchro vidéo",
                 style = rf(13, 18),

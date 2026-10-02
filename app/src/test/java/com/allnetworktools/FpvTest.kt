@@ -29,6 +29,11 @@ class FpvTest {
         assertEquals(5865, FpvChannels.byName("A1")!!.mhz)
         assertEquals(5362, FpvChannels.byName("L1")!!.mhz)
         assertEquals(48, FpvChannels.all.map { it.name }.toSet().size)
+        assertEquals(17, FpvChannels.ghz24.size)
+        assertEquals(2360, FpvChannels.ghz24.first().mhz)
+        assertEquals(2520, FpvChannels.ghz24.last().mhz)
+        assertEquals(48, FpvChannels.scan(58).size)
+        assertEquals(65, FpvChannels.scan(0).size)
     }
 
     // ---- analogue video ------------------------------------------------------------------------------------------

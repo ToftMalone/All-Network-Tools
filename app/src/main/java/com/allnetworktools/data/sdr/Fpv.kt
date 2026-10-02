@@ -8,9 +8,9 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-/** A 5.8 GHz analogue FPV channel (the six standard bands of 8 channels). */
+/** An analogue FPV channel: one of the six 5.8 GHz bands of 8 channels, or a 2.4 GHz frequency (band 'G'). */
 data class FpvChannel(val band: Char, val number: Int, val mhz: Int) {
-    val name: String get() = "$band$number"
+    val name: String get() = if (band == 'G') "$mhz" else "$band$number"
 }
 
 object FpvChannels {
@@ -31,6 +31,19 @@ object FpvChannels {
 
     /** Channels sorted by frequency, for the scan order. */
     val byFrequency: List<FpvChannel> = all.sortedBy { it.mhz }
+
+    /**
+     * 2.4 GHz analogue video transmitters have no common channel plan (the usual 4- and 8-channel sets sit on 2370–2510 MHz in steps of
+     * 18–20 MHz), so the scan walks 2360–2520 MHz in 10 MHz steps: an FM picture is about 17 MHz wide and is seen from two neighbours.
+     */
+    val ghz24: List<FpvChannel> = (0..16).map { FpvChannel('G', it + 1, 2360 + 10 * it) }
+
+    /** What a sweep covers: 58 = the 48 channels at 5.8 GHz, 24 = the 2.4 GHz grid, anything else = both. */
+    fun scan(band: Int): List<FpvChannel> = when (band) {
+        58 -> byFrequency
+        24 -> ghz24
+        else -> ghz24 + byFrequency
+    }
 }
 
 /** Atan2 to about 1e-4 rad: the discriminator runs at every sample of a 16 MS/s stream. */
