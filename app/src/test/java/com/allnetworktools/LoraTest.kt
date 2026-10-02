@@ -283,4 +283,44 @@ class LoraTest {
         assertEquals(0x1a2b3c4dL, p.header.from)
         assertEquals(1, p.header.hops)
     }
+
+    private fun throughHackRf(gain: Float, snrDb: Double): List<LoraFrame> {
+        val payload = meshPacket("Nœud tout proche")
+        val frame = LoraTx.frame(LoraTx.symbols(payload, sf, 1), 0x2B)
+        val fs = 2_000_000.0
+        val (re, im) = LoraTx.waveform(frame, sf, bw, fs, delay = 0.02, cfoHz = 500_000.0 - 8_000.0, ppm = -9.2, snrDb = snrDb, seed = 3)
+        val iq = ByteArray(re.size * 2) { i -> ((if (i % 2 == 0) re[i / 2] else im[i / 2]) * gain).toInt().coerceIn(-128, 127).toByte() }
+        val dec = Decimator(4, 0.07, taps = 48)
+        val got = ArrayList<LoraFrame>()
+        val rx = LoraReceiver(sf, bw, fc, 0x2B) { got += it }
+        val oRe = FloatArray(65536 / 2 / 4 + 8)
+        val oIm = FloatArray(oRe.size)
+        var i = 0
+        while (i < iq.size) {
+            val len = minOf(65536, iq.size - i)
+            val k = dec.process(iq.copyOfRange(i, i + len), len, oRe, oIm, 0)
+            rx.feed(oRe, oIm, k)
+            i += len
+        }
+        return got
+    }
+
+    @Test fun decodesStrongClippedSignals() {
+        for ((g, snr) in listOf(25f to 0.0, 600f to 20.0, 3000f to 30.0)) {
+            assertTrue("gain $g", throughHackRf(g, snr).single().crcOk)
+        }
+    }
+
+    @Test fun channelSpectrumLocatesTheSignal() {
+        val payload = meshPacket("Spectre")
+        val frame = LoraTx.frame(LoraTx.symbols(payload, sf, 1), 0x2B)
+        val (re, im) = LoraTx.waveform(frame, sf, bw, 2 * bw, delay = 0.02, cfoHz = 12_000.0, ppm = 0.0, snrDb = 10.0)
+        val sp = com.allnetworktools.data.sdr.ChannelSpectrum(2 * bw)
+        var i = 0
+        while (i < re.size) { val n = minOf(4096, re.size - i); sp.feed(re.copyOfRange(i, i + n), im.copyOfRange(i, i + n), n); i += n }
+        val v = sp.snapshot()!!
+        assertTrue(v.hasSignal)
+        assertEquals(12.0, v.offsetKHz, 15.0)
+        assertEquals(250.0, v.widthKHz, 60.0)
+    }
 }

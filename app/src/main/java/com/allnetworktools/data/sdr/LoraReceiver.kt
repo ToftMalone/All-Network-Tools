@@ -112,6 +112,10 @@ class LoraReceiver(
     var headerErrors = 0
         private set
 
+    /** Preambles after which no start of frame was found. */
+    var sfdLost = 0
+        private set
+
     /** The sync word read off the air the last time it did not match (e.g. 0x34 for LoRaWAN), or −1. */
     var lastSyncSeen = -1
         private set
@@ -245,7 +249,7 @@ class LoraReceiver(
             preamble += up
         }
         if (downs.size >= 3) { synchronise(); return true }
-        if (++seekCount > 48) restart(next)
+        if (++seekCount > 48) { sfdLost++; restart(next) }
         return true
     }
 

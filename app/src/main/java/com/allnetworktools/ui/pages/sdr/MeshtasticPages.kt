@@ -14,12 +14,14 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -422,10 +424,30 @@ internal fun NodePage(vm: MainViewModel, c: MeshtasticController) {
         InfoRow("Flux USB", "%.1f Mo/s (attendu 4)".format(Locale.FRANCE, c.usbMBps))
         InfoRow("Niveau dans le canal", c.levelDb?.let { "%.0f dBFS".format(Locale.FRANCE, it) + (c.noiseDb?.let { n -> " · bruit %.0f".format(Locale.FRANCE, n) } ?: "") } ?: "—")
         InfoRow("Débuts de trame LoRa", "${c.preambles}")
+        InfoRow("Trame perdue après le début", "${c.sfdLost}")
+        c.channelView?.let { v ->
+            InfoRow("Spectre du canal", if (v.hasSignal) "signal à %+.0f kHz, large de %.0f kHz".format(Locale.FRANCE, v.offsetKHz, v.widthKHz) else "pas de signal net")
+            ChannelBars(v.bins, v.floorDb)
+        }
         InfoRow("Synchro refusée", "${c.syncMismatches}" + if (c.lastSyncSeen >= 0) " (mot vu : 0x%02X)".format(c.lastSyncSeen) else "")
         InfoRow("En-têtes illisibles", "${c.headerErrors}")
         InfoRow("Trames décodées", "${c.framesOk} · CRC invalides ${c.framesBad}")
         InfoRow("Paquets lisibles", "${c.decoded} · autres canaux ${c.otherChannel}")
         InfoRow("Pertes USB", "${c.dropped}")
+    }
+}
+
+/** The channel's spectrum over the last second, −bandwidth to +bandwidth, as bars above the noise floor. */
+@Composable
+private fun ChannelBars(bins: FloatArray, floorDb: Double) {
+    val bar = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp, vertical = 4.dp)) {
+        val w = size.width / bins.size
+        for (i in bins.indices) {
+            val h = ((bins[i] - floorDb) / 30.0).coerceIn(0.03, 1.0).toFloat() * size.height
+            drawRect(track, androidx.compose.ui.geometry.Offset(i * w, 0f), androidx.compose.ui.geometry.Size(w * 0.8f, size.height))
+            drawRect(bar, androidx.compose.ui.geometry.Offset(i * w, size.height - h), androidx.compose.ui.geometry.Size(w * 0.8f, h))
+        }
     }
 }

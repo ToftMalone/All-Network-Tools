@@ -164,6 +164,10 @@ class MeshtasticController(
         private set
     var dropped by mutableIntStateOf(0)
         private set
+    var channelView by mutableStateOf<com.allnetworktools.data.sdr.ChannelView?>(null)
+        private set
+    var sfdLost by mutableIntStateOf(0)
+        private set
     var startedAtMs by mutableLongStateOf(0L)
         private set
 
@@ -217,7 +221,10 @@ class MeshtasticController(
     val decoded: Int get() = channelCounts.values.sum()
 
     fun verdict(): MeshVerdict = MeshDiagnosis.verdict(
-        MeshDiagInput(running, usbMBps, levelDb, noiseDb, peakDb, preambles, syncMismatches, headerErrors, lastSyncSeen, framesOk, framesBad, decoded, otherChannel),
+        MeshDiagInput(
+            running, usbMBps, levelDb, noiseDb, peakDb, preambles, syncMismatches, headerErrors, lastSyncSeen, framesOk, framesBad, decoded, otherChannel,
+            dropped, channelView?.offsetKHz, channelView?.widthKHz, preset.bandwidthHz / 1000.0, channelView?.hasSignal == true, sfdLost,
+        ),
     )
 
     /** Saves the configuration; call after every change the user makes. */
@@ -351,9 +358,11 @@ class MeshtasticController(
         val decim = s.preset.decimation
         val decimator = Decimator(decim, 0.56 * s.preset.bandwidthHz / SAMPLE_RATE, taps = 12 * decim)
         val rx = LoraReceiver(s.preset.sf, s.preset.bandwidthHz.toDouble(), s.hz.toDouble(), 0x2B) { f -> onFrame(f, s) }
+        val spectrum = com.allnetworktools.data.sdr.ChannelSpectrum(2.0 * s.preset.bandwidthHz)
         val outRe = FloatArray(131072 / 2 / decim + 8)
         val outIm = FloatArray(outRe.size)
         usbBytes.set(0)
+        channelView = null; sfdLost = 0
         dspRunning = true
         dsp = Thread({
             var sumSq = 0.0
@@ -370,6 +379,7 @@ class MeshtasticController(
                     for (i in 0 until k) sumSq += outRe[i] * outRe[i] + outIm[i] * outIm[i]
                     count += k
                     rx.feed(outRe, outIm, k)
+                    spectrum.feed(outRe, outIm, k)
                 }
                 val now = System.currentTimeMillis()
                 if (now - lastTick >= 1000) {
@@ -380,11 +390,13 @@ class MeshtasticController(
                     val noise = levels.minOrNull()
                     val peak = levels.maxOrNull()
                     val rate = (bytes - lastBytes) / seconds / 1e6
-                    val pre = rx.preambles; val mis = rx.syncMismatches; val hdr = rx.headerErrors; val seen = rx.lastSyncSeen
+                    val pre = rx.preambles; val mis = rx.syncMismatches; val hdr = rx.headerErrors; val seen = rx.lastSyncSeen; val lost = rx.sfdLost
+                    val view = spectrum.snapshot()
                     lastTick = now; lastBytes = bytes; sumSq = 0.0; count = 0
                     scope.launch {
                         usbMBps = rate; levelDb = level; noiseDb = noise; peakDb = peak
-                        preambles = pre; syncMismatches = mis; headerErrors = hdr; lastSyncSeen = seen
+                        preambles = pre; syncMismatches = mis; headerErrors = hdr; lastSyncSeen = seen; sfdLost = lost
+                        if (view != null) channelView = view
                     }
                 }
             }

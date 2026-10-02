@@ -43,4 +43,21 @@ class MeshDiagnosisTest {
         assertEquals(MeshHealth.Working, v.health)
         assertTrue(v.text.contains("3"))
     }
+
+    private fun v(dropped: Int = 0, off: Double? = null, w: Double? = null, pre: Int = 0, lost: Int = 0) = MeshDiagnosis.verdict(
+        MeshDiagInput(true, 4.0, -40.0, -52.0, -35.0, pre, 0, 0, -1, 0, 0, 0, 0, dropped, off, w, 250.0, true, lost),
+    )
+
+    @Test fun lostUsbBlocksAreBlamedOnThePhone() = assertEquals(MeshHealth.Overload, v(dropped = 50).health)
+
+    @Test fun waitingExplainsAnOffsetSignal() {
+        val r = v(off = 180.0, w = 240.0)
+        assertEquals(MeshHealth.Waiting, r.health)
+        assertTrue(r.text.contains("décalage +180 kHz"))
+        assertTrue(r.text.contains("fréquence"))
+    }
+
+    @Test fun waitingNotesANarrowSignal() = assertTrue(v(off = 5.0, w = 110.0).text.contains("125 kHz"))
+
+    @Test fun waitingNotesLostFrames() = assertTrue(v(pre = 3, lost = 3).text.contains("se perd"))
 }
