@@ -325,6 +325,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         tools.ais.stop()
         tools.emitters.stop()
         tools.aprs.stop()
+        tools.meteor.stop()
     }
 
     init {

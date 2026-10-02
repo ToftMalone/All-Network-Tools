@@ -87,6 +87,7 @@ enum class Tool(
     Fm(Network.Sdr, "Radio FM", Sym.Radio),
     Ais(Network.Sdr, "Navires (AIS)", Sym.Boat),
     Aprs(Network.Sdr, "Radioamateurs (APRS)", Sym.Radio),
+    Meteor(Network.Sdr, "Satellites météo (Meteor-M)", Sym.SatelliteAlt),
     Emitters(Network.Sdr, "Détecteur d'émetteurs", Sym.Radar),
 
     ;

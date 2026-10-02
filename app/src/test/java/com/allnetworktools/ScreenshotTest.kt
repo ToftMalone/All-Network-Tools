@@ -536,6 +536,32 @@ class ScreenshotTest {
         vm.tools.meshtastic.setPresetForTest(com.allnetworktools.data.sdr.MeshPreset.LongModerate, com.allnetworktools.data.sdr.MeshRegion.Us)
         vm.tools.meshtastic.settingsOpen = true
     }
+    @Test fun meteor() = shot("H13_meteor", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meteor))) { vm ->
+        // A made-up picture of clouds over a coast: a few strips of smooth noise.
+        fun px(x: Int, y: Int): Int {
+            val cloud = 0.5 + 0.25 * Math.sin(x / 38.0 + Math.sin(y / 27.0) * 1.6) + 0.18 * Math.sin(y / 15.0 - x / 71.0) + 0.1 * Math.sin((x + y) / 9.0)
+            val coast = if (x < 250 + 70 * Math.sin(y / 60.0)) 0.18 else 0.0
+            return ((cloud * 0.8 + coast) * 255).toInt().coerceIn(0, 255)
+        }
+        val strips = (0 until 70).map { s -> ByteArray(784 * 4) { i -> px(i % 784, s * 4 + i / 784).toByte() } }
+        val now = System.currentTimeMillis()
+        val m3 = com.allnetworktools.data.orbit.MeteorSats.all[0]
+        val m4 = com.allnetworktools.data.orbit.MeteorSats.all[1]
+        vm.tools.meteor.setForTest(
+            com.allnetworktools.data.sdr.LrptStatus(
+                carrier = true, snrDb = 9.4, cfoHz = 2310.0, locked = true, hypothesis = "180°", frames = 214, rsOk = 211, rsFail = 3, corrected = 1840,
+                basis = "base duale", zoneStart = 10, packets = 2990, segmentsOk = 2954, segmentsBad = 0, layout = 12,
+                apids = mapOf(64 to 996, 65 to 996, 66 to 998), strips = mapOf(64 to 70, 65 to 70, 66 to 70),
+            ),
+            137_900_000L,
+            listOf(
+                com.allnetworktools.data.orbit.MeteorPass(m3, now - 4 * 60_000L, now + 8 * 60_000L, now + 2 * 60_000L, 63.0, 12.0, 188.0),
+                com.allnetworktools.data.orbit.MeteorPass(m4, now + 71 * 60_000L, now + 83 * 60_000L, now + 77 * 60_000L, 31.0, 340.0, 205.0),
+                com.allnetworktools.data.orbit.MeteorPass(m3, now + 4 * 3_600_000L, now + 4 * 3_600_000L + 11 * 60_000L, now + 4 * 3_600_000L + 5 * 60_000L, 19.0, 20.0, 160.0),
+            ),
+            mapOf(64 to strips, 65 to strips.map { s -> ByteArray(s.size) { (255 - (s[it].toInt() and 0xFF)).toByte() } }),
+        )
+    }
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard)) { meshDemo(it) }
     @Test fun meshtasticMessages() = shot("H1_meshtastic_messages", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { meshDemo(it) }
     @Test fun meshtasticIdle() = shot("H2_meshtastic_idle", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic)))
