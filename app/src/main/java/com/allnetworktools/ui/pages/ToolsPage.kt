@@ -78,7 +78,7 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
         ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"), ToolEntry(Tool.Passes, "Passages de satellites", "Levers et couchers prévus"))),
     )
     Network.Sdr -> listOf(
-        ToolGroup("Outils", listOf(ToolEntry(Tool.Spectrum, "Analyseur de spectre", "Spectre et chute d'eau, 1 MHz à 6 GHz"), ToolEntry(Tool.Adsb, "Avions (ADS-B)", "Carte des avions sur 1090 MHz"), ToolEntry(Tool.Sonde, "Ballons-sondes", "Sondes météo RS41 vers 403 MHz"), ToolEntry(Tool.Fm, "Radio FM", "Écoute et RDS, 87,5 à 108 MHz"), ToolEntry(Tool.Ais, "Navires (AIS)", "Carte des navires sur 162 MHz"), ToolEntry(Tool.Meteor, "Satellites météo (Meteor-M)", "Images LRPT sur 137 MHz"), ToolEntry(Tool.Aprs, "Radioamateurs (APRS)", "Balises sur 144,800 MHz"), ToolEntry(Tool.Emitters, "Détecteur d'émetteurs", "Qui émet en 169, 433, 446, 868 MHz"))),
+        ToolGroup("Outils", listOf(ToolEntry(Tool.Meshtastic, "Meshtastic", "Réseau maillé LoRa, canal par défaut"), ToolEntry(Tool.Adsb, "Avions (ADS-B)", "Carte des avions sur 1090 MHz"), ToolEntry(Tool.Sonde, "Ballons-sondes", "Sondes météo RS41 vers 403 MHz"), ToolEntry(Tool.Fm, "Radio FM", "Écoute et RDS, 87,5 à 108 MHz"), ToolEntry(Tool.Ais, "Navires (AIS)", "Carte des navires sur 162 MHz"), ToolEntry(Tool.Meteor, "Satellites météo (Meteor-M)", "Images LRPT sur 137 MHz"), ToolEntry(Tool.Aprs, "Radioamateurs (APRS)", "Balises sur 144,800 MHz"), ToolEntry(Tool.Emitters, "Détecteur d'émetteurs", "Qui émet en 169, 433, 446, 868 MHz"))),
     )
 }
 
@@ -87,7 +87,7 @@ private fun featuredSubtitle(net: Network) = when (net) {
     Network.Bluetooth -> "Appareils à proximité, en direct, avec filtres"
     Network.Cellular -> "Cellules NR et LTE détectées par le modem"
     Network.Gnss -> "Sky plot et carte du monde des satellites"
-    Network.Sdr -> "Réseau maillé LoRa, tous les préréglages, canal par défaut"
+    Network.Sdr -> "Spectre et chute d'eau, de 1 MHz à 6 GHz"
 }
 
 @Composable
@@ -96,7 +96,7 @@ private fun featuredBadge(net: Network, vm: MainViewModel): String? = when (net)
     Network.Bluetooth -> vm.ble.collectAsStateWithLifecycle().value.size.let { "$it ${plural(it, "appareil")}" }
     Network.Cellular -> vm.cell.collectAsStateWithLifecycle().value.state?.neighbors?.size?.let { "$it ${plural(it, "cellule")}" }
     Network.Gnss -> vm.gnss.collectAsStateWithLifecycle().value.let { "${it.used.size}/${it.visible.size} satellites" }
-    Network.Sdr -> vm.tools.meshtastic.let { if (it.running) "${it.rows.size} ${plural(it.rows.size, "paquet")}" else null }
+    Network.Sdr -> vm.tools.spectrum.let { if (it.running && it.tunedHz > 0) "%.1f MHz".format(java.util.Locale.FRANCE, it.tunedHz / 1e6) else null }
 }
 
 @Composable
