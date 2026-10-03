@@ -168,6 +168,12 @@ class MeshtasticController(
         private set
     var sfdLost by mutableIntStateOf(0)
         private set
+    var syncRescued by mutableIntStateOf(0)
+        private set
+    var syncRealigned by mutableIntStateOf(0)
+        private set
+    var lastSyncBins by mutableStateOf<Pair<Int, Int>?>(null)
+        private set
     var startedAtMs by mutableLongStateOf(0L)
         private set
 
@@ -362,7 +368,7 @@ class MeshtasticController(
         val outRe = FloatArray(131072 / 2 / decim + 8)
         val outIm = FloatArray(outRe.size)
         usbBytes.set(0)
-        channelView = null; sfdLost = 0
+        channelView = null; sfdLost = 0; syncRealigned = 0; syncRescued = 0; lastSyncBins = null
         dspRunning = true
         dsp = Thread({
             var sumSq = 0.0
@@ -390,12 +396,12 @@ class MeshtasticController(
                     val noise = levels.minOrNull()
                     val peak = levels.maxOrNull()
                     val rate = (bytes - lastBytes) / seconds / 1e6
-                    val pre = rx.preambles; val mis = rx.syncMismatches; val hdr = rx.headerErrors; val seen = rx.lastSyncSeen; val lost = rx.sfdLost
+                    val pre = rx.preambles; val mis = rx.syncMismatches; val hdr = rx.headerErrors; val seen = rx.lastSyncSeen; val lost = rx.sfdLost; val realigned = rx.syncRealigned; val bins = rx.lastSyncBins
                     val view = spectrum.snapshot()
                     lastTick = now; lastBytes = bytes; sumSq = 0.0; count = 0
                     scope.launch {
                         usbMBps = rate; levelDb = level; noiseDb = noise; peakDb = peak
-                        preambles = pre; syncMismatches = mis; headerErrors = hdr; lastSyncSeen = seen; sfdLost = lost
+                        preambles = pre; syncMismatches = mis; headerErrors = hdr; lastSyncSeen = seen; sfdLost = lost; syncRealigned = realigned; lastSyncBins = bins
                         if (view != null) channelView = view
                     }
                 }
@@ -420,6 +426,11 @@ class MeshtasticController(
         val now = System.currentTimeMillis()
         val packet = if (f.crcOk) decodePacket(f.payload, s.channels, now, f.snrDb) else null
         scope.launch {
+            // A frame whose sync word did not match counts only if one of our keys decrypts it.
+            if (!f.syncOk) {
+                if (!f.crcOk || packet?.second == null) return@launch
+                syncRescued++
+            }
             if (!f.crcOk) { framesBad++; return@launch }
             framesOk++
             if (packet == null) return@launch

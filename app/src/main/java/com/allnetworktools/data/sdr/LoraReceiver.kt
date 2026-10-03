@@ -17,6 +17,8 @@ class LoraFrame(
     val snrDb: Double,
     /** Frequency offset between the transmitter and the tuned frequency. */
     val cfoHz: Double,
+    /** False when the sync word did not match and the frame was decoded anyway: trust it only if its content checks out. */
+    val syncOk: Boolean = true,
 )
 
 /**
@@ -92,6 +94,7 @@ class LoraReceiver(
 
     // Payload state.
     private var cfo = 0.0
+    private var syncOk = true
     private var rho = 1.0
     private var payloadExact = 0.0
     private val snrs = ArrayList<Double>()
@@ -111,6 +114,19 @@ class LoraReceiver(
         private set
     var headerErrors = 0
         private set
+
+    /** Frames whose sync word was read off by a whole number of bins and realigned, and the last offset. */
+    var syncRealigned = 0
+        private set
+    var lastSyncOffset = 0
+        private set
+
+    /** The two sync symbols as read (bins), the last time they did not match at first: 16 and 88 for Meshtastic. */
+    var lastSyncBins: Pair<Int, Int>? = null
+        private set
+
+    /** Test hook: pretends the frequency estimate is off by this many bins. */
+    internal var cfoBiasForTest = 0
 
     /** Preambles after which no start of frame was found. */
     var sfdLost = 0
@@ -307,31 +323,58 @@ class LoraReceiver(
         val half = wrap(uPos - dPos, n.toDouble()) / 2 // = k
         val c = wrap(dPos + half, n.toDouble())
         g -= OS * half
-        cfo = c
-        rho = 1 - (c * bw / n) / centerHz
 
+        var shift = c + cfoBiasForTest
         fun sym(at: Double): Pair<Boolean, Int> {
-            val u = analyse(at, down = false, shiftBins = c)
-            val w = analyse(at, down = true, shiftBins = c)
+            val u = analyse(at, down = false, shiftBins = shift)
+            val w = analyse(at, down = true, shiftBins = shift)
             return (w.power > u.power) to u.bin
         }
-        val s0 = listOf(g - symLen, g - 2 * symLen, g, g - 3 * symLen).firstOrNull { b ->
+        // The sync word: the two upchirps just before the downchirps (gr-lora_sdr allows ±2 bins too).
+        var s0 = listOf(g - symLen, g - 2 * symLen, g, g - 3 * symLen).firstOrNull { b ->
             if (!sym(b).first) return@firstOrNull false
             val (d2, v2) = sym(b - symLen)
             val (d1, v1) = sym(b - 2 * symLen)
-            !d1 && !d2 && abs(circDiff(v1, sync1)) <= 1 && abs(circDiff(v2, sync2)) <= 1
+            !d1 && !d2 && abs(circDiff(v1, sync1)) <= SYNC_TOLERANCE && abs(circDiff(v2, sync2)) <= SYNC_TOLERANCE
         }
         if (s0 == null) {
-            syncMismatches++
-            // What sync word is on the air? Read the two symbols before the first downchirp.
-            listOf(g - symLen, g - 2 * symLen, g).firstOrNull { b -> sym(b).first }?.let { b ->
+            // Both sync symbols off by the same amount means our own offset estimate is off by a whole number of bins
+            // (gr-lora_sdr's "net id offset"), not another network: another sync word moves the two symbols differently.
+            val b = listOf(g - symLen, g - 2 * symLen, g, g - 3 * symLen).firstOrNull { sym(it).first && !sym(it - symLen).first && !sym(it - 2 * symLen).first }
+            if (b != null) {
                 val v1 = sym(b - 2 * symLen).second
                 val v2 = sym(b - symLen).second
-                lastSyncSeen = (((v1 + 4) / 8) and 0xF shl 4) or (((v2 + 4) / 8) and 0xF)
+                val e1 = circDiff(v1, sync1)
+                val e2 = circDiff(v2, sync2)
+                if (abs(e1 - e2) <= SYNC_TOLERANCE) {
+                    val off = Math.round((e1 + e2) / 2.0).toInt()
+                    val before = shift
+                    shift = before + off
+                    val (_, w1) = sym(b - 2 * symLen)
+                    val (_, w2) = sym(b - symLen)
+                    if (abs(circDiff(w1, sync1)) <= SYNC_TOLERANCE && abs(circDiff(w2, sync2)) <= SYNC_TOLERANCE) {
+                        s0 = b
+                        syncRealigned++
+                        lastSyncOffset = off
+                    } else shift = before
+                }
+                lastSyncBins = v1 to v2
+                if (s0 == null) {
+                    lastSyncSeen = (((v1 + 4) / 8) and 0xF shl 4) or (((v2 + 4) / 8) and 0xF)
+                    // Decode it anyway: the CRC and the Meshtastic decryption decide whether it is one of ours.
+                    syncMismatches++
+                    s0 = b
+                    syncOk = false
+                }
             }
-            restart(wDown + window)
-            return
-        }
+            if (s0 == null) {
+                syncMismatches++
+                restart(wDown + window)
+                return
+            }
+        } else syncOk = true
+        cfo = shift
+        rho = 1 - (wrap(shift, n.toDouble()) * bw / n) / centerHz
         payloadExact = s0 + 2.25 * symLen
         symbols.clear()
         nibbles.clear()
@@ -394,7 +437,7 @@ class LoraReceiver(
             got == LoraPhy.payloadCrc(payload)
         } else true
         val snr = snrs.sorted()[snrs.size / 2]
-        onFrame(LoraFrame(payload, crcOk, h.hasCrc, h.cr, snr, cfo * bw / n))
+        onFrame(LoraFrame(payload, crcOk, h.hasCrc, h.cr, snr, cfo * bw / n, syncOk))
     }
 
     companion object {
@@ -409,6 +452,7 @@ class LoraReceiver(
          * lobes one bin either side of the true bin, and the stronger one flips from window to window.
          */
         private const val BIN_TOLERANCE = 2
+        private const val SYNC_TOLERANCE = 2
         private const val INTERP_PHASES = 64
     }
 }

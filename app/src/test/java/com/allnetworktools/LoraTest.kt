@@ -235,7 +235,7 @@ class LoraTest {
         val payload = "LoRaWAN".toByteArray()
         val frame = LoraTx.frame(LoraTx.symbols(payload, sf, 1), 0x34)
         val (re, im) = LoraTx.waveform(frame, sf, bw, 2 * bw, delay = 0.01, cfoHz = 3000.0, ppm = 0.0, snrDb = 10.0)
-        assertTrue(receive(re, im).isEmpty())
+        assertTrue(receive(re, im).none { it.syncOk })
     }
 
     /** A network with another sync word is not decoded, but the receiver says it heard one and which. */
@@ -248,7 +248,6 @@ class LoraTest {
             while (i < re.size) { val n = minOf(4096, re.size - i); rx.feed(re.copyOfRange(i, i + n), im.copyOfRange(i, i + n), n); i += n }
             assertEquals(1, rx.preambles)
             assertEquals(1, rx.syncMismatches)
-            assertEquals(0, rx.framesSeen)
             assertEquals("sync 0x${other.toString(16)}", other, rx.lastSyncSeen)
         }
     }
@@ -322,5 +321,33 @@ class LoraTest {
         assertTrue(v.hasSignal)
         assertEquals(12.0, v.offsetKHz, 15.0)
         assertEquals(250.0, v.widthKHz, 60.0)
+    }
+
+    /** Our offset estimate off by whole bins moves both sync symbols alike: realign instead of calling it another network. */
+    @Test fun realignsASyncWordReadOffByWholeBins() {
+        val payload = meshPacket("Synchro décalée")
+        val frame = LoraTx.frame(LoraTx.symbols(payload, sf, 1), 0x2B)
+        val (re, im) = LoraTx.waveform(frame, sf, bw, 2 * bw, delay = 0.017, cfoHz = 4000.0, ppm = 4000 / fc * 1e6, snrDb = 5.0, seed = 9)
+        for (bias in listOf(3, -7, 40)) {
+            val got = ArrayList<LoraFrame>()
+            val rx = LoraReceiver(sf, bw, fc, 0x2B) { got += it }
+            rx.cfoBiasForTest = bias
+            var i = 0
+            while (i < re.size) { val n = minOf(4096, re.size - i); rx.feed(re.copyOfRange(i, i + n), im.copyOfRange(i, i + n), n); i += n }
+            assertEquals("bias $bias", 0, rx.syncMismatches)
+            assertEquals("bias $bias", 1, rx.syncRealigned)
+            assertArrayEquals("bias $bias", payload, got.single { it.crcOk }.payload)
+        }
+    }
+
+    /** A Meshtastic frame whose sync word reads wrong is still decoded, flagged, so the key can vouch for it. */
+    @Test fun decodesFramesWithAnUnexpectedSyncWordButFlagsThem() {
+        val payload = meshPacket("Mot de synchro inattendu")
+        val frame = LoraTx.frame(LoraTx.symbols(payload, sf, 1), 0x34)
+        val (re, im) = LoraTx.waveform(frame, sf, bw, 2 * bw, delay = 0.01, cfoHz = 3000.0, ppm = 0.0, snrDb = 10.0)
+        val f = receive(re, im).single()
+        assertTrue(!f.syncOk)
+        assertTrue(f.crcOk)
+        assertArrayEquals(payload, f.payload)
     }
 }

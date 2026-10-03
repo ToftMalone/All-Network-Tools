@@ -430,6 +430,8 @@ internal fun NodePage(vm: MainViewModel, c: MeshtasticController) {
             ChannelBars(v.bins, v.floorDb)
         }
         InfoRow("Synchro refusée", "${c.syncMismatches}" + if (c.lastSyncSeen >= 0) " (mot vu : 0x%02X)".format(c.lastSyncSeen) else "")
+        InfoRow("Synchro recalée", "${c.syncRealigned}" + (c.lastSyncBins?.let { " · symboles lus ${it.first} et ${it.second} (attendus 16 et 88)" } ?: ""))
+        InfoRow("Trames sauvées par la clé", "${c.syncRescued}")
         InfoRow("En-têtes illisibles", "${c.headerErrors}")
         InfoRow("Trames décodées", "${c.framesOk} · CRC invalides ${c.framesBad}")
         InfoRow("Paquets lisibles", "${c.decoded} · autres canaux ${c.otherChannel}")
