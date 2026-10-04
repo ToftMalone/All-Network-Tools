@@ -60,6 +60,10 @@ class CellLogicTest {
         assertEquals("Brésil", com.allnetworktools.data.WorldMap.countryAt(world, -10.0, -52.0))
         assertNull(com.allnetworktools.data.WorldMap.countryAt(world, 0.0, -30.0))
         assertEquals("Océan Atlantique", com.allnetworktools.data.WorldMap.oceanAt(0.0, -30.0))
+        assertEquals("La Manche", com.allnetworktools.data.WorldMap.oceanAt(51.0, 1.0))
+        assertEquals("Mer du Nord", com.allnetworktools.data.WorldMap.oceanAt(55.0, 3.0))
+        assertEquals("Mer Méditerranée", com.allnetworktools.data.WorldMap.oceanAt(38.0, 5.0))
+        assertEquals("Golfe de Gascogne", com.allnetworktools.data.WorldMap.oceanAt(45.5, -4.0))
     }
 
     @Test fun bleFilters() {

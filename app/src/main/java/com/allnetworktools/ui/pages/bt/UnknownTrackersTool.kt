@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.padding
@@ -254,7 +255,7 @@ private fun TrackerRow(t: TrackerCandidate, onClick: () -> Unit) {
     }
 }
 
-/** Everything about one tag: status, time and distance with you, signal, and the actions (locate, ring, details). */
+/** Everything about one tag on one page: status and actions up top, then signal, identity and advertisement. */
 @Composable
 fun TrackerDetailTool(
     c: UnknownTrackersController,
@@ -262,7 +263,6 @@ fun TrackerDetailTool(
     devices: List<BleDevice>,
     positions: PositionSet,
     onLocate: (BleDevice) -> Unit,
-    onDetails: (String) -> Unit,
 ) {
     // Keep following the tags while the details are open.
     LaunchedEffect(devices) { c.feed(devices, positions) }
@@ -274,66 +274,103 @@ fun TrackerDetailTool(
             ToolEmpty(Sym.GppMaybe, "Traqueur introuvable", "Il n'a plus été entendu depuis la réinitialisation de l'analyse.", null)
             return@PageColumn
         }
-        TrackerCard(t, now, onLocate, onDetails, c::ring, c::stopSound)
+        TrackerHero(t, now, onLocate, c::ring, c::stopSound)
+        SignalCard(t)
+        IdentityCard(t.device)
+        AdvertCard(t.device)
+        FramesCard(t.device)
     }
 }
 
 @Composable
-private fun TrackerCard(t: TrackerCandidate, now: Long, onLocate: (BleDevice) -> Unit, onDetails: (String) -> Unit, onRing: (TrackerCandidate) -> Unit, onStopSound: (TrackerCandidate) -> Unit) {
+private fun TrackerHero(t: TrackerCandidate, now: Long, onLocate: (BleDevice) -> Unit, onRing: (TrackerCandidate) -> Unit, onStopSound: (TrackerCandidate) -> Unit) {
     val a = t.assessment
     val col = levelColor(a.level)
-    SectionCard {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LeadingIcon(Sym.Sell, col.copy(alpha = 0.18f), col)
+    val acc = AntTheme.accent
+    HeroCard {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            LeadingIcon(Sym.Sell, col, if (a.level == FollowLevel.Following) cs.onError else Color.White, 56.dp, RoundedCornerShape(20.dp), 28.dp)
             Column(Modifier.weight(1f)) {
-                Text(t.device?.name ?: t.signal.net.maker, style = rf(15, 20, 600), maxLines = 2)
-                Text(t.signal.net.label, style = rf(12, 16), color = cs.onSurfaceVariant, maxLines = 1)
-                Text(
-                    t.signal.state ?: when (t.signal.separated) {
-                        true -> "Séparé de son propriétaire"
-                        false -> "Propriétaire à proximité"
-                        null -> "État non annoncé par ce type de tag"
-                    },
-                    style = rf(12, 16, 600), color = if (t.signal.separated == true) col else cs.onSurfaceVariant,
-                )
+                Text(t.device?.name ?: t.signal.net.maker, style = gs(22, 28, 500), maxLines = 2)
+                Text(t.signal.net.label, style = rf(13, 18), maxLines = 1)
             }
-            TechChip(a.level.label, col, if (a.level == FollowLevel.Following) cs.onError else Color.White)
+            if (t.device != null) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(fmt(t.device!!.rssi), style = gs(22, 26, 500, tnum = true))
+                    Text("dBm", style = rf(11, 14))
+                }
+            }
         }
-        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            HeroChip(a.level.label, col, blink = a.level == FollowLevel.Following)
+            HeroChip(
+                t.signal.state ?: when (t.signal.separated) {
+                    true -> "Séparé de son propriétaire"
+                    false -> "Propriétaire à proximité"
+                    null -> "État non annoncé"
+                },
+                cs.outline,
+            )
+        }
+        Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             @Composable
-            fun stat(v: String, k: String, m: Modifier) = Column(m.background(cs.surfaceContainerHigh, RoundedCornerShape(14.dp)).padding(horizontal = 10.dp, vertical = 8.dp)) {
+            fun stat(v: String, k: String, m: Modifier) = Column(m.background(cs.surface.copy(alpha = 0.7f), RoundedCornerShape(14.dp)).padding(horizontal = 10.dp, vertical = 8.dp)) {
                 Text(v, style = rf(15, 20, 600, tnum = true), maxLines = 1)
                 Text(k, style = rf(11, 14), color = cs.onSurfaceVariant, maxLines = 1)
             }
             stat(minutes(a.durationMs), "avec vous", Modifier.weight(1f))
             stat(a.spreadM?.let { dist(it) } ?: "—", "distance", Modifier.weight(1f))
             stat("${a.places}", plural(a.places, "lieu", "lieux"), Modifier.weight(1f))
-            stat(t.device?.rssi?.let { "$it" } ?: "—", "dBm", Modifier.weight(1f))
+            stat("${a.sightings}", plural(a.sightings, "relevé", "relevés"), Modifier.weight(1f))
         }
         val lastSeen = t.sightings.lastOrNull()?.timeMs
         Text(
-            (t.device?.address ?: t.address) + (if (t.addresses.size > 1) " · ${t.addresses.size} adresses successives" else "") + " · vu ${a.sightings} fois" + (lastSeen?.let { " · dernière fois il y a ${((now - it) / 1000).coerceAtLeast(0)} s" } ?: ""),
-            Modifier.padding(top = 10.dp), style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant,
+            (t.device?.address ?: t.address) + (if (t.addresses.size > 1) " · ${t.addresses.size} adresses successives" else "") +
+                (lastSeen?.let { " · entendu il y a ${((now - it) / 1000).coerceAtLeast(0)} s" } ?: ""),
+            Modifier.padding(top = 10.dp), style = rf(12, 16, tnum = true),
         )
-        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            t.device?.let { d -> PillButton("Chaud/Froid", { onLocate(d) }, Modifier.weight(1f), icon = Sym.MyLocation, height = 40.dp) }
-            PillButton("Détails", { onDetails(t.device?.address ?: t.address) }, Modifier.weight(1f), icon = Sym.Info, height = 40.dp, outlined = true, bg = AntTheme.accent.accent)
-        }
         val snd = t.sound
-        PillButton(
-            when (snd) {
-                SoundUi.Connecting -> "Connexion au tag…"
-                is SoundUi.Playing -> "Arrêter la sonnerie"
-                else -> "Faire sonner"
-            },
-            { if (snd is SoundUi.Playing) onStopSound(t) else onRing(t) },
-            Modifier.fillMaxWidth().padding(top = 8.dp), icon = Sym.VolumeUp, height = 40.dp, outlined = true, bg = AntTheme.accent.accent,
-            enabled = t.device != null && snd != SoundUi.Connecting,
-        )
+        Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PillButton(
+                "Chaud/Froid", { t.device?.let(onLocate) }, Modifier.weight(1f), icon = Sym.MyLocation, height = 48.dp,
+                bg = acc.accent, fg = acc.onAccent, enabled = t.device != null,
+            )
+            PillButton(
+                when (snd) {
+                    SoundUi.Connecting -> "Connexion…"
+                    is SoundUi.Playing -> "Arrêter"
+                    else -> "Faire sonner"
+                },
+                { if (snd is SoundUi.Playing) onStopSound(t) else onRing(t) },
+                Modifier.weight(1f), icon = Sym.VolumeUp, height = 48.dp, bg = cs.surface, fg = acc.accent,
+                enabled = t.device != null && snd != SoundUi.Connecting,
+            )
+        }
         when (snd) {
-            is SoundUi.Playing -> Text("Sonnerie demandée via le ${snd.via}.", Modifier.padding(top = 6.dp), style = rf(12, 16), color = AntTheme.net.good)
-            is SoundUi.Message -> Text(snd.text, Modifier.padding(top = 6.dp), style = rf(12, 16), color = if (snd.error) cs.error else cs.onSurfaceVariant)
+            is SoundUi.Playing -> Text("Sonnerie demandée via le ${snd.via}.", Modifier.padding(top = 8.dp), style = rf(12, 16, 600), color = AntTheme.net.good)
+            is SoundUi.Message -> Text(snd.text, Modifier.padding(top = 8.dp), style = rf(12, 16), color = if (snd.error) cs.error else cs.onSurfaceVariant)
             else -> Unit
+        }
+    }
+}
+
+/** RSSI over the session: a tag whose signal stays steady while you move is one you carry. */
+@Composable
+private fun SignalCard(t: TrackerCandidate) {
+    val pts = t.sightings.takeLast(60).map { it.rssi.toFloat() }
+    SectionCard {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("Signal", Modifier.weight(1f), style = rf(14, 20, 600), color = AntTheme.accent.accent)
+            if (pts.isNotEmpty()) Text("min ${fmt(pts.min().toInt())} · max ${fmt(pts.max().toInt())} dBm", style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant)
+        }
+        if (pts.size >= 2) {
+            com.allnetworktools.ui.components.Sparkline(
+                pts, -100f, -30f, levelColor(t.assessment.level),
+                Modifier.fillMaxWidth().padding(top = 10.dp).height(72.dp),
+            )
+            Text("Un relevé toutes les 15 s tant que le tag est entendu.", Modifier.padding(top = 6.dp), style = rf(12, 16), color = cs.onSurfaceVariant)
+        } else {
+            Text("La courbe apparaît dès le deuxième relevé (un toutes les 15 s).", Modifier.padding(top = 8.dp), style = rf(13, 18), color = cs.onSurfaceVariant)
         }
     }
 }

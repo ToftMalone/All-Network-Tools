@@ -364,7 +364,7 @@ fun GattTool(c: GattController, address: String?, device: BleDevice?, bonded: Bo
 }
 
 @Composable
-private fun AdvertCard(device: BleDevice?) {
+internal fun AdvertCard(device: BleDevice?) {
     InfoList("Données d'annonce") {
         if (device == null) {
             Text(
@@ -385,7 +385,7 @@ private fun AdvertCard(device: BleDevice?) {
 }
 
 @Composable
-private fun IdentityCard(d: BleDevice?) {
+internal fun IdentityCard(d: BleDevice?) {
     if (d == null) return
     val acc = AntTheme.accent
     SectionCard(shape = RoundedCornerShape(28.dp)) {
@@ -420,7 +420,7 @@ private fun IdentityCard(d: BleDevice?) {
 }
 
 @Composable
-private fun FramesCard(d: BleDevice?) {
+internal fun FramesCard(d: BleDevice?) {
     if (d == null || d.ads.isEmpty()) return
     InfoList("Trames d'annonce · ${d.ads.size}") {
         d.ads.forEach { s -> InfoRow("0x%02X · %s".format(s.type, com.allnetworktools.data.Ad.typeName(s.type)), com.allnetworktools.data.Ad.describe(s)) }

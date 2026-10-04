@@ -67,10 +67,21 @@ object WorldMap {
     fun oceanAt(lat: Double, lon: Double): String = when {
         lat < -60 -> "Océan Austral"
         lat > 66 -> "Océan Arctique"
+        // Enclosed and marginal seas first: the broad ocean boxes below would swallow them.
+        lat in 48.5..51.3 && lon in -5.5..2.0 -> "La Manche"
+        lat in 51.0..61.0 && lon in -4.0..9.0 -> "Mer du Nord"
+        lat in 53.5..66.0 && lon in 9.0..30.5 -> "Mer Baltique"
+        lat in 43.0..48.5 && lon in -10.0..-1.0 -> "Golfe de Gascogne"
+        lat in 61.0..66.0 && lon in -5.0..15.0 -> "Mer de Norvège"
+        lat in 40.5..47.0 && lon in 27.0..42.0 -> "Mer Noire"
+        lat in 36.5..47.5 && lon in 46.5..55.0 -> "Mer Caspienne"
+        lat in 30.0..46.0 && lon in -6.0..36.5 -> "Mer Méditerranée"
+        lat in 12.0..30.0 && lon in 32.0..44.0 -> "Mer Rouge"
+        lat in 23.5..30.5 && lon in 47.5..57.0 -> "Golfe Persique"
         lon in 20.0..146.0 && lat < 25 && !(lon > 100 && lat > 0) -> "Océan Indien"
         lat >= 0 && lon in -100.0..-5.0 && !(lon < -80 && lat < 9) -> "Océan Atlantique"
         lat < 0 && lon in -68.0..20.0 -> "Océan Atlantique"
-        lat >= 30 && lon in -5.0..42.0 -> "Mer Méditerranée"
+        lat >= 0 && lon in -5.0..15.0 -> "Océan Atlantique"
         else -> "Océan Pacifique"
     }
 }

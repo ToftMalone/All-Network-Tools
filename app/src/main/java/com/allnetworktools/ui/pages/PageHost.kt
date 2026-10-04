@@ -307,7 +307,6 @@ private fun BtToolRoute(vm: MainViewModel, page: Page.ToolPage) {
             com.allnetworktools.ui.pages.bt.TrackerDetailTool(
                 vm.tools.unknownTrackers, page.arg, ble, positions,
                 onLocate = { d -> vm.tools.tracker.follow(d); vm.navigate { it.copy(page = Page.ToolPage(Tool.Tracker)) } },
-                onDetails = { a -> vm.navigate { it.copy(page = Page.ToolPage(Tool.Gatt, a)) } },
             )
         }
         else -> Unit
