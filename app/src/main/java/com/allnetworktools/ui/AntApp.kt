@@ -91,6 +91,7 @@ private fun parentPage(page: Page): Page = when (page) {
     is Page.ToolPage -> when (val p = page.tool.parent) {
         ToolParent.Tools -> Page.Tools
         ToolParent.Dashboard -> Page.Dashboard
+        ToolParent.Home -> Page.Home
         is ToolParent.Other -> Page.ToolPage(p.tool)
     }
     else -> Page.Home
@@ -252,6 +253,7 @@ private fun DockLayer(vm: MainViewModel, nav: NavState, modifier: Modifier, onCl
                 }
                 vm.navigate { it.copy(page = page) }
             },
+            onPage = { p -> vm.navigate { it.copy(page = p) } },
             onHome = {
                 haptics.tick()
                 if (nav.page == Page.Home) vm.navigate { it.copy(network = null) } else onClose()

@@ -23,6 +23,7 @@ open class AntApplication : Application() {
     open val tles by lazy { com.allnetworktools.data.orbit.TleRepository(this) }
     open val towers by lazy { com.allnetworktools.data.TowerRepository() }
     open val usage by lazy { com.allnetworktools.data.UsageRepository(this) }
+    open val mesh by lazy { com.allnetworktools.data.mesh.MeshClient(this) }
     open val sdr by lazy { com.allnetworktools.data.sdr.SdrRepository(this) }
     open val weatherTles by lazy { com.allnetworktools.data.orbit.WeatherTleRepository(this) }
     open val wifiDirect by lazy { com.allnetworktools.data.WifiDirectRepository(this) }

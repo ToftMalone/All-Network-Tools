@@ -120,7 +120,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun navigate(block: (NavState) -> NavState) {
         val old = _nav.value
-        val new = block(old)
+        var new = block(old)
+        // Meshtastic has no dashboard nor tools list: its tabs are those of the official app, Messages first,
+        // or Connecter while no node has ever been connected.
+        if (new.network == Network.Meshtastic && (new.page == Page.Dashboard || new.page == Page.Tools)) {
+            new = new.copy(page = Page.ToolPage(if (g.mesh.lastLink == null) Tool.MeshConnect else Tool.MeshMessages))
+        }
+        if (new.network == Network.Meshtastic && old.network != Network.Meshtastic) g.mesh.resume()
         when {
             new.network != old.network || new.page == Page.Home || old.page == Page.Home || old.page == Page.Settings || new.page == Page.Settings -> trail.clear()
             new.page != old.page -> {
@@ -178,6 +184,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 else -> null
             },
             Network.Sdr to if (sdr == null) Blocker.SdrMissing else null,
+            Network.Meshtastic to null,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
@@ -217,6 +224,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val roams: StateFlow<List<RoamEvent>> = _roams
 
     val updater get() = g.updater
+    val mesh get() = g.mesh
 
     internal fun setRoamsForTest(list: List<RoamEvent>) {
         _roams.value = list

@@ -575,4 +575,56 @@ class ScreenshotTest {
             ),
         )
     }
+
+    private fun meshDemo(vm: MainViewModel, connected: Boolean = true) {
+        val me = 0x1a2b3c4dL
+        val nowS = System.currentTimeMillis() / 1000
+        fun u(num: Long, long: String, short: String, hw: Int, role: Int = 0) =
+            com.allnetworktools.data.mesh.MeshProto.User(com.allnetworktools.data.mesh.MeshProto.nodeId(num), long, short, hw, role, false, true, null)
+        fun pos(lat: Double, lon: Double) = com.allnetworktools.data.mesh.MeshProto.Position(lat, lon, 80, nowS - 600, 9, 32, null)
+        fun m(b: Int, v: Float) = com.allnetworktools.data.mesh.MeshProto.Metrics(b, v, 14.2f, 1.1f, 86_400L * 2 + 3600)
+        val nodes = listOf(
+            com.allnetworktools.data.mesh.MeshNode(me, u(me, "Thomas T-Beam", "TOM", 4), pos(48.8606, 2.3376), metrics = m(76, 3.95f), lastHeardS = nowS),
+            com.allnetworktools.data.mesh.MeshNode(0xdeadbeefL, u(0xdeadbeefL, "Relais Montmartre", "MTM", 43, 2), pos(48.8867, 2.3431), 9.5f, -88, nowS - 120, m(101, 5.1f), hopsAway = 0, isFavorite = true),
+            com.allnetworktools.data.mesh.MeshNode(0x7c41a0b2L, u(0x7c41a0b2L, "Camille vélo", "CAM", 48), pos(48.8412, 2.3203), 3.25f, -109, nowS - 900, m(54, 3.78f), hopsAway = 1),
+            com.allnetworktools.data.mesh.MeshNode(0x0badf00dL, u(0x0badf00dL, "Station météo Vincennes", "METO", 9, 6), pos(48.8448, 2.4371), -4.5f, -118, nowS - 2700, m(88, 4.02f), hopsAway = 2,
+                environment = com.allnetworktools.data.mesh.MeshProto.Environment(17.4f, 62f, 1013f)),
+            com.allnetworktools.data.mesh.MeshNode(0x51e5ca7eL, u(0x51e5ca7eL, "Nœud de passage", "PASS", 43), null, -11f, -124, nowS - 6 * 3600, hopsAway = 3, viaMqtt = true),
+        )
+        val channels = listOf(
+            com.allnetworktools.data.mesh.MeshProto.ChannelRecord(0, 1, "", byteArrayOf(1), 13, false, false, null),
+            com.allnetworktools.data.mesh.MeshProto.ChannelRecord(1, 2, "Famille", ByteArray(32) { it.toByte() }, 0, false, false, null),
+        )
+        val lora = com.allnetworktools.data.mesh.ProtoMsg.parse(com.allnetworktools.data.mesh.ProtoWriter().bool(1, true).int(2, 0).int(7, 3).int(8, 3).bool(9, true).int(10, 27).toByteArray())!!
+        val device = com.allnetworktools.data.mesh.ProtoMsg.parse(com.allnetworktools.data.mesh.ProtoWriter().int(1, 0).toByteArray())!!
+        val position = com.allnetworktools.data.mesh.ProtoMsg.parse(com.allnetworktools.data.mesh.ProtoWriter().int(1, 900).bool(2, true).int(13, 1).toByteArray())!!
+        val bt = com.allnetworktools.data.mesh.ProtoMsg.parse(com.allnetworktools.data.mesh.ProtoWriter().bool(1, true).int(2, 0).toByteArray())!!
+        val now = System.currentTimeMillis()
+        fun msg(id: Long, key: String, from: Long, to: Long, text: String, ago: Long, st: com.allnetworktools.data.mesh.MsgStatus = com.allnetworktools.data.mesh.MsgStatus.Delivered, hops: Int? = null, snr: Float? = null) =
+            com.allnetworktools.data.mesh.ChatMessage(id, key, from, to, if (key == "c1") 1 else 0, text, now - ago, from == me, st, null, snr, null, hops)
+        val B = com.allnetworktools.data.mesh.MeshProto.BROADCAST
+        val msgs = listOf(
+            msg(1, "c0", 0x0badf00dL, B, "Bulletin : 17 °C, vent faible, pas de pluie prévue cet après-midi.", 3_600_000, hops = 2, snr = -4.5f),
+            msg(2, "c0", 0xdeadbeefL, B, "Le relais de Montmartre est de retour sur le toit 👍", 1_500_000, hops = 0, snr = 9.5f),
+            msg(3, "c0", me, B, "Bien reçu depuis le Louvre, 3 km en direct !", 1_380_000, com.allnetworktools.data.mesh.MsgStatus.Relayed),
+            msg(4, "c0", 0x7c41a0b2L, B, "Je passe par Montparnasse vers 18 h si quelqu'un veut tester.", 600_000, hops = 1, snr = 3.25f),
+            msg(5, "c1", me, B, "On se retrouve à 19 h ?", 7_200_000, com.allnetworktools.data.mesh.MsgStatus.Delivered),
+            msg(6, "d${0x7c41a0b2L}", 0x7c41a0b2L, me, "Tu me reçois bien d'ici ?", 300_000, hops = 1, snr = 3.25f),
+            msg(7, "d${0x7c41a0b2L}", me, 0x7c41a0b2L, "Oui, SNR à +3 dB, un saut par Montmartre.", 240_000, com.allnetworktools.data.mesh.MsgStatus.Delivered),
+            msg(8, "d${0x7c41a0b2L}", me, 0x7c41a0b2L, "Et maintenant ?", 60_000, com.allnetworktools.data.mesh.MsgStatus.Sent),
+        )
+        val link = com.allnetworktools.data.mesh.MeshLink(com.allnetworktools.data.mesh.MeshLink.Kind.Bluetooth, "AA:BB:CC:DD:EE:01", "Meshtastic_3c4d")
+        vm.mesh.setForTest(
+            me, nodes, channels, com.allnetworktools.data.mesh.RadioConfig(mapOf(1 to device, 2 to position, 6 to lora, 7 to bt)), msgs,
+            if (connected) com.allnetworktools.data.mesh.MeshConn.Connected(link) else com.allnetworktools.data.mesh.MeshConn.Disconnected,
+        )
+    }
+    @Test fun meshHome() = shot("M0_home_meshtastic", nav = NavState(Network.Meshtastic))
+    @Test fun meshMessages() = shot("M1_mesh_messages", nav = NavState(Network.Meshtastic, Page.ToolPage(Tool.MeshMessages))) { meshDemo(it) }
+    @Test fun meshChat() = shot("M2_mesh_chat", nav = NavState(Network.Meshtastic, Page.ToolPage(Tool.MeshChat, "c0"))) { meshDemo(it) }
+    @Test fun meshDm() = shot("M2b_mesh_dm", dark = true, nav = NavState(Network.Meshtastic, Page.ToolPage(Tool.MeshChat, "d${0x7c41a0b2L}"))) { meshDemo(it) }
+    @Test fun meshNodes() = shot("M3_mesh_nodes", nav = NavState(Network.Meshtastic, Page.ToolPage(Tool.MeshNodes))) { meshDemo(it) }
+    @Test fun meshNode() = shot("M4_mesh_node", nav = NavState(Network.Meshtastic, Page.ToolPage(Tool.MeshNode, "${0x0badf00dL}"))) { meshDemo(it) }
+    @Test fun meshSettings() = shot("M6_mesh_settings", nav = NavState(Network.Meshtastic, Page.ToolPage(Tool.MeshSettings))) { meshDemo(it) }
+    @Test fun meshConnect() = shot("M7_mesh_connect", nav = NavState(Network.Meshtastic, Page.ToolPage(Tool.MeshConnect))) { meshDemo(it, connected = false) }
 }

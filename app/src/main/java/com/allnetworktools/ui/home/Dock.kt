@@ -36,6 +36,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.allnetworktools.Page
 import com.allnetworktools.model.Network
+import com.allnetworktools.model.Tool
+import com.allnetworktools.model.ToolParent
+import androidx.compose.ui.unit.Dp
 import com.allnetworktools.ui.components.Symbol
 import com.allnetworktools.ui.components.pop
 import com.allnetworktools.ui.theme.AntTheme
@@ -45,6 +48,8 @@ import com.allnetworktools.ui.theme.rf
 import kotlinx.coroutines.launch
 
 enum class DockTab { Dashboard, Featured, Tools }
+
+private val MeshTabs = listOf(Tool.MeshMessages, Tool.MeshNodes, Tool.MeshMap, Tool.MeshSettings, Tool.MeshConnect)
 
 fun activeTab(page: Page): DockTab? = when (page) {
     Page.Dashboard -> DockTab.Dashboard
@@ -64,6 +69,7 @@ fun FloatingDock(
     onTab: (DockTab) -> Unit,
     onHome: () -> Unit,
     modifier: Modifier = Modifier,
+    onPage: (Page) -> Unit = {},
 ) {
     val acc = AntTheme.accent
     val squash = remember { Animatable(0f) }
@@ -93,6 +99,14 @@ fun FloatingDock(
                 Symbol(if (page == Page.Home) Sym.Close else Sym.GridView, size = 24.dp, tint = acc.onContainer)
             }
         }
+        if (network == Network.Meshtastic) {
+            // The five tabs of the official Meshtastic app; sub-pages light up the tab they belong to.
+            val root = (page as? Page.ToolPage)?.tool?.let { t -> (t.parent as? ToolParent.Other)?.tool ?: t }
+            MeshTabs.forEach { t ->
+                TabButton(t.icon, t.title.substringBefore(' '), root == t, activeWidth = 106.dp, idleWidth = 40.dp) { onPage(Page.ToolPage(t)) }
+            }
+            return@Row
+        }
         val active = activeTab(page)
         DockTab.entries.filter { it != DockTab.Featured || network.dockShortcut != null }.forEach { tab ->
             val (icon, label) = when (tab) {
@@ -106,9 +120,9 @@ fun FloatingDock(
 }
 
 @Composable
-private fun TabButton(icon: String, label: String, active: Boolean, onClick: () -> Unit) {
+private fun TabButton(icon: String, label: String, active: Boolean, activeWidth: Dp = 128.dp, idleWidth: Dp = 48.dp, onClick: () -> Unit) {
     val acc = AntTheme.accent
-    val width by animateDpAsState(if (active) 128.dp else 48.dp, Motion.standard(), label = "tabW")
+    val width by animateDpAsState(if (active) activeWidth else idleWidth, Motion.standard(), label = "tabW")
     val bg by animateColorAsState(if (active) acc.accent else Color.Transparent, tween(250, easing = Motion.Emphasized), label = "tabBg")
     val fg by animateColorAsState(if (active) acc.onAccent else acc.onContainer, tween(250, easing = Motion.Emphasized), label = "tabFg")
     val labelAlpha by animateFloatAsState(if (active) 1f else 0f, tween(200, easing = Motion.Emphasized), label = "tabLabel")

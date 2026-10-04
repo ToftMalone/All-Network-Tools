@@ -12,6 +12,7 @@ enum class Network(
     Cellular("Réseau mobile", Sym.CellBars3, "Cellules"),
     Gnss("GNSS", Sym.SatelliteAlt, "Ciel"),
     Sdr("SDR", Sym.Antenna, "Spectre"),
+    Meshtastic("Meshtastic", Sym.Hub, "Messages"),
     ;
 
     // Getters rather than constructor arguments: Tool's entries reference Network, so eager
@@ -25,6 +26,7 @@ enum class Network(
             Cellular -> Tool.Neighbors
             Gnss -> Tool.Sky
             Sdr -> Tool.Spectrum
+            Meshtastic -> Tool.MeshMessages
         }
 
     /** Tool reachable directly from the dock. */
@@ -36,6 +38,9 @@ enum class Network(
 sealed interface ToolParent {
     data object Tools : ToolParent
     data object Dashboard : ToolParent
+
+    /** Top-level pages of the Meshtastic network: back leaves the network, like the official app's tabs. */
+    data object Home : ToolParent
     data class Other(val tool: Tool) : ToolParent
 }
 
@@ -89,6 +94,15 @@ enum class Tool(
     Meteor(Network.Sdr, "Satellites météo (Meteor-M)", Sym.SatelliteAlt),
     Emitters(Network.Sdr, "Détecteur d'émetteurs", Sym.Radar),
     Fpv(Network.Sdr, "Drones FPV", Sym.Videocam),
+
+    // The five tabs of the official Meshtastic app, in its order, then the pages opened from them.
+    MeshMessages(Network.Meshtastic, "Messages", Sym.Chat, parent = ToolParent.Home, implemented = true),
+    MeshNodes(Network.Meshtastic, "Nœuds", Sym.Group, parent = ToolParent.Home, implemented = true),
+    MeshMap(Network.Meshtastic, "Carte de maillage", Sym.Map, parent = ToolParent.Home, implemented = true),
+    MeshSettings(Network.Meshtastic, "Réglages", Sym.Settings, parent = ToolParent.Home, implemented = true),
+    MeshConnect(Network.Meshtastic, "Connecter", Sym.Link, parent = ToolParent.Home, implemented = true),
+    MeshChat(Network.Meshtastic, "Conversation", Sym.Chat, parent = ToolParent.Other(MeshMessages), implemented = true),
+    MeshNode(Network.Meshtastic, "Nœud", Sym.Router, parent = ToolParent.Other(MeshNodes), implemented = true),
 
     ;
 
