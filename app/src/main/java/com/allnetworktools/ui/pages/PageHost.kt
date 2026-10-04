@@ -102,7 +102,7 @@ private fun titles(nav: NavState): Pair<String, String> {
         Page.Settings -> "Paramètres" to "All Radio Tools ${com.allnetworktools.BuildConfig.VERSION_NAME}"
         Page.Dashboard -> net.label to "Dashboard"
         Page.Tools -> net.label to "Outils"
-        is Page.ToolPage -> p.tool.title to if (net == Network.Meshtastic) "Meshtastic" else "${net.label} · Outils"
+        is Page.ToolPage -> p.tool.title to "${net.label} · Outils"
         Page.Home -> "" to ""
     }
 }
@@ -174,7 +174,6 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Network.Cellular -> CellDashboard(vm)
             Network.Gnss -> GnssDashboard(vm)
             Network.Sdr -> com.allnetworktools.ui.pages.sdr.SdrDashboard(vm)
-            Network.Meshtastic -> com.allnetworktools.ui.pages.mesh.MeshMessagesPage(vm)
         }
         Page.Tools -> ToolsPage(net, vm)
         is Page.ToolPage -> when (page.tool) {
@@ -186,13 +185,6 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.Passes -> com.allnetworktools.ui.pages.gnss.PassesTool(vm)
             Tool.TowerMap -> com.allnetworktools.ui.pages.cell.TowerMapTool(vm)
             Tool.Spectrum -> com.allnetworktools.ui.pages.sdr.SpectrumTool(vm)
-            Tool.MeshMessages -> com.allnetworktools.ui.pages.mesh.MeshMessagesPage(vm)
-            Tool.MeshChat -> com.allnetworktools.ui.pages.mesh.MeshChatPage(vm, page.arg)
-            Tool.MeshNodes -> com.allnetworktools.ui.pages.mesh.MeshNodesPage(vm)
-            Tool.MeshNode -> com.allnetworktools.ui.pages.mesh.MeshNodePage(vm, page.arg)
-            Tool.MeshMap -> com.allnetworktools.ui.pages.mesh.MeshMapPage(vm)
-            Tool.MeshSettings -> com.allnetworktools.ui.pages.mesh.MeshSettingsPage(vm)
-            Tool.MeshConnect -> com.allnetworktools.ui.pages.mesh.MeshConnectPage(vm)
             Tool.Adsb -> com.allnetworktools.ui.pages.sdr.AdsbTool(vm)
             Tool.Sonde -> com.allnetworktools.ui.pages.sdr.SondeTool(vm)
             Tool.Fm -> com.allnetworktools.ui.pages.sdr.FmTool(vm)

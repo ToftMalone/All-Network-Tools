@@ -235,7 +235,6 @@ private fun description(n: Network) = when (n) {
     Network.Cellular -> "Cellules, antennes de votre opérateur et données mobiles."
     Network.Gnss -> "Satellites, ciel, comparaison des positions et passages."
     Network.Sdr -> "HackRF : spectre, avions, navires, ballons-sondes, drones FPV et plus."
-    Network.Meshtastic -> "Votre nœud LoRa : messages, nœuds, carte et réglages."
 }
 
 @Composable
@@ -264,13 +263,6 @@ private fun CardIcon(network: Network) {
                     drawCircle(roles.accent, size.minDimension / 2 - 1.dp.toPx(), style = Stroke(2.dp.toPx(), pathEffect = dash))
                 }
                 Symbol(Sym.SatelliteAlt, size = 26.dp, filled = true, tint = roles.onAccent)
-            }
-        }
-        Network.Meshtastic -> {
-            // Nodes linked in a mesh: the hub glyph on a slowly turning cookie, with a ring for the radio.
-            Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
-                PulseRing(roles.accent, 40.dp, periodMs = 2600)
-                ShapeBadge(Sym.Hub, cookieShape(), 52.dp, roles.accent, roles.onAccent, 26.dp, spinMs = 28_000)
             }
         }
         Network.Sdr -> {

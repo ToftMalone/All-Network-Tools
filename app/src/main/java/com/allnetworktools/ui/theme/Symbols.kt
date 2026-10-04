@@ -195,12 +195,4 @@ object Sym {
     const val Usb = "usb"
     const val Forum = "forum"
     const val Stream = "stream"
-    const val Chat = "chat"
-    const val Group = "group"
-    const val Send = "send"
-    const val DoneAll = "done_all"
-    const val Star = "star"
-    const val Person = "person"
-    const val CloudDone = "cloud_done"
-    const val Sync = "sync"
 }
