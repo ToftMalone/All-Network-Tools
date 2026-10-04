@@ -317,7 +317,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val tools = com.allnetworktools.ui.tools.ToolsHub(g, viewModelScope)
 
     private fun stopSdr() {
-        tools.meshtastic.stop()
         tools.fpv.stop()
         tools.spectrum.stop()
         tools.adsb.stop()

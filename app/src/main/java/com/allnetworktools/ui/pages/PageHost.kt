@@ -184,7 +184,6 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.PositionCompare -> com.allnetworktools.ui.pages.gnss.PositionCompareTool(vm)
             Tool.Passes -> com.allnetworktools.ui.pages.gnss.PassesTool(vm)
             Tool.TowerMap -> com.allnetworktools.ui.pages.cell.TowerMapTool(vm)
-            Tool.Meshtastic -> com.allnetworktools.ui.pages.sdr.MeshtasticTool(vm)
             Tool.Spectrum -> com.allnetworktools.ui.pages.sdr.SpectrumTool(vm)
             Tool.Adsb -> com.allnetworktools.ui.pages.sdr.AdsbTool(vm)
             Tool.Sonde -> com.allnetworktools.ui.pages.sdr.SondeTool(vm)

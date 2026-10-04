@@ -80,7 +80,6 @@ enum class Tool(
     PositionCompare(Network.Gnss, "Comparer les positions", Sym.ShareLocation, Sym.Refresh),
     Passes(Network.Gnss, "Passages de satellites", Sym.Orbit, Sym.Refresh),
 
-    Meshtastic(Network.Sdr, "Meshtastic", Sym.Hub, Sym.Delete, implemented = true),
     Spectrum(Network.Sdr, "Analyseur de spectre", Sym.BarChart),
     Adsb(Network.Sdr, "Avions (ADS-B)", Sym.Flight),
     Sonde(Network.Sdr, "Ballons-sondes", Sym.Cloud),

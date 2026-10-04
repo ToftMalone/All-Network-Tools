@@ -234,7 +234,7 @@ private fun description(n: Network) = when (n) {
     Network.Bluetooth -> "Appareils Bluetooth LE, traqueurs inconnus et recherche Chaud/Froid."
     Network.Cellular -> "Cellules, antennes de votre opérateur et données mobiles."
     Network.Gnss -> "Satellites, ciel, comparaison des positions et passages."
-    Network.Sdr -> "HackRF : réception et décodage du réseau Meshtastic."
+    Network.Sdr -> "HackRF : spectre, avions, navires, ballons-sondes, drones FPV et plus."
 }
 
 @Composable
