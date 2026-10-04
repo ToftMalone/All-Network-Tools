@@ -42,4 +42,11 @@ class UpdaterTest {
         assertNull(updater.parse(release("v0.3", url = "https://evil.example.com/app.apk")))
         assertNull(updater.parse(release("v0.3", asset = "notes.txt")))
     }
+
+    @Test fun changelogBecomesAList() {
+        val items = com.allnetworktools.ui.changelogItems("## Nouveautés\r\n- Premier point\n- **Deuxième** point\n  suite du deuxième\n\n- `Troisième`")
+        assertEquals(listOf("Premier point", "Deuxième point suite du deuxième", "Troisième"), items)
+        assertEquals(listOf("Un paragraphe."), com.allnetworktools.ui.changelogItems("Un paragraphe."))
+        assertTrue(com.allnetworktools.ui.changelogItems("").isEmpty())
+    }
 }

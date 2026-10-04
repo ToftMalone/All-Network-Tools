@@ -15,7 +15,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import com.allnetworktools.BuildConfig
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,6 +44,57 @@ import com.allnetworktools.ui.tools.ProgressBar
 import com.allnetworktools.update.UpdateState
 import kotlinx.coroutines.launch
 
+/** Asks whether to install a newer version, with what changes in it. */
+@Composable
+fun UpdateDialog(vm: MainViewModel) {
+    val state by vm.updater.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val s = state as? UpdateState.Available ?: return
+    AlertDialog(
+        onDismissRequest = { vm.updater.postpone() },
+        icon = { Symbol(Sym.Update, size = 28.dp, tint = cs.primary) },
+        title = { Text("Version ${s.info.version} disponible") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Vous avez la version ${BuildConfig.VERSION_NAME}." + (if (s.info.sizeBytes > 0) " Téléchargement de %.1f Mo, sans quitter l'application.".format(java.util.Locale.FRANCE, s.info.sizeBytes / 1e6) else ""),
+                    style = rf(14, 20), color = cs.onSurfaceVariant,
+                )
+                Text("Nouveautés", style = rf(14, 20, 600))
+                Column(
+                    Modifier.fillMaxWidth().heightIn(max = 320.dp).clip(RoundedCornerShape(16.dp)).background(cs.surfaceContainerHigh)
+                        .verticalScroll(rememberScrollState()).padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val items = changelogItems(s.info.notes)
+                    if (items.isEmpty()) Text("Pas de notes pour cette version.", style = rf(13, 18), color = cs.onSurfaceVariant)
+                    items.forEach { line ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("•", style = rf(13, 18, 700), color = cs.primary)
+                            Text(line, style = rf(13, 18))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton({ scope.launch { vm.updater.downloadAndInstall(s.info) } }) { Text("Installer") } },
+        dismissButton = { TextButton({ vm.updater.postpone() }) { Text("Plus tard") } },
+    )
+}
+
+/** The release notes as a list: one entry per Markdown bullet, or per paragraph when there are none. */
+internal fun changelogItems(notes: String): List<String> {
+    val lines = notes.replace("\r", "").lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+    val out = ArrayList<String>()
+    for (l in lines) {
+        val bullet = l.startsWith("- ") || l.startsWith("* ") || l.startsWith("• ")
+        val text = (if (bullet) l.substring(2) else l).replace("**", "").replace("`", "").trim()
+        if (text.isEmpty()) continue
+        if (!bullet && out.isNotEmpty() && lines.any { it.startsWith("- ") || it.startsWith("* ") }) out[out.size - 1] = out.last() + " " + text else out += text
+    }
+    return out
+}
+
 /** Progress of an app update: download, permission to install, result. Hidden when nothing is going on. */
 @Composable
 fun UpdateBanner(vm: MainViewModel, modifier: Modifier = Modifier) {
@@ -53,7 +110,7 @@ fun UpdateBanner(vm: MainViewModel, modifier: Modifier = Modifier) {
         onDispose { lifecycle.removeObserver(obs) }
     }
     val visible = when (state) {
-        is UpdateState.Downloading, is UpdateState.NeedsPermission, is UpdateState.Installing, is UpdateState.Failed, is UpdateState.Available -> true
+        is UpdateState.Downloading, is UpdateState.NeedsPermission, is UpdateState.Installing, is UpdateState.Failed -> true
         else -> false
     }
     AnimatedVisibility(visible, modifier, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
@@ -64,16 +121,6 @@ fun UpdateBanner(vm: MainViewModel, modifier: Modifier = Modifier) {
         ) {
             val fg = cs.inverseOnSurface
             when (val s = state) {
-                is UpdateState.Available -> {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Symbol(Sym.Update, size = 24.dp, tint = fg)
-                        Column(Modifier.weight(1f)) {
-                            Text("Version ${s.info.version} disponible", style = rf(15, 20, 600), color = fg)
-                            Text("Téléchargement et installation sans quitter l'application.", style = rf(12, 16), color = fg)
-                        }
-                        PillButton("Installer", { scope.launch { vm.updater.downloadAndInstall(s.info) } }, height = 40.dp, bg = cs.inversePrimary, fg = cs.onSurface)
-                    }
-                }
                 is UpdateState.Downloading -> {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Symbol(Sym.Download, size = 24.dp, tint = fg)

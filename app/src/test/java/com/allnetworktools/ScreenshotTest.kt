@@ -606,4 +606,13 @@ class ScreenshotTest {
     @Test fun fpvAnalog() = shot("H18_fpv_analog", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it) }
     @Test fun fpvVideo() = shot("H19_fpv_video", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, watching = true) }
     @Test fun fpvDigital() = shot("H20_fpv_digital", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, digital = true) }
+    @Test fun updateDialog() = shot("Z9_update_dialog") { vm ->
+        vm.updater.offerForTest(
+            com.allnetworktools.update.UpdateInfo(
+                "0.9", "v0.9",
+                "- Nouvel outil « Drones FPV » dans l'onglet SDR\n- Meshtastic : correction de la réception des vrais nœuds\n- Le raccourci principal du dock devient le spectre",
+                "https://github.com/ToftMalone/All-Network-Tools/releases/download/v0.9/AllRadioTools-v0.9.apk", 4_590_146, null,
+            ),
+        )
+    }
 }

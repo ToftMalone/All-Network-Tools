@@ -80,6 +80,7 @@ fun AntApp(vm: MainViewModel) {
                     MainShell(vm)
                 }
                 UpdateBanner(vm, Modifier.align(Alignment.TopCenter))
+                if (settings.onboardingDone) UpdateDialog(vm)
                 Snackbar(toaster, Modifier.align(Alignment.BottomCenter))
             }
         }

@@ -144,7 +144,7 @@ fun SettingsScreen(vm: MainViewModel) {
             Section("Mises à jour") {
                 val us by vm.updater.state.collectAsStateWithLifecycle()
                 Item(
-                    0, 2, Sym.Update, "Mises à jour automatiques", "Vérifie GitHub au lancement et installe la nouvelle version",
+                    0, 2, Sym.Update, "Rechercher au lancement", "Vérifie GitHub et propose la nouvelle version avec ses nouveautés",
                     trailing = { AntSwitch(s.autoUpdate) }, onClick = { vm.updateSettings { setAutoUpdate(!s.autoUpdate) } },
                 )
                 Item(
@@ -158,7 +158,7 @@ fun SettingsScreen(vm: MainViewModel) {
                         else -> "Version installée : ${BuildConfig.VERSION_NAME}"
                     },
                     trailing = { LinkIcon(Sym.ChevronRight) },
-                    onClick = { scope.launch { vm.updater.check(autoInstall = true, force = true) } },
+                    onClick = { scope.launch { vm.updater.check(autoInstall = false, force = true) } },
                 )
             }
             Section("À propos") {

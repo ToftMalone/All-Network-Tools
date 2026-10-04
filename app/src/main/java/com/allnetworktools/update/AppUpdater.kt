@@ -227,6 +227,14 @@ open class AppUpdater(
         }
     }
 
+    /** « Plus tard » : hides the proposal until the next launch or the next manual check. */
+    fun postpone() {
+        if (_state.value is UpdateState.Available) _state.value = UpdateState.Idle
+    }
+
+    /** Test hook: shows the proposal for [info]. */
+    internal fun offerForTest(info: UpdateInfo) { _state.value = UpdateState.Available(info) }
+
     fun dismiss() {
         if (_state.value is UpdateState.Failed || _state.value is UpdateState.UpToDate) _state.value = UpdateState.Idle
     }
