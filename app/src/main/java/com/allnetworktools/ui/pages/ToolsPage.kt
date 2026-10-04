@@ -43,7 +43,7 @@ private data class ToolGroup(val title: String, val items: List<ToolEntry>)
 
 private fun groups(net: Network, connectedDevice: String?, servingLabel: String?): List<ToolGroup> = when (net) {
     Network.Wifi -> listOf(
-        ToolGroup("Analyse", listOf(ToolEntry(Tool.Channels, "Analyseur de canaux", "Canal recommandé"), ToolEntry(Tool.Speed, "Test de débit", "Ping, download, upload"))),
+        ToolGroup("Analyse", listOf(ToolEntry(Tool.Speed, "Test de débit", "Ping, download, upload"))),
         ToolGroup("Réseau local", listOf(ToolEntry(Tool.Lan, "Appareils du LAN", "Découverte des hôtes"), ToolEntry(Tool.Ports, "Scan de ports", "TCP, ports courants"))),
         ToolGroup("Découverte", listOf(ToolEntry(Tool.Upnp, "Scanner UPnP", "Box, TV, NAS, SSDP"), ToolEntry(Tool.Bonjour, "Scanner Bonjour", "Services mDNS / DNS-SD"), ToolEntry(Tool.WifiDirect, "Wi-Fi Direct", "Appareils en connexion directe"))),
         ToolGroup(
@@ -63,15 +63,11 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     Network.Bluetooth -> listOf(
         ToolGroup(
             "Appareils",
-            listOfNotNull(
-                ToolEntry(Tool.Tracker, "Chaud/Froid", "Retrouver un appareil"),
-                ToolEntry(Tool.Paired, connectedDevice ?: "Appareil appairé", if (connectedDevice != null) "Appareil connecté" else "Profils, batterie", Sym.Headphones),
-            ),
+            listOf(ToolEntry(Tool.Tracker, "Chaud/Froid", "Retrouver un appareil")),
         ),
         ToolGroup("Sécurité", listOf(ToolEntry(Tool.UnknownTrackers, "Traqueurs inconnus", "AirTag, SmartTag, Tile qui vous suivent"))),
     )
     Network.Cellular -> listOf(
-        ToolGroup("Antennes", listOf(ToolEntry(Tool.TowerMap, "Carte des antennes", "Sites ANFR de votre opérateur"))),
         ToolGroup("Consommation", listOf(ToolEntry(Tool.DataUsage, "Données mobiles", "Par SIM et par app"), ToolEntry(Tool.CellDetail, "Cellule de service", servingLabel ?: "Identifiants et mesures"))),
     )
     Network.Gnss -> listOf(

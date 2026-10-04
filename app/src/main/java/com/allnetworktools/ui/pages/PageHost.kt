@@ -64,7 +64,6 @@ import com.allnetworktools.ui.pages.cell.NeighborCells
 import com.allnetworktools.ui.pages.gnss.GnssDashboard
 import com.allnetworktools.ui.pages.wifi.WifiDashboard
 import com.allnetworktools.ui.pages.wifi.WifiScanner
-import com.allnetworktools.ui.pages.wifi.ChannelsTool
 import com.allnetworktools.ui.pages.wifi.DnsTool
 import com.allnetworktools.ui.pages.wifi.LanDeviceTool
 import com.allnetworktools.ui.pages.wifi.LanTool
@@ -183,7 +182,6 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.Sky -> SkyTool(vm)
             Tool.PositionCompare -> com.allnetworktools.ui.pages.gnss.PositionCompareTool(vm)
             Tool.Passes -> com.allnetworktools.ui.pages.gnss.PassesTool(vm)
-            Tool.TowerMap -> com.allnetworktools.ui.pages.cell.TowerMapTool(vm)
             Tool.Spectrum -> com.allnetworktools.ui.pages.sdr.SpectrumTool(vm)
             Tool.Adsb -> com.allnetworktools.ui.pages.sdr.AdsbTool(vm)
             Tool.Sonde -> com.allnetworktools.ui.pages.sdr.SondeTool(vm)
@@ -204,7 +202,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
                     else "Android demande l'autorisation de localisation pour rechercher les appareils Wi-Fi Direct.",
                 ) { actions.request(if (modern) PermGroup.Nearby else PermGroup.Location) }
             }
-            Tool.Gatt, Tool.Paired, Tool.Tracker, Tool.UnknownTrackers -> BtToolRoute(vm, page)
+            Tool.Gatt, Tool.Paired, Tool.Tracker, Tool.UnknownTrackers, Tool.TrackerDetail -> BtToolRoute(vm, page)
             Tool.DataUsage -> {
                 val perms by vm.permissions.collectAsStateWithLifecycle()
                 val actions = LocalActions.current
@@ -217,7 +215,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.CellDetail -> CellDetailTool(vm.cell.collectAsStateWithLifecycle().value.state, page.arg) {
                 vm.navigate { it.copy(page = Page.ToolPage(Tool.Neighbors)) }
             }
-            Tool.Channels, Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed,
+            Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed,
             Tool.Upnp, Tool.Bonjour, Tool.Whois, Tool.EvilTwin, Tool.Audit, Tool.PortalDns, Tool.Mitm -> WifiToolRoute(vm, page)
             else -> ComingSoon(page.tool)
         }
@@ -237,10 +235,6 @@ private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
     val actions = LocalActions.current
     fun open(tool: Tool, arg: String? = null) = vm.navigate { it.copy(page = Page.ToolPage(tool, arg)) }
     when (page.tool) {
-        Tool.Channels -> ChannelsTool(
-            tools.channels, conn, vm.wifiScan, vm::startWifiScan, perms.location && locationOn,
-            onFixLocation = { if (!perms.location) actions.request(PermGroup.Location) else actions.openLocationSettings() },
-        )
         Tool.Lan -> LanTool(tools.lan, conn) { ip -> open(Tool.LanDevice, ip) }
         Tool.LanDevice -> LanDeviceTool(
             tools.lanDevice, page.arg, page.arg?.let(tools.lan::device), conn?.prefix,
@@ -305,6 +299,13 @@ private fun BtToolRoute(vm: MainViewModel, page: Page.ToolPage) {
             val positions by vm.positions.collectAsStateWithLifecycle()
             com.allnetworktools.ui.pages.bt.UnknownTrackersTool(
                 vm.tools.unknownTrackers, ble, positions,
+                onOpen = { key -> vm.navigate { it.copy(page = Page.ToolPage(Tool.TrackerDetail, key)) } },
+            )
+        }
+        Tool.TrackerDetail -> {
+            val positions by vm.positions.collectAsStateWithLifecycle()
+            com.allnetworktools.ui.pages.bt.TrackerDetailTool(
+                vm.tools.unknownTrackers, page.arg, ble, positions,
                 onLocate = { d -> vm.tools.tracker.follow(d); vm.navigate { it.copy(page = Page.ToolPage(Tool.Tracker)) } },
                 onDetails = { a -> vm.navigate { it.copy(page = Page.ToolPage(Tool.Gatt, a)) } },
             )

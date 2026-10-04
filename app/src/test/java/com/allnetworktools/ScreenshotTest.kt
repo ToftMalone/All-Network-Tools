@@ -140,12 +140,6 @@ class ScreenshotTest {
 
     private fun tool(t: Tool, arg: String? = null) = NavState(Network.Wifi, Page.ToolPage(t, arg))
 
-    @Test fun channelsIdle() = shot("60_channels_idle", nav = tool(Tool.Channels))
-    @Test fun channelsResults() = shot("61_channels_results", nav = tool(Tool.Channels)) { vm ->
-        vm.tools.channels.band = WifiBand.B5
-        FakeData.scan.forEach { vm.tools.channels.seen[it.bssid] = it }
-        vm.tools.channels.phase = Phase.Results
-    }
     @Test fun lanIdle() = shot("62_lan_idle", nav = tool(Tool.Lan))
     @Test fun lanResults() = shot("63_lan_results", nav = tool(Tool.Lan)) { vm ->
         vm.tools.lan.devices.addAll(FakeData.lan)
@@ -374,17 +368,16 @@ class ScreenshotTest {
             System.currentTimeMillis() - 41 * 60_000L, 2380.0,
         )
     }
+    @Test fun trackerDetail() = shot("D4b_tracker_detail", nav = NavState(Network.Bluetooth, Page.ToolPage(Tool.TrackerDetail, "F2:6B:91:0C:3A:58"))) { vm ->
+        val walk = (0 until 12).map { 48.8566 + it * 0.0017 to 2.3522 + it * 0.0009 }
+        vm.tools.unknownTrackers.setForTest(
+            listOf(tag("F2:6B:91:0C:3A:58", "1EFF4C00121910" + "5A".repeat(22) + "0201", 38, walk, -61)),
+            System.currentTimeMillis() - 41 * 60_000L, 2380.0,
+        )
+    }
     @Test fun unknownTrackersEmpty() = shot("D5_unknown_trackers_empty", dark = true, nav = bt(Tool.UnknownTrackers)) { vm ->
         Scenario.bleEmpty = true
         vm.tools.unknownTrackers.reset()
-    }
-    @Test fun towerMap() = shot("D8_tower_map", nav = cellTool(Tool.TowerMap))
-    @Test fun towerMapSelected() = shot("D9_tower_map_site", nav = cellTool(Tool.TowerMap)) { vm ->
-        runBlocking {
-            val r = app.towers.fetch(com.allnetworktools.data.TowerQuery(com.allnetworktools.data.FrOperator.Orange, 48.85661, 2.35222, 2000))
-            vm.tools.towerMap.setForTest(r)
-            vm.tools.towerMap.selected = r.sites.first().supportId
-        }
     }
     @Test fun passes() = shot("DA_passes", nav = gnssTool(Tool.Passes)) { vm -> precomputePasses(vm) }
     @Test fun passesDark() = shot("DB_passes_dark", dark = true, nav = gnssTool(Tool.Passes)) { vm ->

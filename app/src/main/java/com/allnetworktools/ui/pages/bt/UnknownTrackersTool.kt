@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -179,8 +181,7 @@ fun UnknownTrackersTool(
     c: UnknownTrackersController,
     devices: List<BleDevice>,
     positions: PositionSet,
-    onLocate: (BleDevice) -> Unit,
-    onDetails: (String) -> Unit,
+    onOpen: (String) -> Unit,
 ) {
     LaunchedEffect(devices) { c.feed(devices, positions) }
     TopBarAction(Sym.RestartAlt) { c.reset() }
@@ -214,7 +215,15 @@ fun UnknownTrackersTool(
                 null,
             )
         }
-        list.forEach { t -> TrackerCard(t, now, onLocate, onDetails, c::ring, c::stopSound) }
+        // Just the tags: name and status. Everything else is one tap away.
+        if (list.isNotEmpty()) {
+            SectionCard(padding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)) {
+                list.forEachIndexed { i, t ->
+                    if (i > 0) com.allnetworktools.ui.components.Hairline()
+                    TrackerRow(t) { onOpen(t.address) }
+                }
+            }
+        }
         SectionCard {
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Symbol(Sym.Info, size = 22.dp, tint = AntTheme.accent.accent)
@@ -227,6 +236,45 @@ fun UnknownTrackersTool(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun TrackerRow(t: TrackerCandidate, onClick: () -> Unit) {
+    val col = levelColor(t.assessment.level)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(t.device?.name ?: t.signal.net.maker, style = rf(16, 22, 600), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(t.assessment.level.label, style = rf(13, 18, 500), color = col)
+        }
+        Symbol(Sym.ChevronRight, size = 22.dp, tint = cs.onSurfaceVariant)
+    }
+}
+
+/** Everything about one tag: status, time and distance with you, signal, and the actions (locate, ring, details). */
+@Composable
+fun TrackerDetailTool(
+    c: UnknownTrackersController,
+    key: String?,
+    devices: List<BleDevice>,
+    positions: PositionSet,
+    onLocate: (BleDevice) -> Unit,
+    onDetails: (String) -> Unit,
+) {
+    // Keep following the tags while the details are open.
+    LaunchedEffect(devices) { c.feed(devices, positions) }
+    var now by androidx.compose.runtime.remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { delay(1000); now = System.currentTimeMillis() } }
+    val t = key?.let { k -> c.candidates[k] ?: c.candidates.values.firstOrNull { k in it.addresses } }
+    PageColumn {
+        if (t == null) {
+            ToolEmpty(Sym.GppMaybe, "Traqueur introuvable", "Il n'a plus été entendu depuis la réinitialisation de l'analyse.", null)
+            return@PageColumn
+        }
+        TrackerCard(t, now, onLocate, onDetails, c::ring, c::stopSound)
     }
 }
 

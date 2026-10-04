@@ -101,6 +101,10 @@ fun BleScanner(vm: MainViewModel) {
                         style = rf(14, 20, 500),
                     )
                 }
+                Text(
+                    "Distance estimée d'après la force du signal. La direction n'est pas mesurable par un téléphone : chaque appareil garde sa place sur le cercle.",
+                    Modifier.padding(top = 6.dp, start = 8.dp, end = 8.dp), style = rf(11, 15), color = cs.onSurfaceVariant, textAlign = TextAlign.Center,
+                )
             }
         }
         BleSearchBar(f) { f.sheetOpen = true }
@@ -162,11 +166,10 @@ private fun Radar(devices: List<BleDevice>, sweeping: Boolean) {
     Box(Modifier.size(300.dp).clip(CircleShape).background(roles.container)) {
         Canvas(Modifier.matchParentSize()) {
             val c = center
-            val r = size.minDimension / 2
-            drawCircle(roles.accent.copy(alpha = 0.35f), r * 100f / 150f, c, style = Stroke(1.dp.toPx()))
-            drawCircle(roles.accent.copy(alpha = 0.35f), r * 50f / 150f, c, style = Stroke(1.dp.toPx()))
-            drawLine(roles.accent.copy(alpha = 0.2f), Offset(c.x, 0f), Offset(c.x, size.height), 1.dp.toPx())
-            drawLine(roles.accent.copy(alpha = 0.2f), Offset(0f, c.y), Offset(size.width, c.y), 1.dp.toPx())
+            val unit = size.minDimension / 300f
+            RadarRings.forEach { m -> drawCircle(roles.accent.copy(alpha = 0.32f), radarRadius(m.toDouble()) * unit, c, style = Stroke(1.dp.toPx())) }
+            drawLine(roles.accent.copy(alpha = 0.18f), Offset(c.x, 0f), Offset(c.x, size.height), 1.dp.toPx())
+            drawLine(roles.accent.copy(alpha = 0.18f), Offset(0f, c.y), Offset(size.width, c.y), 1.dp.toPx())
             if (sweeping) {
                 rotate(sweep.value - 90f, c) {
                     drawCircle(
@@ -174,17 +177,24 @@ private fun Radar(devices: List<BleDevice>, sweeping: Boolean) {
                             0f to Color.Transparent, 280f / 360f to Color.Transparent, 1f to roles.accent.copy(alpha = 0.45f),
                             center = c,
                         ),
-                        r, c,
+                        size.minDimension / 2, c,
                     )
                 }
             }
         }
+        // Ring labels, along the vertical axis.
+        RadarRings.forEach { m ->
+            Text(
+                "$m m", Modifier.offset(x = 154.dp, y = (150 - radarRadius(m.toDouble()) - 13).dp),
+                style = rf(9, 11, 600), color = roles.onContainer.copy(alpha = 0.6f),
+            )
+        }
         devices.take(12).forEach { d ->
             key(d.address) {
-                val dist = ((-d.rssi - 40) / 55f * 138f).coerceIn(30f, 138f)
+                val dist = radarRadius(d.distanceM)
                 val a = Math.toRadians(d.angle.toDouble())
                 val target = Offset((150 + dist * sin(a)).toFloat(), (150 - dist * cos(a)).toFloat())
-                val pos by animateOffsetAsState(target, spring(0.8f, 380f), label = "dot")
+                val pos by animateOffsetAsState(target, spring(0.8f, 120f), label = "dot")
                 Box(Modifier.offset { androidx.compose.ui.unit.IntOffset((pos.x - 7).dp.roundToPx(), (pos.y - 7).dp.roundToPx()) }) {
                     Box(Modifier.size(22.dp).offset((-4).dp, (-4).dp).clip(CircleShape).background(roles.accent.copy(alpha = 0.25f)))
                     Box(Modifier.size(14.dp).clip(CircleShape).background(roles.accent))
@@ -202,6 +212,17 @@ private fun Radar(devices: List<BleDevice>, sweeping: Boolean) {
         }
         Box(Modifier.offset(138.dp, 138.dp)) { PulseRing(roles.accent, 24.dp, periodMs = 2000) }
     }
+}
+
+private val RadarRings = listOf(1, 3, 10, 30)
+
+/** Distance in metres to radar units (centre 0, edge 150), on a log scale from 0.5 m to 60 m. */
+private fun radarRadius(m: Double): Float = (40 + 104 * (Math.log10(m.coerceIn(0.5, 60.0) / 0.5) / Math.log10(120.0))).toFloat()
+
+internal fun distanceLabel(m: Double): String = when {
+    m < 1 -> "< 1 m"
+    m < 10 -> "≈ ${"%.1f".format(java.util.Locale.FRANCE, m)} m"
+    else -> "≈ ${m.toInt()} m"
 }
 
 @Composable
@@ -233,6 +254,7 @@ private fun BleItem(d: BleDevice, index: Int, count: Int, onClick: () -> Unit) {
         }
         Column(Modifier.width(56.dp), horizontalAlignment = Alignment.End) {
             Text(fmt(d.rssi), style = gs(18, 22, 500, tnum = true))
+            Text(distanceLabel(d.distanceM), style = rf(11, 14, tnum = true), color = cs.onSurfaceVariant, maxLines = 1)
             LevelBar(((d.rssi + 100) / 60f).coerceAtLeast(0.05f), roles.accent, Modifier.padding(top = 4.dp), height = 4.dp)
         }
     }

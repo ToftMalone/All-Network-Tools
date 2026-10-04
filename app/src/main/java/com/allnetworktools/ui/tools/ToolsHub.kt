@@ -5,7 +5,6 @@ import com.allnetworktools.data.net.LanScanner
 import com.allnetworktools.ui.pages.bt.GattController
 import com.allnetworktools.ui.pages.cell.DataUsageController
 import com.allnetworktools.ui.pages.bt.TrackerController
-import com.allnetworktools.ui.pages.wifi.ChannelsController
 import com.allnetworktools.ui.pages.wifi.DnsController
 import com.allnetworktools.ui.pages.wifi.LanController
 import com.allnetworktools.ui.pages.wifi.LanDeviceController
@@ -19,7 +18,6 @@ import kotlinx.coroutines.CoroutineScope
 class ToolsHub(private val app: AntApplication, private val scope: CoroutineScope) {
     private val lanScanner by lazy { LanScanner(app) }
 
-    val channels by lazy { ChannelsController(scope) }
     val lan by lazy { LanController(scope, lanScanner) }
     val lanDevice by lazy { LanDeviceController(scope, lanScanner) }
     val ping by lazy { PingController(scope) }
@@ -37,7 +35,6 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val dataUsage by lazy { DataUsageController(scope, app.usage) }
     val positionCompare = com.allnetworktools.ui.pages.gnss.PositionCompareController()
     val passes by lazy { com.allnetworktools.ui.pages.gnss.PassesController(app.tles, scope) }
-    val towerMap by lazy { com.allnetworktools.ui.pages.cell.TowerMapController(app.towers, scope) }
     private val probes by lazy { com.allnetworktools.data.RealProbes() }
     private val links by lazy { com.allnetworktools.data.LinkReader(app) }
     val audit by lazy { com.allnetworktools.ui.pages.wifi.AuditController(probes, links, scope) }

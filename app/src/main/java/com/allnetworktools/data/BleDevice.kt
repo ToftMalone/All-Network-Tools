@@ -71,6 +71,16 @@ data class BleDevice(
 
     val displayName: String get() = title
 
+    /**
+     * Distance estimated from the signal, log-distance path loss with exponent 2.2 (indoors, line of sight): the
+     * power at 1 m is the advertised transmit power (measured at 0 m) minus 41 dB, or −59 dBm, the usual value for
+     * phones and tags. Bodies and walls make it read farther; take it as an order of magnitude.
+     */
+    val distanceM: Double get() {
+        val p1m = txPower?.let { it - 41 } ?: -59
+        return Math.pow(10.0, (p1m - rssi) / 22.0).coerceIn(0.1, 100.0)
+    }
+
     /** Stable pseudo-angle so a device keeps its place on the radar. */
     val angle: Float get() = (abs(address.hashCode()) % 360).toFloat()
 

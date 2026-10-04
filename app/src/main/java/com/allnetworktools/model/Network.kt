@@ -48,7 +48,6 @@ enum class Tool(
     val implemented: Boolean = false,
 ) {
     WifiScan(Network.Wifi, "Scanner Wi-Fi", Sym.WifiFind, implemented = true),
-    Channels(Network.Wifi, "Analyseur de canaux", Sym.BarChart, Sym.Refresh),
     Lan(Network.Wifi, "Appareils du LAN", Sym.Devices, Sym.Refresh),
     LanDevice(Network.Wifi, "Appareil du LAN", Sym.Devices, Sym.MoreVert, ToolParent.Other(Lan)),
     Ping(Network.Wifi, "Ping", Sym.NetworkPing, Sym.IosShare),
@@ -70,10 +69,10 @@ enum class Tool(
     Paired(Network.Bluetooth, "Appareil appairé", Sym.Headphones, Sym.MoreVert, ToolParent.Dashboard),
     Tracker(Network.Bluetooth, "Chaud/Froid", Sym.MyLocation),
     UnknownTrackers(Network.Bluetooth, "Traqueurs inconnus", Sym.GppMaybe, Sym.RestartAlt),
+    TrackerDetail(Network.Bluetooth, "Traqueur", Sym.Sell, parent = ToolParent.Other(UnknownTrackers)),
 
     Neighbors(Network.Cellular, "Cellules voisines", Sym.CellTower, implemented = true),
     DataUsage(Network.Cellular, "Données mobiles", Sym.DataUsage, Sym.CalendarMonth),
-    TowerMap(Network.Cellular, "Carte des antennes", Sym.Map, Sym.Refresh),
     CellDetail(Network.Cellular, "Détail de la cellule", Sym.CellTower, Sym.ContentCopy, ToolParent.Other(Neighbors)),
 
     Sky(Network.Gnss, "Ciel GNSS", Sym.SatelliteAlt, implemented = true),

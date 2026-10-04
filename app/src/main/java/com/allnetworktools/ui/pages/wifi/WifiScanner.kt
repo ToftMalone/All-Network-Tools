@@ -159,7 +159,6 @@ fun WifiScanner(vm: MainViewModel) {
         SectionCard(padding = androidx.compose.foundation.layout.PaddingValues(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 12.dp)) {
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Occupation des canaux", Modifier.weight(1f), style = rf(14, 20, 600))
-                TextAction("Analyseur", { vm.navigate { it.copy(page = Page.ToolPage(Tool.Channels)) } }, color = roles.accent)
             }
             ChannelChart(list, band, conn?.bssid)
         }

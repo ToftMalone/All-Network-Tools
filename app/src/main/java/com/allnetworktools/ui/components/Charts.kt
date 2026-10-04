@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -172,21 +174,25 @@ fun SignalGauge(
 ) {
     val target = if (value == null) 0f else ((value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
     val frac by animateFloatAsState(target, Motion.standard(), label = "gauge")
-    Box(modifier.size(260.dp, 164.dp)) {
+    // Drawn on a 300 × 184 grid: the arc's centre sits on the baseline (y 150) with a 124 radius, so the value
+    // has 80 units of clear space above it inside the arc, and the end labels sit under each end of the arc.
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.widthIn(max = 300.dp).fillMaxWidth().aspectRatio(300f / 184f)) {
+        val u = maxWidth / 300f
         Canvas(Modifier.matchParentSize()) {
-            val s = size.width / 260f
-            val stroke = Stroke(18.dp.toPx(), cap = StrokeCap.Round)
-            val r = 100 * s
-            val topLeft = Offset(130 * s - r, 138 * s - r)
+            val k = size.width / 300f
+            val stroke = Stroke(16.dp.toPx(), cap = StrokeCap.Round)
+            val r = 124 * k
+            val topLeft = Offset(150 * k - r, 150 * k - r)
             drawArc(track, 180f, 180f, false, topLeft, Size(r * 2, r * 2), style = stroke)
             if (frac > 0.001f) drawArc(color, 180f, 180f * frac, false, topLeft, Size(r * 2, r * 2), style = stroke)
         }
-        Column(Modifier.fillMaxWidth().padding(top = 58.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(display, style = gs(56, 56, 500, -1.5f, tnum = true))
-            Text(label, Modifier.padding(top = 4.dp), style = rf(13, 18, 500))
+        Column(Modifier.fillMaxWidth().padding(top = u * 70), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(display, style = gs(52, 56, 500, -1.5f, tnum = true), maxLines = 1)
+            Text(label, Modifier.padding(top = 2.dp), style = rf(13, 18, 500), maxLines = 1)
         }
-        Text(fmt(range.start), Modifier.align(Alignment.BottomStart).offset(x = 14.dp), style = rf(11, 14), color = androidx.compose.material3.LocalContentColor.current.copy(alpha = 0.8f))
-        Text(fmt(range.endInclusive), Modifier.align(Alignment.BottomEnd).offset(x = (-18).dp), style = rf(11, 14), color = androidx.compose.material3.LocalContentColor.current.copy(alpha = 0.8f))
+        val endColor = androidx.compose.material3.LocalContentColor.current.copy(alpha = 0.75f)
+        Text(fmt(range.start), Modifier.width(u * 52).offset(x = u * 0, y = u * 164), style = rf(11, 14), color = endColor, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(fmt(range.endInclusive), Modifier.width(u * 52).offset(x = u * 248, y = u * 164), style = rf(11, 14), color = endColor, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 
