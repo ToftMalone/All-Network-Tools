@@ -94,7 +94,7 @@ fun TalkieDashboard(vm: MainViewModel) {
         }
         InfoList("Matériel") {
             InfoRow("Câble de programmation", cable?.name ?: "—")
-            InfoRow("Talkie", channels.ident?.let { channels.spec.label } ?: "—")
+            InfoRow("Talkie", channels.detected?.label ?: "Reconnu à la lecture")
             InfoRow("Entrée audio", audio.selected?.label ?: "—")
             InfoRow("Émission", "Jamais : lecture et écriture de la mémoire, écoute seule")
         }

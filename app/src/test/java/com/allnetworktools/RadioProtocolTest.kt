@@ -64,8 +64,12 @@ private class SimUv5r(memory: ByteArray, private val magic: ByteArray, private v
         while (true) {
             when (stage) {
                 0 -> {
-                    val m = take(magic.size) ?: return
-                    if (m.contentEquals(magic)) { emit(0x06); stage = 1 } else { return }
+                    // Other models' handshakes are noise: wait for this one's magic at the end of what arrived.
+                    if (inbox.size < magic.size) return
+                    val tail = peek(inbox.size)!!.copyOfRange(inbox.size - magic.size, inbox.size)
+                    if (!tail.contentEquals(magic)) { while (inbox.size > magic.size) inbox.removeFirst(); return }
+                    inbox.clear()
+                    emit(0x06); stage = 1
                 }
                 1 -> { take(1) ?: return; emit(ident); stage = 2 }
                 2 -> { take(1) ?: return; emit(0x06); stage = 3 }
@@ -112,10 +116,14 @@ private class SimJc8810(memory: ByteArray, private val fingerprint: ByteArray, p
     override fun process() {
         while (true) {
             if (!inProgramming) {
-                val m = take(magic.size) ?: return
+                // Other models' handshakes are noise: wait for this one's magic at the end of what arrived.
+                if (inbox.size < magic.size) return
+                val tail = peek(inbox.size)!!.copyOfRange(inbox.size - magic.size, inbox.size)
+                if (!tail.contentEquals(magic)) { while (inbox.size > magic.size) inbox.removeFirst(); return }
+                inbox.clear()
                 magicsSeen++
-                if (m.contentEquals(magic) && magicsSeen > ignoreFirst) { inProgramming = true; emit(0x06) }
-                continue
+                if (magicsSeen > ignoreFirst) { inProgramming = true; emit(0x06) }
+                return
             }
             val head = peek(1) ?: return
             when (head[0].toInt().toChar()) {
@@ -360,5 +368,76 @@ class ChannelsControllerTest {
         val appel = c.channels.filterNotNull().first { it.name == "APPEL2M" }
         assertEquals(145_500_000L, appel.txHz)
         assertNull(c.channels.filterNotNull().first { it.name == "ISS VOX" }.txHz) // a downlink: never
+    }
+
+    @Test fun recognisesTheRt470xWithoutBeingTold() {
+        val mem = ByteArray(Rt470xSpec().imageSize) { 0xFF.toByte() }
+        Rt470xSpec().encode(mem, RadioChannel(0, 433_500_000, 433_500_000, "APPEL", wide = false))
+        val radio = SimJc8810(mem, byteArrayOf(0, 0, 0, 0x36, 0, 0x20, 0xDC.toByte(), 0x04))
+        val c = com.allnetworktools.ui.pages.talkie.ChannelsController(
+            SimCables(androidx.test.core.app.ApplicationProvider.getApplicationContext(), radio),
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined), listOf(Uv5rSpec(0), Rt470xSpec()),
+        )
+        assertNull(c.detected)
+        c.read(cable); waitIdle(c)
+        assertEquals("rt470x", c.detected?.id)
+        assertEquals(1, c.count)
+        assertTrue(c.message!!.text.contains("Radtel RT-470X reconnu"))
+    }
+
+    @Test fun recognisesTheUv5rWithoutBeingTold() {
+        val uv = Uv5rSpec(0)
+        val mem = ByteArray(uv.imageSize) { 0xFF.toByte() }
+        uv.encode(mem, RadioChannel(0, 145_500_000, 145_500_000, "APPEL"))
+        val magic = byteArrayOf(0x50, 0xBB.toByte(), 0xFF.toByte(), 0x20, 0x12, 0x07, 0x25)
+        val c = com.allnetworktools.ui.pages.talkie.ChannelsController(
+            SimCables(androidx.test.core.app.ApplicationProvider.getApplicationContext(), SimUv5r(mem, magic, magic + 0xDD.toByte())),
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined), listOf(Rt470xSpec(), uv),
+        )
+        c.read(cable); waitIdle(c)
+        assertEquals("uv5r", c.detected?.id)
+        assertEquals("APPEL", c.channels[0]!!.name)
+        assertEquals(128, c.channels.count { true }.coerceAtMost(256).let { if (c.limits.slots == 128) 128 else 0 })
+    }
+
+    @Test fun noRadioAnswersAtAll() {
+        val silent = object : SerialLink {
+            override fun write(data: ByteArray) = Unit
+            override fun read(count: Int, timeoutMs: Int) = ByteArray(0)
+            override fun purge() = Unit
+            override fun close() = Unit
+        }
+        val c = com.allnetworktools.ui.pages.talkie.ChannelsController(
+            SimCables(androidx.test.core.app.ApplicationProvider.getApplicationContext(), silent),
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined), listOf(Uv5rSpec(0), Rt470xSpec()),
+        )
+        c.read(cable); waitIdle(c)
+        assertNull(c.detected)
+        assertEquals(com.allnetworktools.ui.pages.talkie.ProgMessage.Kind.Error, c.message!!.kind)
+        assertTrue(c.message!!.text.contains("Aucun talkie reconnu"))
+    }
+
+    @Test fun aListIsFittedToTheRadioThatAnswers() {
+        val uv = Uv5rSpec(0)
+        val mem = ByteArray(uv.imageSize) { 0xFF.toByte() }
+        val magic = byteArrayOf(0x50, 0xBB.toByte(), 0xFF.toByte(), 0x20, 0x12, 0x07, 0x25)
+        val radio = SimUv5r(mem, magic, magic + 0xDD.toByte())
+        val c = com.allnetworktools.ui.pages.talkie.ChannelsController(
+            SimCables(androidx.test.core.app.ApplicationProvider.getApplicationContext(), radio),
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined), listOf(Rt470xSpec(), uv),
+        )
+        // Prepared before any radio is known: long name, medium power, an airband channel, and one beyond 128 memories.
+        c.edit(RadioChannel(0, 145_500_000, 145_500_000, "appel 2 metres", power = RadioPower.Medium))
+        c.edit(RadioChannel(1, 118_100_000, null, "AIR"))
+        c.edit(RadioChannel(200, 446_006_250, null, "PMR1"))
+        c.write(cable); waitIdle(c)
+        assertEquals("uv5r", c.detected?.id)
+        val written = uv.decode(radio.memory, 0)!!
+        assertEquals("APPEL 2", written.name)
+        assertEquals(RadioPower.Low, written.power)
+        assertNull(uv.decode(radio.memory, 1))
+        assertTrue(c.message!!.text, c.message!!.text.contains("hors des bandes"))
+        assertTrue(c.message!!.text.contains("en trop"))
+        assertEquals(128, c.channels.size)
     }
 }

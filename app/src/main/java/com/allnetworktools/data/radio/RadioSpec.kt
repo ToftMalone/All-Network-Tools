@@ -1,16 +1,14 @@
 package com.allnetworktools.data.radio
 
 /** The radio did not answer as expected; the message is meant for the user. */
-class RadioException(message: String) : Exception(message)
+open class RadioException(message: String) : Exception(message)
 
-/**
- * A handheld that can be read and written through its programming cable: the clone protocol and the layout of its channel
- * memory. Only the channels are touched: every other byte of the radio's memory is left exactly as it was read.
- */
-interface RadioSpec {
-    val id: String
+/** Nothing answered the handshake of this model: it is probably another one. */
+class RadioNoAnswer(message: String) : RadioException(message)
+
+/** What a memory list has to respect for a radio: how many memories, how long the names, which bands and power levels. */
+interface RadioLimits {
     val label: String
-    val baud: Int
     val slots: Int
     val nameLength: Int
 
@@ -19,6 +17,34 @@ interface RadioSpec {
 
     /** Power levels the radio offers, strongest first. */
     val powers: List<RadioPower>
+
+    fun inBand(hz: Long) = bands.any { hz in it }
+
+    /** The channel as the radio will store it: 10 Hz steps, capital letters that fit the name, a power it has. */
+    fun normalize(ch: RadioChannel): RadioChannel = ch.copy(
+        rxHz = ch.rxHz / 10 * 10,
+        txHz = ch.txHz?.let { it / 10 * 10 },
+        name = ch.name.uppercase().filter { it.code in 32..126 }.take(nameLength).trimEnd(),
+        power = if (ch.power in powers) ch.power else powers.last(),
+    )
+}
+
+/** Before a radio is recognised: the most generous limits, so a list can be prepared and then fitted to whatever answers. */
+object GenericRadio : RadioLimits {
+    override val label = "Talkie-walkie"
+    override val slots = 256
+    override val nameLength = 12
+    override val bands = listOf(18_000_000L..1_000_000_000L)
+    override val powers = listOf(RadioPower.High, RadioPower.Medium, RadioPower.Low)
+}
+
+/**
+ * A handheld that can be read and written through its programming cable: the clone protocol and the layout of its channel
+ * memory. Only the channels are touched: every other byte of the radio's memory is left exactly as it was read.
+ */
+interface RadioSpec : RadioLimits {
+    val id: String
+    val baud: Int
 
     /** The radio's memory image, as downloaded; [decode] and [encode] work on it. */
     val imageSize: Int
@@ -34,16 +60,6 @@ interface RadioSpec {
 
     /** Writes back the memory blocks that hold [slots]; [image] is the one from [download] with the edited channels encoded. */
     fun upload(link: SerialLink, image: ByteArray, slots: Collection<Int>, progress: (Float) -> Unit)
-
-    fun inBand(hz: Long) = bands.any { hz in it }
-
-    /** The channel as the radio will store it: 10 Hz steps, capital letters that fit the name, a power it has. */
-    fun normalize(ch: RadioChannel): RadioChannel = ch.copy(
-        rxHz = ch.rxHz / 10 * 10,
-        txHz = ch.txHz?.let { it / 10 * 10 },
-        name = ch.name.uppercase().filter { it.code in 32..126 }.take(nameLength).trimEnd(),
-        power = if (ch.power in powers) ch.power else powers.last(),
-    )
 
     class Download(val image: ByteArray, val ident: String, val known: Boolean)
 }
@@ -129,7 +145,7 @@ class Uv5rSpec(private val pauseMs: Long = 50) : RadioSpec {
             if (ack2.size != 1 || ack2[0] != ACK) throw RadioException("Le talkie a refusé le mode clonage.")
             return ident.hex()
         }
-        throw RadioException(
+        throw RadioNoAnswer(
             "Le talkie ne répond pas ($last). Vérifiez que le câble est enfoncé à fond dans la prise du talkie, que celui-ci est allumé " +
                 "et que son volume n'est pas à zéro.",
         )
@@ -246,7 +262,7 @@ class Rt470xSpec(private val pauseMs: Long = 0) : RadioSpec {
             if (pauseMs > 0) Thread.sleep(pauseMs)
         }
         if (!ok) {
-            throw RadioException(
+            throw RadioNoAnswer(
                 "Le talkie ne répond pas. Vérifiez que le câble est enfoncé à fond dans la prise du talkie, que celui-ci est allumé, " +
                     "puis éteignez-le et rallumez-le.",
             )

@@ -38,7 +38,7 @@ import com.allnetworktools.data.radio.RadioChannel
 import com.allnetworktools.data.radio.RadioPower
 import com.allnetworktools.data.radio.RadioPreset
 import com.allnetworktools.data.radio.RadioPresets
-import com.allnetworktools.data.radio.RadioSpec
+import com.allnetworktools.data.radio.RadioLimits
 import com.allnetworktools.data.radio.RadioTones
 import com.allnetworktools.data.radio.Tone
 import com.allnetworktools.ui.components.AntFilterChip
@@ -97,20 +97,17 @@ fun ChannelsTool(vm: MainViewModel) {
                     Symbol(Sym.Radio, size = 28.dp, filled = true, tint = acc.onAccent)
                 }
                 Column(Modifier.weight(1f)) {
-                    Text(c.spec.label, style = gs(22, 28, 500), maxLines = 1)
+                    Text(c.detected?.label ?: "Talkie-walkie", style = gs(22, 28, 500), maxLines = 1)
                     Text(
-                        "${c.count} ${plural(c.count, "canal", "canaux")} sur ${c.spec.slots}" + if (c.changed > 0 && c.count > 0) " · ${c.changed} à écrire" else "",
+                        "${c.count} ${plural(c.count, "canal", "canaux")}" + (c.detected?.let { " sur ${it.slots}" } ?: "") +
+                            if (c.changed > 0 && c.count > 0) " · ${c.changed} à écrire" else "",
                         style = rf(14, 20),
                     )
                 }
             }
-            SegmentedRow(
-                c.specs.map { it to it.label.substringAfter(' ') }, c.spec, { c.select(it) },
-                Modifier.fillMaxWidth().padding(top = 14.dp),
-                selectedColor = acc.accent, onSelectedColor = acc.onAccent, container = cs.surface,
-            )
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 HeroChip(cable?.let { "Câble ${it.name}" } ?: "Aucun câble USB", if (cable != null) AntTheme.net.good else cs.outline)
+                if (c.detected == null && cable != null) HeroChip("Modèle reconnu à la lecture", cs.outline)
             }
             if (c.busy) {
                 Text(c.phase.label, Modifier.padding(top = 14.dp), style = rf(14, 20, 600))
@@ -190,13 +187,13 @@ fun ChannelsTool(vm: MainViewModel) {
 
     editing?.let { ch ->
         ChannelEditor(
-            spec = c.spec, initial = ch, exists = c.channels[ch.slot] != null,
+            spec = c.limits, initial = ch, exists = c.channels[ch.slot] != null,
             onSave = { c.edit(it); editing = null },
             onDelete = { c.clear(ch.slot); editing = null },
             onDismiss = { editing = null },
         )
     }
-    if (presets) PresetDialog(c.spec, onAdd = { p, listen -> c.insertPreset(p, listen) }, onDismiss = { presets = false })
+    if (presets) PresetDialog(c.limits, onAdd = { p, listen -> c.insertPreset(p, listen) }, onDismiss = { presets = false })
     if (confirmWrite) {
         AlertDialog(
             onDismissRequest = { confirmWrite = false },
@@ -204,7 +201,7 @@ fun ChannelsTool(vm: MainViewModel) {
             title = { Text("Écrire dans le talkie ?") },
             text = {
                 Text(
-                    "Le ${c.spec.label} va être relu, puis ${if (c.changed > 0) "${c.changed} ${plural(c.changed, "canal modifié", "canaux modifiés")}" else "la liste"} " +
+                    "Le talkie va être reconnu et relu, puis ${if (c.changed > 0) "${c.changed} ${plural(c.changed, "canal modifié", "canaux modifiés")}" else "la liste"} " +
                         "seront écrits ; les canaux du talkie absents de la liste seront effacés. Il sera ensuite relu pour vérification, " +
                         "et vous pourrez rétablir son état précédent.",
                     style = rf(14, 20),
@@ -247,7 +244,7 @@ private enum class TxMode(val label: String) { Simplex("Simplex"), Shift("Décal
 
 /** Form for one memory. */
 @Composable
-private fun ChannelEditor(spec: RadioSpec, initial: RadioChannel, exists: Boolean, onSave: (RadioChannel) -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
+private fun ChannelEditor(spec: RadioLimits, initial: RadioChannel, exists: Boolean, onSave: (RadioChannel) -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf(initial.name) }
     var rx by remember { mutableStateOf(if (exists) fmtMhz(initial.rxHz) else "") }
     var mode by remember {
@@ -361,7 +358,7 @@ private fun ToneField(label: String, tone: Tone, onChange: (Tone) -> Unit) {
 }
 
 @Composable
-private fun PresetDialog(spec: RadioSpec, onAdd: (RadioPreset, Boolean) -> PresetResult, onDismiss: () -> Unit) {
+private fun PresetDialog(spec: RadioLimits, onAdd: (RadioPreset, Boolean) -> PresetResult, onDismiss: () -> Unit) {
     var chosen by remember { mutableStateOf<RadioPreset?>(null) }
     var listenOnly by remember { mutableStateOf(true) }
     var result by remember { mutableStateOf<PresetResult?>(null) }

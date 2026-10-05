@@ -586,7 +586,8 @@ class ScreenshotTest {
     @Test fun talkieChannelsList() = shot("T2_talkie_channels", nav = NavState(Network.Talkie, Page.ToolPage(Tool.RadioChannels))) { vm ->
         vm.tools.radioChannels.setForTest(
             talkieChannels(),
-            com.allnetworktools.ui.pages.talkie.ProgMessage("6 canaux lus dans le Baofeng UV-5R.", com.allnetworktools.ui.pages.talkie.ProgMessage.Kind.Success),
+            com.allnetworktools.ui.pages.talkie.ProgMessage("Baofeng UV-5R reconnu : 6 canaux lus.", com.allnetworktools.ui.pages.talkie.ProgMessage.Kind.Success),
+            com.allnetworktools.data.radio.Uv5rSpec(),
         )
     }
     @Test fun talkieChannelsNoCable() = shot("T3_talkie_channels_empty", dark = true, nav = NavState(Network.Talkie, Page.ToolPage(Tool.RadioChannels))) { Scenario.cable.value = null }
