@@ -317,35 +317,44 @@ class AfskDemodulator(private val sampleRate: Double = 50_000.0, private val onF
         onFrame(out)
     }
 
+    /** Complex baseband: the instantaneous frequency (phase difference of successive samples) is the AFSK signal. */
     fun feed(re: FloatArray, im: FloatArray, count: Int) {
         for (i in 0 until count) {
             val a = re[i] * pr + im[i] * pi
             val b = im[i] * pr - re[i] * pi
             pr = re[i]; pi = im[i]
-            val f = atan2(b, a)
-            mean += (f - mean) / 200f
-            val x = f - mean
-            val k = (n % len).toInt()
-            val cm = (x * cos(phM)).toFloat(); val sm = (-x * sin(phM)).toFloat()
-            val cs = (x * cos(phS)).toFloat(); val ss = (-x * sin(phS)).toFloat()
-            sMr += cm - mre[k]; sMi += sm - mim[k]; mre[k] = cm; mim[k] = sm
-            sSr += cs - sre[k]; sSi += ss - sim[k]; sre[k] = cs; sim[k] = ss
-            phM += incM; if (phM > 2 * PI) phM -= 2 * PI
-            phS += incS; if (phS > 2 * PI) phS -= 2 * PI
-            val em = sMr * sMr + sMi * sMi
-            val es = sSr * sSr + sSi * sSi
-            peakM = maxOf(em, peakM * 0.9995)
-            peakS = maxOf(es, peakS * 0.9995)
-            val level = if (em / peakM - es / peakS > 0) 1 else 0
-            for (p in 0 until PHASES) {
-                if (n >= next[p]) {
-                    hdlc[p].bit(if (level == prev[p]) 1 else 0) // NRZI: no change is a 1
-                    prev[p] = level
-                    next[p] += spb
-                }
-            }
-            n++
+            step(atan2(b, a))
         }
+    }
+
+    /** Audio from a receiver's speaker or headphone output: already the FM-demodulated AFSK, at this demodulator's sample rate. */
+    fun feedAudio(x: FloatArray, count: Int) {
+        for (i in 0 until count) step(x[i])
+    }
+
+    private fun step(f: Float) {
+        mean += (f - mean) / 200f
+        val x = f - mean
+        val k = (n % len).toInt()
+        val cm = (x * cos(phM)).toFloat(); val sm = (-x * sin(phM)).toFloat()
+        val cs = (x * cos(phS)).toFloat(); val ss = (-x * sin(phS)).toFloat()
+        sMr += cm - mre[k]; sMi += sm - mim[k]; mre[k] = cm; mim[k] = sm
+        sSr += cs - sre[k]; sSi += ss - sim[k]; sre[k] = cs; sim[k] = ss
+        phM += incM; if (phM > 2 * PI) phM -= 2 * PI
+        phS += incS; if (phS > 2 * PI) phS -= 2 * PI
+        val em = sMr * sMr + sMi * sMi
+        val es = sSr * sSr + sSi * sSi
+        peakM = maxOf(em, peakM * 0.9995)
+        peakS = maxOf(es, peakS * 0.9995)
+        val level = if (em / peakM - es / peakS > 0) 1 else 0
+        for (p in 0 until PHASES) {
+            if (n >= next[p]) {
+                hdlc[p].bit(if (level == prev[p]) 1 else 0) // NRZI: no change is a 1
+                prev[p] = level
+                next[p] += spb
+            }
+        }
+        n++
     }
 
     companion object {

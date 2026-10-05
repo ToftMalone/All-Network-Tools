@@ -105,6 +105,7 @@ data class NetworkColors(
     val qzss: Color,
     val shadow: Color,
     val sdr: AccentRoles,
+    val talkie: AccentRoles,
 ) {
     operator fun get(network: Network): AccentRoles = when (network) {
         Network.Wifi -> wifi
@@ -112,6 +113,7 @@ data class NetworkColors(
         Network.Cellular -> cell
         Network.Gnss -> gnss
         Network.Sdr -> sdr
+        Network.Talkie -> talkie
     }
 }
 
@@ -121,6 +123,7 @@ private val BaseAccents = mapOf(
     Network.Cellular to Color(0xFF2F6A3E),
     Network.Gnss to Color(0xFF7F5700),
     Network.Sdr to Color(0xFF006A6A),
+    Network.Talkie to Color(0xFFA23B72),
 )
 
 val NetworkColorsLight = NetworkColors(
@@ -133,6 +136,7 @@ val NetworkColorsLight = NetworkColors(
     beidou = Color(0xFF2F6A3E), qzss = Color(0xFF8A5A00),
     shadow = Color(0x47461423),
     sdr = AccentRoles(Color(0xFF006A6A), Color.White, Color(0xFF9CF1F0), Color(0xFF002020)),
+    talkie = AccentRoles(Color(0xFFA23B72), Color.White, Color(0xFFFFD8E8), Color(0xFF3B0020)),
 )
 
 val NetworkColorsDark = NetworkColors(
@@ -145,6 +149,7 @@ val NetworkColorsDark = NetworkColors(
     beidou = Color(0xFF97D5A0), qzss = Color(0xFFF8BD49),
     shadow = Color(0x99000000),
     sdr = AccentRoles(Color(0xFF80D5D4), Color(0xFF003737), Color(0xFF004F4F), Color(0xFF9CF1F0)),
+    talkie = AccentRoles(Color(0xFFFFAFD2), Color(0xFF5E1139), Color(0xFF7B2951), Color(0xFFFFD8E8)),
 )
 
 /** Network accents shifted toward the dynamic primary, each expanded into its 4 Compose roles. */
@@ -161,6 +166,7 @@ fun harmonizedNetworkColors(primary: Color, dark: Boolean): NetworkColors {
         cell = roles(Network.Cellular),
         gnss = roles(Network.Gnss),
         sdr = roles(Network.Sdr),
+        talkie = roles(Network.Talkie),
     )
 }
 

@@ -235,6 +235,7 @@ private fun description(n: Network) = when (n) {
     Network.Cellular -> "Cellules, antennes de votre opérateur et données mobiles."
     Network.Gnss -> "Satellites, ciel, comparaison des positions et passages."
     Network.Sdr -> "HackRF : spectre, avions, navires, ballons-sondes, drones FPV et plus."
+    Network.Talkie -> "Programmer un Baofeng ou un Radtel par câble, et décoder son audio."
 }
 
 @Composable
@@ -263,6 +264,14 @@ private fun CardIcon(network: Network) {
                     drawCircle(roles.accent, size.minDimension / 2 - 1.dp.toPx(), style = Stroke(2.dp.toPx(), pathEffect = dash))
                 }
                 Symbol(Sym.SatelliteAlt, size = 26.dp, filled = true, tint = roles.onAccent)
+            }
+        }
+        Network.Talkie -> {
+            // A radio handset behind a ring that pulses like a transmission.
+            Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+                PulseRing(roles.accent, 40.dp, periodMs = 2200)
+                Box(Modifier.size(48.dp).spinning(rememberSpin(28_000)).clip(RoundedCornerShape(20.dp)).background(roles.accent))
+                Symbol(Sym.Radio, size = 26.dp, filled = true, tint = roles.onAccent)
             }
         }
         Network.Sdr -> {

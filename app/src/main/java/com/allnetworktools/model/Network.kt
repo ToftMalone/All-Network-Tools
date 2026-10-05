@@ -12,6 +12,7 @@ enum class Network(
     Cellular("Réseau mobile", Sym.CellBars3, "Cellules"),
     Gnss("GNSS", Sym.SatelliteAlt, "Ciel"),
     Sdr("SDR", Sym.Antenna, "Spectre"),
+    Talkie("Talkie-walkie", Sym.Radio, "Canaux"),
     ;
 
     // Getters rather than constructor arguments: Tool's entries reference Network, so eager
@@ -25,6 +26,7 @@ enum class Network(
             Cellular -> Tool.Neighbors
             Gnss -> Tool.Sky
             Sdr -> Tool.Spectrum
+            Talkie -> Tool.RadioChannels
         }
 
     /** Tool reachable directly from the dock. */
@@ -88,6 +90,10 @@ enum class Tool(
     Meteor(Network.Sdr, "Satellites météo (Meteor-M)", Sym.SatelliteAlt),
     Emitters(Network.Sdr, "Détecteur d'émetteurs", Sym.Radar),
     Fpv(Network.Sdr, "Drones FPV", Sym.Videocam),
+
+    RadioChannels(Network.Talkie, "Canaux du talkie", Sym.Radio, implemented = true),
+    RadioListen(Network.Talkie, "Écoute audio", Sym.Hearing, Sym.RestartAlt),
+    RadioAprs(Network.Talkie, "APRS par la radio", Sym.Podcasts, Sym.RestartAlt),
 
     ;
 

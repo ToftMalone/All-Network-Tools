@@ -151,6 +151,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** The plugged-in HackRF; USB enumeration only, the radio stays off until a tool starts it. */
     val sdrDevice = g.sdr.device.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /** The plugged-in radio programming cable; USB enumeration only. */
+    val radioCable = g.cables.cable.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     val blockers: StateFlow<Map<Network, Blocker?>> = combine(
         combine(permissions, wifiEnabled, bluetoothEnabled, airplane, locationEnabled, ::CoreAvail),
         sdrDevice,
@@ -180,6 +183,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 else -> null
             },
             Network.Sdr to if (sdr == null) Blocker.SdrMissing else null,
+            // Always open: channel lists can be edited without the radio, the cable is only needed to read and write it.
+            Network.Talkie to null,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
@@ -337,6 +342,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             sdrDevice.collect { if (it == null) stopSdr() }
+        }
+        // The microphone is only open while the Talkie-walkie tab is.
+        viewModelScope.launch {
+            nav.map { it.network }.distinctUntilChanged().collect { if (it != Network.Talkie) tools.talkieAudio.stop() }
         }
     }
     val history get() = g.history

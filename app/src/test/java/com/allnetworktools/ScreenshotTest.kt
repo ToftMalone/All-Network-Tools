@@ -53,6 +53,7 @@ class ScreenshotTest {
     fun reset() {
         Scenario.airplane = false
         Scenario.sdrDevice.value = com.allnetworktools.data.sdr.SdrDevice("HackRF One", null)
+        Scenario.cable.value = com.allnetworktools.data.radio.RadioCable("FTDI", null)
         Scenario.gnssDenied = false
         Scenario.throttled = false
         Scenario.bleEmpty = false
@@ -566,6 +567,41 @@ class ScreenshotTest {
                 "0.9", "v0.9",
                 "- Nouvel outil « Drones FPV » dans l'onglet SDR\n- Meshtastic : correction de la réception des vrais nœuds\n- Le raccourci principal du dock devient le spectre",
                 "https://github.com/ToftMalone/All-Network-Tools/releases/download/v0.9/AllRadioTools-v0.9.apk", 4_590_146, null,
+            ),
+        )
+    }
+
+    private fun talkieChannels(slots: Int = 8): List<com.allnetworktools.data.radio.RadioChannel> {
+        val ctcss = com.allnetworktools.data.radio.Tone.Ctcss(88.5)
+        return listOf(
+            com.allnetworktools.data.radio.RadioChannel(0, 145_500_000, 145_500_000, "APPEL2M", wide = false),
+            com.allnetworktools.data.radio.RadioChannel(1, 145_600_000, 145_000_000, "RV48", txTone = ctcss, wide = false),
+            com.allnetworktools.data.radio.RadioChannel(2, 446_006_250, null, "PMR 1", wide = false),
+            com.allnetworktools.data.radio.RadioChannel(3, 156_800_000, null, "MAR 16"),
+            com.allnetworktools.data.radio.RadioChannel(4, 144_800_000, null, "APRS", wide = false),
+            com.allnetworktools.data.radio.RadioChannel(5, 433_500_000, 433_500_000, "APPEL70", rxTone = com.allnetworktools.data.radio.Tone.Dcs(23, true), power = com.allnetworktools.data.radio.RadioPower.Low),
+        ).take(slots)
+    }
+    @Test fun talkieDashboard() = shot("T1_talkie_dashboard", nav = NavState(Network.Talkie, Page.Dashboard))
+    @Test fun talkieChannelsList() = shot("T2_talkie_channels", nav = NavState(Network.Talkie, Page.ToolPage(Tool.RadioChannels))) { vm ->
+        vm.tools.radioChannels.setForTest(
+            talkieChannels(),
+            com.allnetworktools.ui.pages.talkie.ProgMessage("6 canaux lus dans le Baofeng UV-5R.", com.allnetworktools.ui.pages.talkie.ProgMessage.Kind.Success),
+        )
+    }
+    @Test fun talkieChannelsNoCable() = shot("T3_talkie_channels_empty", dark = true, nav = NavState(Network.Talkie, Page.ToolPage(Tool.RadioChannels))) { Scenario.cable.value = null }
+    @Test fun talkieTools() = shot("T4_talkie_tools", nav = NavState(Network.Talkie, Page.Tools))
+    @Test fun talkieListen() = shot("T5_talkie_listen", nav = NavState(Network.Talkie, Page.ToolPage(Tool.RadioListen))) { vm ->
+        val history = List(120) { i -> if (i in 20..45 || i in 80..100) -34f + (i % 7) else -88f }
+        vm.tools.talkieAudio.setForTest(-31f, history, "5 1 # 4", emptyList())
+    }
+    @Test fun talkieAprs() = shot("T6_talkie_aprs", dark = true, nav = NavState(Network.Talkie, Page.ToolPage(Tool.RadioAprs))) { vm ->
+        val now = System.currentTimeMillis()
+        vm.tools.talkieAudio.setForTest(
+            -40f, List(120) { -85f }, "",
+            listOf(
+                com.allnetworktools.ui.pages.talkie.HeardStation("F4ABC-9", "/>", 48.8566, 2.3522, 57.0, "Test mobile", "WIDE1", 4, now - 12_000),
+                com.allnetworktools.ui.pages.talkie.HeardStation("F5XYZ", "/#", 48.9, 2.2, null, "Digipeater Paris Ouest", null, 11, now - 95_000),
             ),
         )
     }

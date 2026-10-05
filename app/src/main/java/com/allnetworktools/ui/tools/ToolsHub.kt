@@ -70,5 +70,7 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val meteor: com.allnetworktools.ui.pages.sdr.MeteorController by lazy {
         com.allnetworktools.ui.pages.sdr.MeteorController(app.sdr, app.weatherTles, scope) { spectrum.stop(); adsb.stop(); sonde.stop(); fm.stop(); ais.stop(); emitters.stop(); aprs.stop(); fpv.stop() }
     }
+    val radioChannels by lazy { com.allnetworktools.ui.pages.talkie.ChannelsController(app.cables, scope) }
+    val talkieAudio by lazy { com.allnetworktools.ui.pages.talkie.TalkieAudioController(app.audio) }
     val skyView = androidx.compose.runtime.mutableStateOf(com.allnetworktools.ui.pages.gnss.SkyView.Sky)
 }

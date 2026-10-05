@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- HackRF One, Jawbreaker and rad1o (vendor 0x1d50). Plugging one in offers to open the app with USB access. -->
-<resources>
-    <usb-device vendor-id="7504" product-id="24713" />
-    <usb-device vendor-id="7504" product-id="24651" />
-    <usb-device vendor-id="7504" product-id="52245" />
-</resources>
