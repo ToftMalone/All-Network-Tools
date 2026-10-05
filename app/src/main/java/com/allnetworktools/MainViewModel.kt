@@ -352,8 +352,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            // Once per launch and at most every 6 hours: a newer GitHub release is offered in a window with its notes.
-            if (g.settings.settings.first().autoUpdate) runCatching { g.updater.check(autoInstall = false) }
+            // At every launch: a newer GitHub release is offered in a window with its notes. A launch while offline stays silent.
+            if (g.settings.settings.first().autoUpdate) {
+                runCatching { g.updater.check(autoInstall = false, force = true) }
+                g.updater.forgetFailedCheck()
+            }
         }
         viewModelScope.launch { g.history.purgeLegacyFiles() }
     }

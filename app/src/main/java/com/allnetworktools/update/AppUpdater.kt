@@ -253,6 +253,12 @@ open class AppUpdater(
         }
     }
 
+    /** A failed check at launch (no network) is not worth a banner; failed downloads and installs still are. */
+    fun forgetFailedCheck() {
+        val s = _state.value
+        if (s is UpdateState.Failed && s.info == null) _state.value = UpdateState.Idle
+    }
+
     /** « Plus tard » : hides the proposal until the next launch or the next manual check. */
     fun postpone() {
         if (_state.value is UpdateState.Available) _state.value = UpdateState.Idle
