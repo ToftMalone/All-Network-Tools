@@ -30,6 +30,9 @@ data class UpdateInfo(
     val sha256: String?,
 )
 
+/** One published release, for the changelog. */
+data class ReleaseNote(val tag: String, val publishedAt: String, val notes: String)
+
 sealed interface UpdateState {
     data object Idle : UpdateState
     data object Checking : UpdateState
@@ -86,6 +89,29 @@ open class AppUpdater(
             version = tag.removePrefix("v"), tag = tag, notes = o.optString("body"), apkUrl = url, sizeBytes = apk.optLong("size"),
             sha256 = apk.optString("digest").takeIf { it.startsWith("sha256:") }?.removePrefix("sha256:"),
         ).takeIf { isNewerVersion(tag, currentVersion) }
+    }
+
+    /** Parses the JSON of "releases": published (non-draft, non-prerelease) ones, newest first. */
+    fun parseReleases(json: String): List<ReleaseNote> {
+        val a = org.json.JSONArray(json)
+        return (0 until a.length()).map { a.getJSONObject(it) }
+            .filter { !it.optBoolean("draft") && !it.optBoolean("prerelease") }
+            .map { ReleaseNote(it.getString("tag_name"), it.optString("published_at"), it.optString("body")) }
+            .sortedWith { x, y -> if (isNewerVersion(x.tag, y.tag)) -1 else if (isNewerVersion(y.tag, x.tag)) 1 else 0 }
+    }
+
+    /** Release notes of every published version, as written on GitHub. */
+    open suspend fun releases(): List<ReleaseNote> = withContext(Dispatchers.IO) {
+        val c = URL("https://api.github.com/repos/$repo/releases?per_page=50").openConnection() as HttpURLConnection
+        c.connectTimeout = 8000; c.readTimeout = 8000
+        c.setRequestProperty("Accept", "application/vnd.github+json")
+        c.setRequestProperty("User-Agent", "AllRadioTools/$currentVersion")
+        try {
+            if (c.responseCode != 200) throw java.io.IOException("GitHub a répondu ${c.responseCode}")
+            parseReleases(c.inputStream.bufferedReader().readText())
+        } finally {
+            c.disconnect()
+        }
     }
 
     /** Asks GitHub for the latest release. With [autoInstall] a newer one is downloaded and installed right away. */

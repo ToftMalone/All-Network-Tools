@@ -254,6 +254,11 @@ class FakeApp : AntApplication() {
     override val updater by lazy {
         object : com.allnetworktools.update.AppUpdater(this@FakeApp, "0.1") {
             override suspend fun check(autoInstall: Boolean, force: Boolean) = Unit
+            override suspend fun releases() = listOf(
+                com.allnetworktools.update.ReleaseNote("v0.9.3", "2026-10-04T11:43:26Z", "- GNSS : la Manche, la mer du Nord et la Baltique sont nommées sous les satellites\n- Bluetooth : une page complète par traqueur, avec Chaud/Froid et Faire sonner"),
+                com.allnetworktools.update.ReleaseNote("v0.9.2", "2026-10-04T10:54:03Z", "- Wi-Fi : jauge de signal redessinée\n- Bluetooth : radar selon la distance estimée\n- Réseau mobile : carte des antennes retirée"),
+                com.allnetworktools.update.ReleaseNote("v0.1", "2026-09-01T09:00:00Z", "- Première version"),
+            )
         }
     }
     override val sdr by lazy {

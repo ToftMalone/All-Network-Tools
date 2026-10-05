@@ -48,6 +48,8 @@ sealed interface Page {
     data object Tools : Page
     data class ToolPage(val tool: Tool, val arg: String? = null) : Page
     data object Settings : Page
+    /** Release notes of every version, read from GitHub. */
+    data object Changelog : Page
 }
 
 data class NavState(
@@ -122,7 +124,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val old = _nav.value
         val new = block(old)
         when {
-            new.network != old.network || new.page == Page.Home || old.page == Page.Home || old.page == Page.Settings || new.page == Page.Settings -> trail.clear()
+            new.network != old.network || new.page == Page.Home || old.page == Page.Home || old.page == Page.Settings || new.page == Page.Settings || new.page == Page.Changelog -> trail.clear()
             new.page != old.page -> {
                 val i = trail.indexOf(new.page)
                 // Coming back to a page already in the trail: drop what was opened after it.
@@ -344,6 +346,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             // Once per launch and at most every 6 hours: a newer GitHub release is offered in a window with its notes.
             if (g.settings.settings.first().autoUpdate) runCatching { g.updater.check(autoInstall = false) }
         }
-        viewModelScope.launch { g.history.load(g.settings.settings.first().historyDays) }
+        viewModelScope.launch { g.history.purgeLegacyFiles() }
     }
 }

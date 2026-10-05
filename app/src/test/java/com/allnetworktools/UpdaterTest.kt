@@ -29,6 +29,16 @@ class UpdaterTest {
         assertFalse(isNewerVersion("v0.1.0", "0.1"))
     }
 
+    @Test fun listsPublishedReleasesNewestFirst() {
+        val json = """[{"tag_name":"v0.9.2","draft":false,"prerelease":false,"published_at":"2026-10-04T10:54:03Z","body":"- B"},""" +
+            """{"tag_name":"v0.10.0","draft":false,"prerelease":false,"published_at":"2026-10-06T08:00:00Z","body":"- C"},""" +
+            """{"tag_name":"v0.11.0","draft":true,"prerelease":false,"body":"- brouillon"},""" +
+            """{"tag_name":"v0.9.3","draft":false,"prerelease":false,"published_at":"2026-10-04T11:43:26Z","body":"- A"}]"""
+        val list = updater.parseReleases(json)
+        assertEquals(listOf("v0.10.0", "v0.9.3", "v0.9.2"), list.map { it.tag })
+        assertEquals("4 octobre 2026", com.allnetworktools.ui.settings.releaseDate(list[1].publishedAt))
+    }
+
     @Test fun acceptsANewerReleaseWithAnApk() {
         val info = updater.parse(release("v0.2"))!!
         assertEquals("0.2", info.version)

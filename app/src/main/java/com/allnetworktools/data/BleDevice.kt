@@ -141,12 +141,8 @@ data class BleDevice(
     }
 }
 
-/**
- * Identities learned by connecting to devices. Addresses that are resolvable private ones change
- * every few minutes, so only stable addresses are written to disk.
- */
+/** Identities learned by connecting to devices, kept in memory for the session only: nothing is written to disk. */
 class BleIdentityStore(context: Context?) {
-    private val file = context?.let { File(it.filesDir, "ble_identities.json") }
     private val map = ConcurrentHashMap<String, GattIdentity>()
     private val _version = MutableStateFlow(0)
 
@@ -154,17 +150,8 @@ class BleIdentityStore(context: Context?) {
     val version: StateFlow<Int> = _version.asStateFlow()
 
     init {
-        runCatching {
-            val arr = JSONArray(file?.takeIf { it.exists() }?.readText() ?: "[]")
-            for (i in 0 until arr.length()) {
-                val o = arr.getJSONObject(i)
-                map[o.getString("address")] = GattIdentity(
-                    o.optString("name").ifEmpty { null }, if (o.has("appearance")) o.getInt("appearance") else null,
-                    o.optString("manufacturer").ifEmpty { null }, o.optString("model").ifEmpty { null }, o.optString("firmware").ifEmpty { null },
-                    o.optJSONArray("services")?.let { a -> (0 until a.length()).map { a.getInt(it) }.toSet() } ?: emptySet(),
-                )
-            }
-        }
+        // Identities saved by earlier versions.
+        context?.let { runCatching { File(it.filesDir, "ble_identities.json").delete() } }
     }
 
     fun get(address: String): GattIdentity? = map[address]
@@ -174,29 +161,10 @@ class BleIdentityStore(context: Context?) {
     fun put(address: String, id: GattIdentity) {
         map[address] = id
         _version.value++
-        persist()
     }
 
     fun clear() {
         map.clear()
         _version.value++
-        file?.delete()
-    }
-
-    private fun stable(address: String) = ((address.take(2).toIntOrNull(16) ?: 0) shr 6) != 1
-
-    private fun persist() {
-        val f = file ?: return
-        runCatching {
-            val arr = JSONArray()
-            map.entries.filter { stable(it.key) }.take(300).forEach { (a, g) ->
-                arr.put(
-                    JSONObject().put("address", a).put("name", g.name.orEmpty()).apply { g.appearance?.let { put("appearance", it) } }
-                        .put("manufacturer", g.manufacturer.orEmpty()).put("model", g.model.orEmpty()).put("firmware", g.firmware.orEmpty())
-                        .put("services", JSONArray(g.services.toList())),
-                )
-            }
-            f.writeText(arr.toString())
-        }
     }
 }

@@ -195,4 +195,5 @@ object Sym {
     const val Usb = "usb"
     const val Forum = "forum"
     const val Stream = "stream"
+    const val NewspaperNotes = "newspaper"
 }

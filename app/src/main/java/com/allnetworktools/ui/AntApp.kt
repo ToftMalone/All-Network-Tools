@@ -93,6 +93,7 @@ private fun parentPage(page: Page): Page = when (page) {
         ToolParent.Dashboard -> Page.Dashboard
         is ToolParent.Other -> Page.ToolPage(p.tool)
     }
+    Page.Changelog -> Page.Settings
     else -> Page.Home
 }
 
@@ -192,7 +193,7 @@ private fun MainShell(vm: MainViewModel) {
         val s = shown
         if (s != null) {
             val net = s.network ?: Network.Wifi
-            val isSettings = s.page == Page.Settings
+            val isSettings = s.page == Page.Settings || s.page == Page.Changelog
             val origin = (if (isSettings) settingsBounds else cardBounds[net])?.takeIf { it != Rect.Zero }
                 ?: Rect(0f, 0f, rootSize.width.toFloat(), rootSize.height.toFloat())
             val full = Rect(0f, 0f, rootSize.width.toFloat(), rootSize.height.toFloat())
@@ -228,7 +229,7 @@ private fun MainShell(vm: MainViewModel) {
 
 @Composable
 private fun DockLayer(vm: MainViewModel, nav: NavState, modifier: Modifier, onClose: () -> Unit) {
-    val visible = nav.network != null && nav.page != Page.Settings
+    val visible = nav.network != null && nav.page != Page.Settings && nav.page != Page.Changelog
     var lastNet by remember { mutableStateOf(nav.network ?: Network.Wifi) }
     if (nav.network != null) lastNet = nav.network
     val density = LocalDensity.current

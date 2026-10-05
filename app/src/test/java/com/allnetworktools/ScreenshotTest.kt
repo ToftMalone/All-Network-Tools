@@ -135,6 +135,7 @@ class ScreenshotTest {
         shot("42_gnss_denied", nav = NavState(Network.Gnss, Page.Dashboard))
     }
     @Test fun settings() = shot("50_settings", nav = NavState(page = Page.Settings))
+    @Test fun changelog() = shot("52_changelog", nav = NavState(page = Page.Changelog))
     @Test fun settingsDark() = shot("51_settings_dark", dark = true, nav = NavState(page = Page.Settings))
     @Test fun cellDashboardDark() = shot("32_cell_dashboard_dark", dark = true, nav = NavState(Network.Cellular, Page.Dashboard))
 

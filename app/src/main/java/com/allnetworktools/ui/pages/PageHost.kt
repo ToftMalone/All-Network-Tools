@@ -98,6 +98,7 @@ fun TopBarAction(icon: String, onClick: () -> Unit) {
 private fun titles(nav: NavState): Pair<String, String> {
     val net = nav.network ?: Network.Wifi
     return when (val p = nav.page) {
+        Page.Changelog -> "Journal des nouveautés" to "Paramètres"
         Page.Settings -> "Paramètres" to "All Radio Tools ${com.allnetworktools.BuildConfig.VERSION_NAME}"
         Page.Dashboard -> net.label to "Dashboard"
         Page.Tools -> net.label to "Outils"
@@ -158,6 +159,10 @@ fun PageColumn(content: @Composable ColumnScope.() -> Unit) {
 private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
     if (page == Page.Settings) {
         SettingsScreen(vm)
+        return
+    }
+    if (page == Page.Changelog) {
+        com.allnetworktools.ui.settings.ChangelogScreen(vm)
         return
     }
     val blocker = vm.blockers.collectAsStateWithLifecycle().value[net]

@@ -79,7 +79,7 @@ fun SettingsScreen(vm: MainViewModel) {
     PageColumn {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Section("Apparence") {
-                Item(0, 2, Sym.Contrast, "Thème", "Suit le réglage Android par défaut") {
+                Item(0, 1, Sym.Contrast, "Thème", "Suit le réglage Android par défaut") {
                     SegmentedRow(
                         listOf(ThemeMode.System to "Système", ThemeMode.Light to "Clair", ThemeMode.Dark to "Sombre"), s.theme,
                         { vm.updateSettings { setTheme(it) } }, Modifier.fillMaxWidth(),
@@ -87,34 +87,16 @@ fun SettingsScreen(vm: MainViewModel) {
                         icons = mapOf(ThemeMode.System to Sym.BrightnessAuto, ThemeMode.Light to Sym.LightMode, ThemeMode.Dark to Sym.DarkMode),
                     )
                 }
-                Item(
-                    1, 2, Sym.Palette, "Dynamic Color", "Couleurs issues de votre fond d'écran",
-                    trailing = { AntSwitch(s.dynamicColor) },
-                    onClick = { vm.updateSettings { setDynamicColor(!s.dynamicColor) } },
-                ) {
-                    val n = AntTheme.net
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(cs.primary, n.wifi.accent, n.bt.accent, n.cell.accent, n.gnss.accent).forEach { c ->
-                            Box(Modifier.size(32.dp).clip(CircleShape).border(1.dp, cs.outlineVariant, CircleShape).padding(2.dp).clip(CircleShape).background(c))
-                        }
-                    }
-                }
             }
             Section("Mesures") {
-                Item(0, 5, Sym.Straighten, "Unités", "Distances, vitesses et altitudes") {
+                Item(0, 4, Sym.Straighten, "Unités", "Distances, vitesses et altitudes") {
                     SegmentedRow(listOf(Units.Metric to "Métrique", Units.Imperial to "Impérial"), s.units, { vm.updateSettings { setUnits(it) } }, Modifier.fillMaxWidth(), selectedColor = cs.primary, onSelectedColor = cs.onPrimary)
                 }
-                Item(1, 5, Sym.CellBars3, "Affichage du signal", "Valeur brute ou pourcentage") {
+                Item(1, 4, Sym.CellBars3, "Affichage du signal", "Valeur brute ou pourcentage") {
                     SegmentedRow(listOf(SignalDisplay.Dbm to "dBm", SignalDisplay.Percent to "%"), s.signal, { vm.updateSettings { setSignal(it) } }, Modifier.fillMaxWidth(), selectedColor = cs.primary, onSelectedColor = cs.onPrimary)
                 }
-                Item(2, 5, Sym.Update, "Fréquence de rafraîchissement", "Plus rapide = plus de batterie") {
-                    SegmentedRow(
-                        listOf(0.5f to "0,5 s", 1f to "1 s", 2f to "2 s", 5f to "5 s"), s.refreshSeconds,
-                        { vm.updateSettings { setRefresh(it) } }, Modifier.fillMaxWidth(), selectedColor = cs.primary, onSelectedColor = cs.onPrimary,
-                    )
-                }
-                Item(3, 5, Sym.Vibration, "Retour haptique", "Vibrations sur les actions importantes", trailing = { AntSwitch(s.haptics) }, onClick = { vm.updateSettings { setHaptics(!s.haptics) } })
-                Item(4, 5, Sym.ScreenLock, "Écran toujours allumé", "Pendant une mesure ou un enregistrement", trailing = { AntSwitch(s.keepAwake) }, onClick = { vm.updateSettings { setKeepAwake(!s.keepAwake) } })
+                Item(2, 4, Sym.Vibration, "Retour haptique", "Vibrations sur les actions importantes", trailing = { AntSwitch(s.haptics) }, onClick = { vm.updateSettings { setHaptics(!s.haptics) } })
+                Item(3, 4, Sym.ScreenLock, "Écran toujours allumé", "Pendant une mesure ou un enregistrement", trailing = { AntSwitch(s.keepAwake) }, onClick = { vm.updateSettings { setKeepAwake(!s.keepAwake) } })
             }
             Section("Autorisations") {
                 PermRows.forEachIndexed { i, p ->
@@ -133,22 +115,14 @@ fun SettingsScreen(vm: MainViewModel) {
                     )
                 }
             }
-            Section("Données") {
-                Item(0, 3, Sym.History, "Historique conservé", if (s.historyDays == 0) "Illimité" else "${s.historyDays} jours", trailing = { LinkIcon(Sym.ChevronRight) }, onClick = { dialog = "history" })
-                Item(1, 3, Sym.IosShare, "Exporter toutes les mesures", "Historique au format JSON", trailing = { LinkIcon(Sym.ChevronRight) }, onClick = {
-                    if (vm.history.isEmpty) actions.toast("Aucune mesure enregistrée pour l'instant")
-                    else scope.launch { actions.share("Mesures All Radio Tools", vm.history.exportJson()) }
-                })
-                Item(2, 3, Sym.Delete, "Effacer toutes les données", "Journaux, traces et historiques", danger = true, trailing = { LinkIcon(Sym.ChevronRight) }, onClick = { dialog = "clear" })
-            }
             Section("Mises à jour") {
                 val us by vm.updater.state.collectAsStateWithLifecycle()
                 Item(
-                    0, 2, Sym.Update, "Rechercher au lancement", "Vérifie GitHub et propose la nouvelle version avec ses nouveautés",
+                    0, 3, Sym.Update, "Rechercher au lancement", "Vérifie GitHub et propose la nouvelle version avec ses nouveautés",
                     trailing = { AntSwitch(s.autoUpdate) }, onClick = { vm.updateSettings { setAutoUpdate(!s.autoUpdate) } },
                 )
                 Item(
-                    1, 2, Sym.Refresh, "Rechercher maintenant",
+                    1, 3, Sym.Refresh, "Rechercher maintenant",
                     when (val u = us) {
                         is com.allnetworktools.update.UpdateState.Checking -> "Vérification…"
                         is com.allnetworktools.update.UpdateState.UpToDate -> "Vous avez la dernière version (${BuildConfig.VERSION_NAME})"
@@ -160,41 +134,30 @@ fun SettingsScreen(vm: MainViewModel) {
                     trailing = { LinkIcon(Sym.ChevronRight) },
                     onClick = { scope.launch { vm.updater.check(autoInstall = false, force = true) } },
                 )
+                Item(
+                    2, 3, Sym.NewspaperNotes, "Journal des nouveautés", "Les notes de chaque version, publiées sur GitHub",
+                    trailing = { LinkIcon(Sym.ChevronRight) },
+                    onClick = { vm.navigate { it.copy(network = null, page = com.allnetworktools.Page.Changelog) } },
+                )
             }
             Section("À propos") {
                 Item(0, 3, Sym.Info, "Version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
                 Item(1, 3, Sym.Description, "Licences open source", "Bibliothèques utilisées", trailing = { LinkIcon(Sym.ChevronRight) }, onClick = { dialog = "licenses" })
-                Item(2, 3, Sym.Shield, "Confidentialité", "Aucune donnée ne quitte l'appareil", trailing = { LinkIcon(Sym.OpenInNew) }, onClick = { dialog = "privacy" })
+                Item(2, 3, Sym.Shield, "Confidentialité", "Rien n'est conservé ni envoyé", trailing = { LinkIcon(Sym.OpenInNew) }, onClick = { dialog = "privacy" })
             }
             Text(
-                "All Radio Tools ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · Toutes les mesures restent sur l'appareil.",
+                "All Radio Tools ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · Aucune mesure n'est conservée.",
                 Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp), style = rf(12, 18), color = cs.onSurfaceVariant, textAlign = TextAlign.Center,
             )
         }
     }
     when (dialog) {
-        "history" -> ChoiceDialog(
-            "Historique conservé", listOf(7 to "7 jours", 30 to "30 jours", 90 to "90 jours", 0 to "Illimité"), s.historyDays,
-            onPick = { v -> vm.updateSettings { setHistoryDays(v) }; dialog = null }, onDismiss = { dialog = null },
-        )
-        "clear" -> AlertDialog(
-            onDismissRequest = { dialog = null },
-            icon = { Symbol(Sym.Delete, size = 24.dp, tint = cs.error) },
-            title = { Text("Effacer toutes les données ?") },
-            text = { Text("Les journaux, traces et historiques enregistrés seront supprimés définitivement. Vos réglages sont conservés.") },
-            confirmButton = {
-                TextButton({
-                    dialog = null
-                    scope.launch { vm.history.clear(); actions.toast("Données effacées") }
-                }) { Text("Effacer", color = cs.error) }
-            },
-            dismissButton = { TextButton({ dialog = null }) { Text("Annuler") } },
-        )
         "licenses" -> InfoDialog("Licences open source", Licenses.joinToString("\n\n") { (lib, lic) -> "$lib\n$lic" }) { dialog = null }
         "privacy" -> InfoDialog(
             "Confidentialité",
-            "Toutes les mesures (signaux, positions, appareils détectés) sont traitées et conservées uniquement sur cet appareil. " +
-                "L'application n'envoie aucune donnée à un serveur et ne contient aucun traceur.",
+            "Les mesures (signaux, positions, appareils détectés) sont traitées en mémoire, sur cet appareil, le temps de la session : " +
+                "rien n'est enregistré ni exportable, et tout disparaît à la fermeture de l'application. " +
+                "L'application n'envoie aucune donnée à un serveur et ne contient aucun traceur. Seuls vos réglages sont mémorisés.",
         ) { dialog = null }
         "help" -> InfoDialog(
             "Aide",
