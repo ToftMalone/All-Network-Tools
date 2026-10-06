@@ -54,12 +54,14 @@ import com.allnetworktools.data.sdr.Rs41Demodulator
 import com.allnetworktools.data.sdr.SdrDevice
 import com.allnetworktools.data.sdr.SdrRepository
 import com.allnetworktools.data.sdr.SondeTracker
+import com.allnetworktools.ui.LocalActions
 import com.allnetworktools.ui.components.AntFilterChip
 import com.allnetworktools.ui.components.Hairline
 import com.allnetworktools.ui.components.IconCircleButton
 import com.allnetworktools.ui.components.SectionCard
 import com.allnetworktools.ui.components.Symbol
 import com.allnetworktools.ui.pages.PageColumn
+import com.allnetworktools.ui.pages.TopBarAction
 import com.allnetworktools.ui.pages.gnss.TouchMapView
 import com.allnetworktools.ui.pages.gnss.configureOsm
 import com.allnetworktools.ui.pages.gnss.darkTilesFilter
@@ -72,6 +74,7 @@ import com.allnetworktools.ui.tools.HeroCard
 import com.allnetworktools.ui.tools.HeroChip
 import com.allnetworktools.ui.tools.HostInputField
 import com.allnetworktools.ui.tools.StartButton
+import com.allnetworktools.util.Export
 import com.allnetworktools.util.plural
 import java.util.Locale
 import java.util.concurrent.ArrayBlockingQueue
@@ -248,6 +251,12 @@ private fun climb(v: Double) = when {
 @Composable
 fun SondeTool(vm: MainViewModel) {
     val c = vm.tools.sonde
+    val actions = LocalActions.current
+    if (c.sondes.isNotEmpty()) TopBarAction(Sym.Download) {
+        val snapshot = c.sondes
+        val now = System.currentTimeMillis()
+        actions.saveFile("ballons-sondes-${Export.stamp(now)}.csv", "text/csv") { Export.sondes(snapshot, now).toByteArray() }
+    }
     val device by vm.sdrDevice.collectAsStateWithLifecycle()
     val positions by vm.positions.collectAsStateWithLifecycle()
     val loc = positions.fused ?: positions.gnss ?: positions.network
@@ -300,11 +309,11 @@ fun SondeTool(vm: MainViewModel) {
                 Column(Modifier.padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     HostInputField(c.frequencyMhz, { c.frequencyMhz = it }, "Fréquence (MHz)", Sym.Stream, keyboardType = KeyboardType.Decimal)
                     if (freqError != null) Text(freqError, style = rf(13, 18), color = cs.error)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(16, 24, 32, 40).forEach { g -> AntFilterChip("LNA $g", c.lnaGain == g, { c.lnaGain = g; c.applyGains() }) }
-                        listOf(20, 30, 40).forEach { g -> AntFilterChip("VGA $g", c.vgaGain == g, { c.vgaGain = g; c.applyGains() }) }
-                        AntFilterChip("Ampli +14 dB", c.amp, { c.amp = !c.amp; c.applyGains() })
-                    }
+                    GainSettings(
+                        c.lnaGain, listOf(16, 24, 32, 40), { c.lnaGain = it; c.applyGains() },
+                        c.vgaGain, listOf(20, 30, 40), { c.vgaGain = it; c.applyGains() },
+                        c.amp, { c.amp = !c.amp; c.applyGains() },
+                    )
                     Text(
                         "La fréquence s'applique au prochain lancement. Repérez les sondes avec l'analyseur de spectre (préréglage « Sondes météo ») : " +
                             "une raie qui revient chaque seconde entre 400 et 406 MHz.",

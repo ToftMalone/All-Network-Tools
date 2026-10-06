@@ -266,11 +266,10 @@ fun FmTool(vm: MainViewModel) {
                     AntFilterChip(if (c.sound) "Son activé" else "Son coupé", c.sound, { c.toggleSound() })
                     AntFilterChip("Ampli +14 dB", c.amp, { c.amp = !c.amp; c.applyGains() })
                 }
-                Text("Gain LNA / VGA (dB)", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(0, 8, 16, 24, 32, 40).forEach { g -> AntFilterChip("LNA $g", c.lnaGain == g, { c.lnaGain = g; c.applyGains() }) }
-                    listOf(10, 20, 30, 40).forEach { g -> AntFilterChip("VGA $g", c.vgaGain == g, { c.vgaGain = g; c.applyGains() }) }
-                }
+                GainSettings(
+                    c.lnaGain, listOf(0, 8, 16, 24, 32, 40), { c.lnaGain = it; c.applyGains() },
+                    c.vgaGain, listOf(10, 20, 30, 40), { c.vgaGain = it; c.applyGains() },
+                )
             }
         }
         SectionCard {

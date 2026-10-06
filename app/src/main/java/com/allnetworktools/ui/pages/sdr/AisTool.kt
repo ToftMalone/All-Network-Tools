@@ -44,19 +44,21 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.allnetworktools.MainViewModel
+import com.allnetworktools.data.sdr.AdsbTracker
 import com.allnetworktools.data.sdr.Ais
 import com.allnetworktools.data.sdr.AisReceiver
 import com.allnetworktools.data.sdr.AisTracker
-import com.allnetworktools.data.sdr.AdsbTracker
 import com.allnetworktools.data.sdr.HackRf
 import com.allnetworktools.data.sdr.SdrDevice
 import com.allnetworktools.data.sdr.SdrRepository
+import com.allnetworktools.ui.LocalActions
 import com.allnetworktools.ui.components.AntFilterChip
 import com.allnetworktools.ui.components.Hairline
 import com.allnetworktools.ui.components.IconCircleButton
 import com.allnetworktools.ui.components.SectionCard
 import com.allnetworktools.ui.components.Symbol
 import com.allnetworktools.ui.pages.PageColumn
+import com.allnetworktools.ui.pages.TopBarAction
 import com.allnetworktools.ui.pages.gnss.TouchMapView
 import com.allnetworktools.ui.pages.gnss.configureOsm
 import com.allnetworktools.ui.pages.gnss.darkTilesFilter
@@ -68,6 +70,7 @@ import com.allnetworktools.ui.theme.rf
 import com.allnetworktools.ui.tools.HeroCard
 import com.allnetworktools.ui.tools.HeroChip
 import com.allnetworktools.ui.tools.StartButton
+import com.allnetworktools.util.Export
 import com.allnetworktools.util.plural
 import java.util.Locale
 import java.util.concurrent.ArrayBlockingQueue
@@ -218,6 +221,12 @@ private fun knots(v: Double) = "%.1f nds (%d km/h)".format(Locale.FRANCE, v, (v 
 @Composable
 fun AisTool(vm: MainViewModel) {
     val c = vm.tools.ais
+    val actions = LocalActions.current
+    if (c.ships.isNotEmpty()) TopBarAction(Sym.Download) {
+        val snapshot = c.ships
+        val now = System.currentTimeMillis()
+        actions.saveFile("navires-${Export.stamp(now)}.csv", "text/csv") { Export.ships(snapshot, now).toByteArray() }
+    }
     val device by vm.sdrDevice.collectAsStateWithLifecycle()
     val positions by vm.positions.collectAsStateWithLifecycle()
     val loc = positions.fused ?: positions.gnss ?: positions.network
@@ -255,12 +264,11 @@ fun AisTool(vm: MainViewModel) {
         }
         SectionCard {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Gain", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(16, 24, 32, 40).forEach { g -> AntFilterChip("LNA $g", c.lnaGain == g, { c.lnaGain = g; c.applyGains() }) }
-                    listOf(20, 30, 40).forEach { g -> AntFilterChip("VGA $g", c.vgaGain == g, { c.vgaGain = g; c.applyGains() }) }
-                    AntFilterChip("Ampli +14 dB", c.amp, { c.amp = !c.amp; c.applyGains() })
-                }
+                GainSettings(
+                    c.lnaGain, listOf(16, 24, 32, 40), { c.lnaGain = it; c.applyGains() },
+                    c.vgaGain, listOf(20, 30, 40), { c.vgaGain = it; c.applyGains() },
+                    c.amp, { c.amp = !c.amp; c.applyGains() },
+                )
             }
         }
         SectionCard {

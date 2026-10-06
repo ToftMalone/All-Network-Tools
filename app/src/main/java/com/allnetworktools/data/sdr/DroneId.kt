@@ -190,10 +190,67 @@ class DroneWindow(val centreMhz: Double) {
 }
 
 object DroneBands {
-    /** 20 MS/s captures usable over about 14 MHz each, covering the 2.4 GHz and 5.8 GHz ISM bands. */
+    /**
+     * Centres where DroneID bursts have been recorded (proto17/dji_droneid notes: 2399.5 to 2459.5 MHz every 15 MHz,
+     * 5756.5 to 5796.5 MHz every 20 MHz), extended by one step at each end. Each 20 MS/s capture is centred on one, so a
+     * 10 MHz burst always falls wholly inside it.
+     */
     fun windows(band: Int): List<Double> = when (band) {
-        24 -> (0 until 6).map { 2407.0 + 14 * it }
-        58 -> (0 until 9).map { 5732.0 + 14 * it }
+        24 -> (0 until 6).map { 2399.5 + 15 * it }
+        58 -> (0 until 6).map { 5736.5 + 20 * it }
         else -> windows(24) + windows(58)
+    }
+}
+
+/** Where DJI's DroneID stands after the bursts heard so far. */
+data class DjiDetection(
+    val bursts: Int,
+    val confirmed: Boolean,
+    val lastCentreMhz: Double,
+    val lastLevelDb: Double,
+    val levels: List<Double>,
+    val frequencies: List<Double>,
+    val firstSeenMs: Long,
+    val lastSeenMs: Long,
+)
+
+/**
+ * Pools the DroneID-shaped bursts of every window. The broadcast hops between frequencies, so a single window rarely
+ * hears two in a row: three bursts within [WINDOW_MS], or two at the 600 ms rhythm in one window, confirm a DJI drone.
+ */
+class DjiTracker {
+    private class Hit(val atMs: Long, val centreMhz: Double, val level: Double)
+
+    private val hits = ArrayList<Hit>()
+    private var periodicAtMs = -1L
+    private var firstMs = -1L
+
+    fun add(windowMhz: Double, b: DroneBurst, atMs: Long) {
+        if (firstMs < 0) firstMs = atMs
+        hits += Hit(atMs, windowMhz + b.offsetMHz, b.levelDb)
+        if (hits.size > 200) hits.removeAt(0)
+    }
+
+    /** A window reported two bursts at the broadcast's rhythm. */
+    fun periodic(atMs: Long) { periodicAtMs = atMs }
+
+    fun state(nowMs: Long): DjiDetection? {
+        hits.removeAll { nowMs - it.atMs > FORGET_MS }
+        val last = hits.lastOrNull() ?: run { firstMs = -1; return null }
+        val recent = hits.count { nowMs - it.atMs <= WINDOW_MS }
+        val confirmed = recent >= 3 || (periodicAtMs >= 0 && nowMs - periodicAtMs <= WINDOW_MS)
+        return DjiDetection(
+            bursts = hits.size, confirmed = confirmed, lastCentreMhz = last.centreMhz, lastLevelDb = last.level,
+            levels = hits.takeLast(30).map { it.level },
+            frequencies = hits.map { Math.round(it.centreMhz * 2) / 2.0 }.distinct().sorted(),
+            firstSeenMs = firstMs, lastSeenMs = last.atMs,
+        )
+    }
+
+    fun clear() { hits.clear(); periodicAtMs = -1; firstMs = -1 }
+
+    private companion object {
+        const val WINDOW_MS = 20_000L
+        const val FORGET_MS = 60_000L
     }
 }

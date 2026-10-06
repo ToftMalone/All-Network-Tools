@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.allnetworktools.MainViewModel
 import com.allnetworktools.Page
 import com.allnetworktools.model.Tool
+import com.allnetworktools.ui.components.AntFilterChip
 import com.allnetworktools.ui.components.InfoList
 import com.allnetworktools.ui.components.InfoRow
 import com.allnetworktools.ui.components.PillButton
@@ -89,4 +91,32 @@ internal fun Empty(text: String) {
 @Composable
 internal fun ListCard(content: @Composable () -> Unit) {
     SectionCard(padding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)) { content() }
+}
+
+/**
+ * The HackRF's two gain stages, each on its own line so the values never mix, then the +14 dB amplifier when the tool
+ * offers it. Calls [onChange] after every tap so the controller can push the new gains to the radio.
+ */
+@Composable
+internal fun GainSettings(
+    lna: Int, lnaSteps: List<Int>, onLna: (Int) -> Unit,
+    vga: Int, vgaSteps: List<Int>, onVga: (Int) -> Unit,
+    amp: Boolean? = null, onAmp: () -> Unit = {},
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        GainLine("Gain LNA (dB)", lna, lnaSteps, onLna)
+        GainLine("Gain VGA (dB)", vga, vgaSteps, onVga)
+        if (amp != null) {
+            Text("Préamplificateur", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
+            AntFilterChip("Ampli +14 dB", amp, onAmp)
+        }
+    }
+}
+
+@Composable
+private fun GainLine(label: String, value: Int, steps: List<Int>, onPick: (Int) -> Unit) {
+    Text(label, style = rf(13, 18, 600), color = cs.onSurfaceVariant)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        steps.forEach { g -> AntFilterChip("$g", value == g, { onPick(g) }) }
+    }
 }

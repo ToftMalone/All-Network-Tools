@@ -20,11 +20,11 @@ open class AntApplication : Application() {
     open val gnss by lazy { GnssRepository(this) }
     open val history by lazy { HistoryStore(this) }
     open val cables by lazy { com.allnetworktools.data.radio.RadioCableRepository(this) }
-    open val audio by lazy { com.allnetworktools.data.radio.AudioCapture(this) }
     open val updater by lazy { com.allnetworktools.update.AppUpdater(this, BuildConfig.VERSION_NAME) }
     open val tles by lazy { com.allnetworktools.data.orbit.TleRepository(this) }
     open val towers by lazy { com.allnetworktools.data.TowerRepository() }
     open val usage by lazy { com.allnetworktools.data.UsageRepository(this) }
+    open val remoteId by lazy { com.allnetworktools.data.drone.RemoteIdScanner(this) }
     open val sdr by lazy { com.allnetworktools.data.sdr.SdrRepository(this) }
     open val weatherTles by lazy { com.allnetworktools.data.orbit.WeatherTleRepository(this) }
     open val wifiDirect by lazy { com.allnetworktools.data.WifiDirectRepository(this) }

@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,9 +25,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.lifecycle.viewModelScope
 import com.allnetworktools.Blocker
 import com.allnetworktools.MainViewModel
 import com.allnetworktools.data.PermGroup
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Snackbar message holder (inverse surface, bottom, 2.4 s). */
 class Toaster {
@@ -50,7 +55,9 @@ class AppActions(
     private val vm: MainViewModel,
     val toaster: Toaster,
     private val requestPermissions: (Array<String>) -> Unit,
+    private val createFile: (SaveRequest) -> Unit = {},
 ) {
+    private var pendingSave: (() -> ByteArray)? = null
     fun toast(text: String) = toaster.show(text)
 
     private fun activity(): Activity? {
@@ -112,6 +119,27 @@ class AppActions(
         launch(Intent.createChooser(send, title))
     }
 
+    /**
+     * Asks Android where to save [fileName], then writes what [content] produces there. The app keeps no copy: the bytes
+     * go straight to the file the user chose. [content] runs off the main thread, so it must work on a snapshot.
+     */
+    fun saveFile(fileName: String, mime: String, content: () -> ByteArray) {
+        pendingSave = content
+        runCatching { createFile(SaveRequest(fileName, mime)) }.onFailure { pendingSave = null; toast("Enregistrement indisponible sur cet appareil") }
+    }
+
+    internal fun onFileChosen(uri: Uri?) {
+        val content = pendingSave ?: return
+        pendingSave = null
+        if (uri == null) return
+        vm.viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(content()) } }.isSuccess
+            }
+            toast(if (ok) "Fichier enregistré" else "Impossible d'écrire le fichier")
+        }
+    }
+
     fun openUrl(url: String) = launch(Intent(Intent.ACTION_VIEW, url.toUri()))
 
     fun copy(label: String, text: String) {
@@ -133,6 +161,16 @@ class AppActions(
     }
 }
 
+data class SaveRequest(val fileName: String, val mime: String)
+
+/** "Create document" with the MIME type chosen per call rather than fixed with the launcher. */
+private class CreateFile : ActivityResultContract<SaveRequest, Uri?>() {
+    override fun createIntent(context: Context, input: SaveRequest): Intent =
+        Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(input.mime).putExtra(Intent.EXTRA_TITLE, input.fileName)
+
+    override fun parseResult(resultCode: Int, intent: Intent?): Uri? = if (resultCode == Activity.RESULT_OK) intent?.data else null
+}
+
 val LocalActions = staticCompositionLocalOf<AppActions> { error("AppActions not provided") }
 
 @Composable
@@ -142,5 +180,9 @@ fun rememberAppActions(vm: MainViewModel, toaster: Toaster): AppActions {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         vmState.refreshPermissions()
     }
-    return remember(context, vm, toaster) { AppActions(context, vm, toaster) { launcher.launch(it) } }
+    val holder = remember { arrayOfNulls<AppActions>(1) }
+    val saver = rememberLauncherForActivityResult(CreateFile()) { holder[0]?.onFileChosen(it) }
+    return remember(context, vm, toaster) {
+        AppActions(context, vm, toaster, { launcher.launch(it) }, { saver.launch(it) }).also { holder[0] = it }
+    }
 }

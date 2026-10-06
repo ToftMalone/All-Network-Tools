@@ -57,7 +57,6 @@ private val PermRows = listOf(
     PermRow(PermGroup.Location, Sym.LocationOn, "Position précise", "Wi-Fi (SSID, scans), cellules et GNSS"),
     PermRow(PermGroup.Nearby, Sym.BluetoothSearching, "Appareils à proximité", "Scan et connexion Bluetooth"),
     PermRow(PermGroup.Phone, Sym.SimCard, "Téléphone", "Opérateur, cellules, double SIM"),
-    PermRow(PermGroup.Microphone, Sym.Mic, "Microphone", "Audio du talkie (jamais enregistré)"),
     PermRow(PermGroup.UsageAccess, Sym.DataUsage, "Accès aux données d'utilisation", "Données mobiles consommées par application"),
 )
 

@@ -22,9 +22,6 @@ enum class PermGroup(val permissions: List<String>) {
     ),
     Phone(listOf(Manifest.permission.READ_PHONE_STATE)),
 
-    /** Hears the radio's speaker or an audio interface; nothing is recorded. */
-    Microphone(listOf(Manifest.permission.RECORD_AUDIO)),
-
     /** Special app-op, granted from the system "Usage access" screen. */
     UsageAccess(emptyList()),
 }
@@ -34,7 +31,6 @@ data class PermissionSnapshot(val granted: Set<PermGroup>) {
     val location get() = PermGroup.Location in granted
     val nearby get() = PermGroup.Nearby in granted
     val phone get() = PermGroup.Phone in granted
-    val mic get() = PermGroup.Microphone in granted
 }
 
 open class PermissionsRepository(private val context: Context) {

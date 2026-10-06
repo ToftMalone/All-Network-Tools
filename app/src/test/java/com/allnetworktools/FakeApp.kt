@@ -268,12 +268,10 @@ class FakeApp : AntApplication() {
             override fun hasPermission(c: com.allnetworktools.data.radio.RadioCable) = true
         }
     }
-    override val audio by lazy {
-        object : com.allnetworktools.data.radio.AudioCapture(this@FakeApp) {
-            override fun inputs() = listOf(
-                com.allnetworktools.data.radio.AudioInput(1, "Interface USB · Digirig Mobile", true),
-                com.allnetworktools.data.radio.AudioInput(2, "Micro du téléphone", false),
-            )
+    override val remoteId by lazy {
+        object : com.allnetworktools.data.drone.RemoteIdScanner(this@FakeApp) {
+            override fun radios() = com.allnetworktools.data.drone.RidRadios(bluetooth = true, wifi = true)
+            override fun frames(): Flow<com.allnetworktools.data.drone.RidFrame> = kotlinx.coroutines.flow.emptyFlow()
         }
     }
     override val sdr by lazy {

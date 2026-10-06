@@ -5,12 +5,12 @@ import android.graphics.Canvas as AndroidCanvas
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,11 +49,13 @@ import com.allnetworktools.data.sdr.LrptReceiver
 import com.allnetworktools.data.sdr.LrptStatus
 import com.allnetworktools.data.sdr.SdrDevice
 import com.allnetworktools.data.sdr.SdrRepository
+import com.allnetworktools.ui.LocalActions
 import com.allnetworktools.ui.components.AntFilterChip
 import com.allnetworktools.ui.components.Hairline
 import com.allnetworktools.ui.components.SectionCard
 import com.allnetworktools.ui.components.Symbol
 import com.allnetworktools.ui.pages.PageColumn
+import com.allnetworktools.ui.pages.TopBarAction
 import com.allnetworktools.ui.theme.AntTheme
 import com.allnetworktools.ui.theme.Sym
 import com.allnetworktools.ui.theme.cs
@@ -66,6 +68,7 @@ import com.allnetworktools.ui.tools.HostInputField
 import com.allnetworktools.ui.tools.StartButton
 import com.allnetworktools.ui.tools.ToolButton
 import com.allnetworktools.ui.tools.ToolButtons
+import com.allnetworktools.util.Export
 import com.allnetworktools.util.plural
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -288,6 +291,17 @@ private fun countdown(ms: Long): String {
 @Composable
 fun MeteorTool(vm: MainViewModel) {
     val c = vm.tools.meteor
+    val actions = LocalActions.current
+    val shown = c.channels[c.selectedApid] ?: c.channels.values.minByOrNull { it.apid }
+    if (shown != null && shown.rows > 0) TopBarAction(Sym.Download) {
+        // The bitmap grows by whole strips; only the part already received is saved.
+        val image = Bitmap.createBitmap(shown.bitmap, 0, 0, shown.bitmap.width, minOf(shown.rows * 4, shown.bitmap.height))
+        val now = System.currentTimeMillis()
+        val label = shown.label.lowercase(Locale.ROOT).replace(' ', '-')
+        actions.saveFile("meteor-$label-${Export.stamp(now)}.png", "image/png") {
+            java.io.ByteArrayOutputStream().also { image.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+        }
+    }
     val device by vm.sdrDevice.collectAsStateWithLifecycle()
     val positions by vm.positions.collectAsStateWithLifecycle()
     val loc = positions.fused ?: positions.gnss ?: positions.network
@@ -340,12 +354,11 @@ fun MeteorTool(vm: MainViewModel) {
                     }
                 }
                 if (!c.running) HostInputField(c.frequencyMhz, { c.frequencyMhz = it }, "Fréquence (MHz)", Sym.Stream, keyboardType = KeyboardType.Decimal)
-                Text("Gain LNA / VGA (dB)", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(16, 24, 32, 40).forEach { g -> AntFilterChip("LNA $g", c.lnaGain == g, { c.lnaGain = g; c.applyGains() }) }
-                    listOf(20, 30, 40, 50).forEach { g -> AntFilterChip("VGA $g", c.vgaGain == g, { c.vgaGain = g; c.applyGains() }) }
-                    AntFilterChip("Ampli +14 dB", c.amp, { c.amp = !c.amp; c.applyGains() })
-                }
+                GainSettings(
+                    c.lnaGain, listOf(16, 24, 32, 40), { c.lnaGain = it; c.applyGains() },
+                    c.vgaGain, listOf(20, 30, 40, 50), { c.vgaGain = it; c.applyGains() },
+                    c.amp, { c.amp = !c.amp; c.applyGains() },
+                )
             }
         }
         SectionCard {

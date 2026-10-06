@@ -330,7 +330,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         tools.sonde.stop()
         tools.fm.stop()
         tools.ais.stop()
-        tools.emitters.stop()
         tools.aprs.stop()
         tools.meteor.stop()
     }
@@ -342,10 +341,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             sdrDevice.collect { if (it == null) stopSdr() }
-        }
-        // The microphone is only open while the Talkie-walkie tab is.
-        viewModelScope.launch {
-            nav.map { it.network }.distinctUntilChanged().collect { if (it != Network.Talkie) tools.talkieAudio.stop() }
         }
     }
     val history get() = g.history

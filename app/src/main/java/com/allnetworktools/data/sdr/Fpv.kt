@@ -289,3 +289,103 @@ fun iqPowerDb(buf: ByteArray, len: Int): Double {
     val n = len / 2
     return if (n == 0) -120.0 else 10 * log10(sum / n + 1e-12)
 }
+
+/** What a pass over one analogue channel found. */
+data class FpvResult(val channel: FpvChannel, val powerDb: Double, val syncQuality: Double, val hPulses: Int, val standard: String?, val atMs: Long) {
+    /** Line and field sync pulses at the right spacing: that is video, not just a transmitter. */
+    val isVideo: Boolean get() = hPulses >= 40 && syncQuality >= 0.5
+
+    /** Some sync at the right spacing but not enough to call: worth a longer listen. */
+    val isCandidate: Boolean get() = !isVideo && hPulses >= 10 && syncQuality >= 0.2
+}
+
+/** One analogue FPV drone: a video transmitter, followed from sweep to sweep. */
+data class AnalogDrone(
+    val channel: FpvChannel,
+    val standard: String?,
+    val syncQuality: Double,
+    val levelDb: Double,
+    /** Recent levels, oldest first, for the trend. */
+    val levels: List<Double>,
+    val firstSeenMs: Long,
+    val lastSeenMs: Long,
+    /** Sweeps since the video was last seen: 0 while it is on the air. */
+    val missedSweeps: Int,
+) {
+    val lost: Boolean get() = missedSweeps > 0
+}
+
+/** Rising, falling or steady signal: compares the mean of the last three levels with the three before. */
+fun levelTrend(levels: List<Double>): Int {
+    if (levels.size < 4) return 0
+    val n = minOf(3, levels.size / 2)
+    val recent = levels.takeLast(n).average()
+    val before = levels.dropLast(n).takeLast(n).average()
+    return when {
+        recent - before > 3 -> 1
+        before - recent > 3 -> -1
+        else -> 0
+    }
+}
+
+/**
+ * Turns sweep results into drones. A transmitter spills onto neighbouring channels (R7 and F8 share 5880 MHz, E5 is
+ * 5 MHz away), so videos closer than [MERGE_MHZ] are one drone, named after its strongest channel. A drone that stops
+ * showing video is kept, marked lost, for [KEEP_SWEEPS] sweeps.
+ */
+class AnalogDroneTracker {
+    private val drones = LinkedHashMap<Int, AnalogDrone>() // by frequency in MHz
+    private val seen = HashSet<Int>() // drones that showed video during the current sweep
+
+    /** One channel measured during the sweep; only video counts. Returns true when it is a drone not known before. */
+    fun found(r: FpvResult, nowMs: Long): Boolean {
+        if (!r.isVideo) return false
+        val key = drones.keys.firstOrNull { kotlin.math.abs(it - r.channel.mhz) < MERGE_MHZ }
+        val old = key?.let { drones.getValue(it) }
+        // The same transmitter seen on a neighbouring channel this sweep, but weaker: not a second drone.
+        if (old != null && key in seen && old.levelDb >= r.powerDb) return false
+        if (key != null) { drones.remove(key); seen.remove(key) }
+        drones[r.channel.mhz] = AnalogDrone(
+            r.channel, r.standard ?: old?.standard, r.syncQuality, r.powerDb,
+            ((old?.levels ?: emptyList()) + r.powerDb).takeLast(MAX_LEVELS),
+            old?.firstSeenMs ?: nowMs, nowMs, 0,
+        )
+        seen += r.channel.mhz
+        return old == null
+    }
+
+    /** Closes a sweep: drones that showed no video are marked lost, then forgotten after [KEEP_SWEEPS]. */
+    fun endSweep() {
+        val missed = drones.filterKeys { it !in seen }.mapValues { (_, d) -> d.copy(missedSweeps = d.missedSweeps + 1) }
+        missed.forEach { (k, d) -> if (d.missedSweeps > KEEP_SWEEPS) drones.remove(k) else drones[k] = d }
+        seen.clear()
+    }
+
+    fun sweep(results: List<FpvResult>, nowMs: Long) {
+        results.forEach { found(it, nowMs) }
+        endSweep()
+    }
+
+    /** Level of the drone being watched, measured continuously instead of once a sweep. */
+    fun watched(ch: FpvChannel, levelDb: Double, standard: String?, quality: Double, nowMs: Long) {
+        val key = drones.keys.firstOrNull { kotlin.math.abs(it - ch.mhz) < MERGE_MHZ } ?: return
+        val d = drones.getValue(key)
+        val video = quality >= 0.5
+        drones[key] = d.copy(
+            levelDb = levelDb, standard = standard ?: d.standard, syncQuality = quality,
+            levels = (d.levels + levelDb).takeLast(MAX_LEVELS),
+            lastSeenMs = if (video) nowMs else d.lastSeenMs, missedSweeps = if (video) 0 else d.missedSweeps,
+        )
+    }
+
+    /** On the air first, strongest first. */
+    fun list(): List<AnalogDrone> = drones.values.sortedWith(compareBy<AnalogDrone> { it.lost }.thenByDescending { it.levelDb })
+
+    fun clear() { drones.clear(); seen.clear() }
+
+    private companion object {
+        const val MERGE_MHZ = 12
+        const val KEEP_SWEEPS = 3
+        const val MAX_LEVELS = 40
+    }
+}

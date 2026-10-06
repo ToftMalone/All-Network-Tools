@@ -478,22 +478,6 @@ class ScreenshotTest {
             total = 356,
         )
     }
-    @Test fun emitters() = shot("H10_emitters", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Emitters))) { vm ->
-        val db = FloatArray(2048) { i ->
-            var v = -92f + ((i * 37) % 7) * 0.6f
-            listOf(1128 to -45f, 1500 to -70f, 1750 to -58f).forEach { (k, p) -> val d = (i - k) / 3f; v = maxOf(v, p - 8 * d * d) }
-            for (k in 1670..1730) if (i == k) v = maxOf(v, -66f)
-            v
-        }
-        vm.tools.emitters.setForTest(
-            listOf(
-                com.allnetworktools.data.sdr.EmitterInfo(433_920_000.0, 12_000.0, -45f, -45f, 14, 1.2, 3, 0.0, true, com.allnetworktools.data.sdr.EmitterKind.Burst, "ISM 433,92 : télécommandes, stations météo, capteurs"),
-                com.allnetworktools.data.sdr.EmitterInfo(434_150_000.0, 125_000.0, -66f, -80f, 3, 0.4, 1, 8.0, false, com.allnetworktools.data.sdr.EmitterKind.Spread, "ISM 433 MHz"),
-                com.allnetworktools.data.sdr.EmitterInfo(433_315_000.0, 8_000.0, -58f, -58f, 1, 41.0, 96, 0.0, true, com.allnetworktools.data.sdr.EmitterKind.Carrier, null),
-            ),
-            db, FloatArray(2048) { -94f }, 433_000_000L,
-        )
-    }
     @Test fun aprs() = shot("H11_aprs", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Aprs))) { vm ->
         vm.tools.aprs.setForTest(
             listOf(
@@ -539,28 +523,41 @@ class ScreenshotTest {
     @Test fun homeWithSdr() = shot("H4_home_sdr_missing") { Scenario.sdrDevice.value = null }
     @Test fun wifiDirect() = shot("G6_wifi_direct", nav = NavState(Network.Wifi, Page.ToolPage(Tool.WifiDirect)))
 
-    private fun fpvDemo(vm: MainViewModel, watching: Boolean = false, digital: Boolean = false) {
+    private fun fpvDemo(vm: MainViewModel, watching: Boolean = false, tab: com.allnetworktools.ui.pages.sdr.FpvTab = com.allnetworktools.ui.pages.sdr.FpvTab.Analog) {
         val ch = com.allnetworktools.data.sdr.FpvChannels
         val now = System.currentTimeMillis()
-        fun r(n: String, db: Double, q: Double, std: String?) = com.allnetworktools.ui.pages.sdr.FpvResult(ch.byName(n)!!, db, q, if (q > 0.5) 900 else 12, std, now)
         val img = if (watching) {
             val w = com.allnetworktools.ui.pages.sdr.FpvController.PIC_W; val h = com.allnetworktools.ui.pages.sdr.FpvController.PIC_H
             val px = IntArray(w * h) { i -> val x = i % w; val y = i / w; val g = (255 * (0.15 + 0.7 * x / w) * (if ((y / 72 + x / 52) % 2 == 0) 1.0 else 0.8)).toInt().coerceIn(0, 255); (0xFF shl 24) or (g shl 16) or (g shl 8) or g }
             android.graphics.Bitmap.createBitmap(px, w, h, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
         } else null
+        val levels = List(12) { -52.0 + it * 1.2 }
         vm.tools.fpv.setForTest(
-            listOf(r("F4", -38.0, 0.97, "PAL"), r("R2", -52.0, 0.91, "PAL"), r("E1", -61.0, 0.1, null), r("A3", -70.0, 0.05, null), r("B5", -74.0, 0.0, null)),
-            if (digital) listOf(
-                com.allnetworktools.ui.pages.sdr.DroneHit(2435.0, 6, true, 9.0, 24.0, now),
-                com.allnetworktools.ui.pages.sdr.DroneHit(5760.0, 1, false, 9.1, 12.0, now - 20000),
-            ) else emptyList(),
+            listOf(
+                com.allnetworktools.data.sdr.AnalogDrone(ch.byName("F4")!!, "PAL", 0.97, -38.0, levels, now - 95_000, now - 1_000, 0),
+                com.allnetworktools.data.sdr.AnalogDrone(ch.byName("R2")!!, "NTSC", 0.82, -61.0, levels.reversed(), now - 300_000, now - 40_000, 2),
+            ),
             running = true, watching = if (watching) ch.byName("F4") else null, image = img,
+            dji = com.allnetworktools.data.sdr.DjiDetection(7, true, 2444.5, 22.0, listOf(14.0, 16.0, 19.0, 22.0), listOf(2414.5, 2429.5, 2444.5), now - 60_000, now - 2_000),
         )
-        if (digital) vm.tools.fpv.tab = com.allnetworktools.ui.pages.sdr.FpvTab.Digital
+        if (tab != com.allnetworktools.ui.pages.sdr.FpvTab.Analog) {
+            vm.tools.fpv.rid.setForTest(
+                listOf(
+                    com.allnetworktools.data.drone.RemoteDrone(
+                        "1581F5FHD23170001", "1581F5FHD23170001", 1, 2, 2, 48.8582, 2.2945, 152.0, 150.0, 85.0, false, 6.4, 1.5, 270.0,
+                        48.8566, 2.2920, 66.0, "FRA87ag3k5ht1lm", null, 1, 2, -71,
+                        setOf(com.allnetworktools.data.drone.RidTransport.Wifi), now - 120_000, now - 1_000, 34, emptyList(),
+                    ),
+                ),
+                running = true,
+            )
+            vm.tools.fpv.tab = tab
+        }
     }
     @Test fun fpvAnalog() = shot("H18_fpv_analog", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it) }
     @Test fun fpvVideo() = shot("H19_fpv_video", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, watching = true) }
-    @Test fun fpvDigital() = shot("H20_fpv_digital", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, digital = true) }
+    @Test fun fpvDji() = shot("H20_fpv_dji", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, tab = com.allnetworktools.ui.pages.sdr.FpvTab.Dji) }
+    @Test fun fpvRemoteId() = shot("H21_fpv_remote_id", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, tab = com.allnetworktools.ui.pages.sdr.FpvTab.RemoteId) }
     @Test fun updateDialog() = shot("Z9_update_dialog") { vm ->
         vm.updater.offerForTest(
             com.allnetworktools.update.UpdateInfo(
@@ -592,18 +589,4 @@ class ScreenshotTest {
     }
     @Test fun talkieChannelsNoCable() = shot("T3_talkie_channels_empty", dark = true, nav = NavState(Network.Talkie, Page.ToolPage(Tool.RadioChannels))) { Scenario.cable.value = null }
     @Test fun talkieTools() = shot("T4_talkie_tools", nav = NavState(Network.Talkie, Page.Tools))
-    @Test fun talkieListen() = shot("T5_talkie_listen", nav = NavState(Network.Talkie, Page.ToolPage(Tool.RadioListen))) { vm ->
-        val history = List(120) { i -> if (i in 20..45 || i in 80..100) -34f + (i % 7) else -88f }
-        vm.tools.talkieAudio.setForTest(-31f, history, "5 1 # 4", emptyList())
-    }
-    @Test fun talkieAprs() = shot("T6_talkie_aprs", dark = true, nav = NavState(Network.Talkie, Page.ToolPage(Tool.RadioAprs))) { vm ->
-        val now = System.currentTimeMillis()
-        vm.tools.talkieAudio.setForTest(
-            -40f, List(120) { -85f }, "",
-            listOf(
-                com.allnetworktools.ui.pages.talkie.HeardStation("F4ABC-9", "/>", 48.8566, 2.3522, 57.0, "Test mobile", "WIDE1", 4, now - 12_000),
-                com.allnetworktools.ui.pages.talkie.HeardStation("F5XYZ", "/#", 48.9, 2.2, null, "Digipeater Paris Ouest", null, 11, now - 95_000),
-            ),
-        )
-    }
 }

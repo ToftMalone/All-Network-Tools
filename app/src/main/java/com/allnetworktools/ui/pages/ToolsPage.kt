@@ -73,11 +73,9 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     Network.Gnss -> listOf(
         ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"), ToolEntry(Tool.Passes, "Passages de satellites", "Levers et couchers prévus"))),
     )
-    Network.Talkie -> listOf(
-        ToolGroup("Audio", listOf(ToolEntry(Tool.RadioListen, "Écoute audio", "Niveau, spectre et touches DTMF"), ToolEntry(Tool.RadioAprs, "APRS par la radio", "Balises 1200 bauds sur 144,800 MHz"))),
-    )
+    Network.Talkie -> emptyList()
     Network.Sdr -> listOf(
-        ToolGroup("Outils", listOf(ToolEntry(Tool.Adsb, "Avions (ADS-B)", "Carte des avions sur 1090 MHz"), ToolEntry(Tool.Sonde, "Ballons-sondes", "Sondes météo RS41 vers 403 MHz"), ToolEntry(Tool.Fm, "Radio FM", "Écoute et RDS, 87,5 à 108 MHz"), ToolEntry(Tool.Ais, "Navires (AIS)", "Carte des navires sur 162 MHz"), ToolEntry(Tool.Meteor, "Satellites météo (Meteor-M)", "Images LRPT sur 137 MHz"), ToolEntry(Tool.Aprs, "Radioamateurs (APRS)", "Balises sur 144,800 MHz"), ToolEntry(Tool.Emitters, "Détecteur d'émetteurs", "Qui émet en 169, 433, 446, 868 MHz"), ToolEntry(Tool.Fpv, "Drones FPV", "Vidéo analogique 5,8 GHz et DJI DroneID"))),
+        ToolGroup("Outils", listOf(ToolEntry(Tool.Adsb, "Avions (ADS-B)", "Carte des avions sur 1090 MHz"), ToolEntry(Tool.Sonde, "Ballons-sondes", "Sondes météo RS41 vers 403 MHz"), ToolEntry(Tool.Fm, "Radio FM", "Écoute et RDS, 87,5 à 108 MHz"), ToolEntry(Tool.Ais, "Navires (AIS)", "Carte des navires sur 162 MHz"), ToolEntry(Tool.Meteor, "Satellites météo (Meteor-M)", "Images LRPT sur 137 MHz"), ToolEntry(Tool.Aprs, "Radioamateurs (APRS)", "Balises sur 144,800 MHz"), ToolEntry(Tool.Fpv, "Drones", "FPV analogique, DJI et Remote ID"))),
     )
 }
 

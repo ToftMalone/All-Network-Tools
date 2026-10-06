@@ -88,12 +88,9 @@ enum class Tool(
     Ais(Network.Sdr, "Navires (AIS)", Sym.Boat),
     Aprs(Network.Sdr, "Radioamateurs (APRS)", Sym.Radio),
     Meteor(Network.Sdr, "Satellites météo (Meteor-M)", Sym.SatelliteAlt),
-    Emitters(Network.Sdr, "Détecteur d'émetteurs", Sym.Radar),
-    Fpv(Network.Sdr, "Drones FPV", Sym.Videocam),
+    Fpv(Network.Sdr, "Drones", Sym.Videocam),
 
     RadioChannels(Network.Talkie, "Canaux du talkie", Sym.Radio, implemented = true),
-    RadioListen(Network.Talkie, "Écoute audio", Sym.Hearing, Sym.RestartAlt),
-    RadioAprs(Network.Talkie, "APRS par la radio", Sym.Podcasts, Sym.RestartAlt),
 
     ;
 

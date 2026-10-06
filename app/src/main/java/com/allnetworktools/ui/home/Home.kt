@@ -235,7 +235,7 @@ private fun description(n: Network) = when (n) {
     Network.Cellular -> "Cellules, antennes de votre opérateur et données mobiles."
     Network.Gnss -> "Satellites, ciel, comparaison des positions et passages."
     Network.Sdr -> "HackRF : spectre, avions, navires, ballons-sondes, drones FPV et plus."
-    Network.Talkie -> "Programmer un Baofeng ou un Radtel par câble, et décoder son audio."
+    Network.Talkie -> "Programmer un Baofeng ou un Radtel par câble USB."
 }
 
 @Composable

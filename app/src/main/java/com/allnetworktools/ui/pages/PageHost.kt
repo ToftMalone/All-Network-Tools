@@ -193,13 +193,10 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.Sonde -> com.allnetworktools.ui.pages.sdr.SondeTool(vm)
             Tool.Fm -> com.allnetworktools.ui.pages.sdr.FmTool(vm)
             Tool.Ais -> com.allnetworktools.ui.pages.sdr.AisTool(vm)
-            Tool.Emitters -> com.allnetworktools.ui.pages.sdr.EmittersTool(vm)
             Tool.Fpv -> com.allnetworktools.ui.pages.sdr.FpvTool(vm)
             Tool.Aprs -> com.allnetworktools.ui.pages.sdr.AprsTool(vm)
             Tool.Meteor -> com.allnetworktools.ui.pages.sdr.MeteorTool(vm)
             Tool.RadioChannels -> com.allnetworktools.ui.pages.talkie.ChannelsTool(vm)
-            Tool.RadioListen -> com.allnetworktools.ui.pages.talkie.ListenTool(vm)
-            Tool.RadioAprs -> com.allnetworktools.ui.pages.talkie.AudioAprsTool(vm)
             Tool.WifiDirect -> {
                 val perms by vm.permissions.collectAsStateWithLifecycle()
                 val actions = LocalActions.current

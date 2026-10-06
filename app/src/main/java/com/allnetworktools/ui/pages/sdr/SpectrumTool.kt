@@ -100,15 +100,13 @@ fun SpectrumTool(vm: MainViewModel) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(2, 5, 10, 20).forEach { s -> AntFilterChip("$s MHz", c.spanMhz == s, { if (!c.running) c.spanMhz = s }) }
                 }
-                Text("Gain LNA / VGA (dB)", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(0, 8, 16, 24, 32, 40).forEach { g -> AntFilterChip("LNA $g", c.lnaGain == g, { c.lnaGain = g; c.applyGains() }) }
-                    listOf(10, 20, 30, 40).forEach { g -> AntFilterChip("VGA $g", c.vgaGain == g, { c.vgaGain = g; c.applyGains() }) }
-                }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AntFilterChip("Ampli +14 dB", c.amp, { c.amp = !c.amp; c.applyGains() })
-                    AntFilterChip("Maintien des pics", c.peakHold, { c.peakHold = !c.peakHold })
-                }
+                GainSettings(
+                    c.lnaGain, listOf(0, 8, 16, 24, 32, 40), { c.lnaGain = it; c.applyGains() },
+                    c.vgaGain, listOf(10, 20, 30, 40), { c.vgaGain = it; c.applyGains() },
+                    c.amp, { c.amp = !c.amp; c.applyGains() },
+                )
+                Text("Affichage", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
+                AntFilterChip("Maintien des pics", c.peakHold, { c.peakHold = !c.peakHold })
             }
         }
         SectionCard {
