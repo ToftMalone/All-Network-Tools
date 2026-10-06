@@ -43,6 +43,10 @@ import com.allnetworktools.data.sdr.FpvChannel
 import com.allnetworktools.data.sdr.FpvChannels
 import com.allnetworktools.data.sdr.FpvResult
 import com.allnetworktools.data.sdr.HackRf
+import com.allnetworktools.data.sdr.RcBands
+import com.allnetworktools.data.sdr.RcBurstDetector
+import com.allnetworktools.data.sdr.RcLink
+import com.allnetworktools.data.sdr.RcLinkTracker
 import com.allnetworktools.data.sdr.SdrDevice
 import com.allnetworktools.data.sdr.SdrRepository
 import com.allnetworktools.data.sdr.iqPowerDb
@@ -77,7 +81,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class FpvTab(val label: String) { Analog("Analogique"), Dji("DJI") }
+enum class FpvTab(val label: String) { Analog("Analogique"), Dji("DJI"), Rc("Radiocommande") }
 
 /**
  * Drones, with the HackRF only: analogue FPV video (5.8 and 2.4 GHz, a drone is a channel carrying real video sync) and
@@ -89,6 +93,7 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
     var vgaGain by mutableIntStateOf(24)
     var amp by mutableStateOf(false)
     var band by mutableIntStateOf(0) // DroneID: 24, 58 or 0 for both
+    var rcBand by mutableIntStateOf(0) // remote controls: 24, 868, 915, 433 or 0 for all
     var analogBand by mutableIntStateOf(58) // analogue scan: 24, 58 or 0 for both
 
     var running by mutableStateOf(false)
@@ -122,21 +127,28 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
     var digitalSweeps by mutableIntStateOf(0)
         private set
 
+    // Remote controls.
+    var rcLinks by mutableStateOf<List<RcLink>>(emptyList())
+        private set
+    var rcSweeps by mutableIntStateOf(0)
+        private set
+
     private val analog = AnalogDroneTracker()
     private val djiTracker = DjiTracker()
+    private val rcTracker = RcLinkTracker()
     private var radio: HackRf? = null
     @Volatile private var dspRunning = false
     @Volatile private var mode: Any = Mode.Scan
     private val usbBytes = java.util.concurrent.atomic.AtomicLong()
 
-    private enum class Mode { Scan, Digital }
+    private enum class Mode { Scan, Digital, Rc }
     private class Watch(val channel: FpvChannel)
 
     /** The HackRF is starting or listening. */
     val active: Boolean get() = running || starting
 
-    /** Starts the analogue scan or the DroneID search, depending on the tab. */
-    fun start(device: SdrDevice) = begin(device, if (tab == FpvTab.Analog) Mode.Scan else Mode.Digital)
+    /** Starts the analogue scan, the DroneID search or the remote-control search, depending on the tab. */
+    fun start(device: SdrDevice) = begin(device, when (tab) { FpvTab.Analog -> Mode.Scan; FpvTab.Dji -> Mode.Digital; FpvTab.Rc -> Mode.Rc })
 
     /** Shows the picture of [ch]; starts the radio if needed. */
     fun watch(device: SdrDevice, ch: FpvChannel) {
@@ -160,7 +172,7 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
             try {
                 if (!repo.hasPermission(device) && !repo.requestPermission(device)) { error = "Accès USB au HackRF refusé"; return@launch }
                 val r = withContext(Dispatchers.IO) { repo.open(device) } ?: run { error = "Impossible d'ouvrir le HackRF"; return@launch }
-                val rate = if (m == Mode.Digital) DIGITAL_RATE else ANALOG_RATE
+                val rate = if (m == Mode.Digital || m == Mode.Rc) DIGITAL_RATE else ANALOG_RATE
                 val lna = lnaGain
                 val vga = vgaGain
                 val withAmp = amp
@@ -172,7 +184,7 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
                 mode = m
                 watching = (m as? Watch)?.channel
                 frame = null
-                startPipeline(r, rate)
+                startPipeline(r, rate, m)
                 running = true
             } finally {
                 starting = false
@@ -191,14 +203,18 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
         }
     }
 
-    private fun startPipeline(r: HackRf, rate: Int) {
+    private fun startPipeline(r: HackRf, rate: Int, m: Any) {
         val pipe = Pipe(ArrayBlockingQueue(POOL), ArrayBlockingQueue(POOL))
         repeat(POOL) { pipe.free.add(ByteArray(131072)) }
         usbBytes.set(0)
         dspRunning = true
         Thread({
             try {
-                if (rate == DIGITAL_RATE) digitalLoop(r, pipe) else analogLoop(r, pipe, rate)
+                when (m) {
+                    Mode.Digital -> digitalLoop(r, pipe)
+                    Mode.Rc -> rcLoop(r, pipe)
+                    else -> analogLoop(r, pipe, rate)
+                }
             } catch (e: Exception) {
                 scope.launch { error = e.message ?: "Erreur de traitement" }
             }
@@ -359,6 +375,33 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
         }
     }
 
+    private fun rcLoop(r: HackRf, pipe: Pipe) {
+        lastTick = System.currentTimeMillis(); lastBytes = 0L
+        var dwell = 0
+        while (dspRunning) {
+            for (w in RcBands.windows(rcBand)) {
+                if (!dspRunning) return
+                scope.launch { windowMhz = w.centreMhz }
+                tune(r, w.centreMhz, pipe)
+                val visit = dwell++
+                val start = System.currentTimeMillis()
+                val det = RcBurstDetector(DIGITAL_RATE.toDouble(), w.centreMhz * 1e6) { b ->
+                    rcTracker.add(w.band, visit, b, start + (b.timeS * 1000).toLong())
+                }
+                val until = start + RC_DWELL_MS
+                while (dspRunning && System.currentTimeMillis() < until) {
+                    val item = pipe.take(100) ?: continue
+                    det.feed(item.first, item.second)
+                    pipe.give(item.first)
+                    tick()
+                }
+                val links = rcTracker.links(System.currentTimeMillis())
+                scope.launch { rcLinks = links }
+            }
+            scope.launch { rcSweeps++ }
+        }
+    }
+
     fun applyGains() {
         val r = radio ?: return
         val lna = lnaGain
@@ -369,8 +412,8 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
 
     fun clear() {
         if (running) return
-        analog.clear(); djiTracker.clear()
-        drones = emptyList(); dji = null; sweeps = 0; digitalSweeps = 0
+        analog.clear(); djiTracker.clear(); rcTracker.clear()
+        drones = emptyList(); dji = null; rcLinks = emptyList(); sweeps = 0; digitalSweeps = 0; rcSweeps = 0
     }
 
     fun stop() {
@@ -384,8 +427,11 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
         if (r != null) scope.launch(Dispatchers.IO) { r.close() }
     }
 
-    internal fun setForTest(list: List<AnalogDrone>, running: Boolean, watching: FpvChannel? = null, image: ImageBitmap? = null, dji: DjiDetection? = null) {
-        drones = list; this.running = running; this.watching = watching; frame = image; this.dji = dji
+    internal fun setForTest(
+        list: List<AnalogDrone>, running: Boolean, watching: FpvChannel? = null, image: ImageBitmap? = null, dji: DjiDetection? = null,
+        rc: List<RcLink> = emptyList(),
+    ) {
+        drones = list; this.running = running; this.watching = watching; frame = image; this.dji = dji; rcLinks = rc
     }
 
     companion object {
@@ -396,6 +442,7 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
         private const val SCAN_DWELL_MS = 140L
         private const val RECHECK_DWELL_MS = 450L
         private const val DIGITAL_DWELL_MS = 1200L
+        private const val RC_DWELL_MS = 1500L
         const val PIC_W = AnalogVideoDecoder.WIDTH
         const val PIC_H = 576
         private const val FIRST_LINE = 16
@@ -435,12 +482,16 @@ fun FpvTool(vm: MainViewModel) {
     val count = when (tab) {
         FpvTab.Analog -> c.drones.count { !it.lost }
         FpvTab.Dji -> if (c.dji?.confirmed == true) 1 else 0
+        FpvTab.Rc -> c.rcLinks.size
     }
     PageColumn {
         HeroCard {
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("$count", style = gs(56, 60, 500, -1.5f, tnum = true))
-                Text(plural(count, "drone détecté", "drones détectés"), Modifier.padding(bottom = 8.dp), style = rf(18, 24, 500))
+                Text(
+                    if (tab == FpvTab.Rc) plural(count, "radiocommande", "radiocommandes") else plural(count, "drone détecté", "drones détectés"),
+                    Modifier.padding(bottom = 8.dp), style = rf(18, 24, 500),
+                )
             }
             Text(
                 when (tab) {
@@ -448,6 +499,7 @@ fun FpvTool(vm: MainViewModel) {
                         ?: if (c.sweeps > 0) "${c.sweeps} ${plural(c.sweeps, "balayage terminé", "balayages terminés")}"
                         else when (c.analogBand) { 24 -> "Vidéo analogique 2,4 GHz"; 0 -> "Vidéo analogique 2,4 et 5,8 GHz"; else -> "Vidéo analogique 5,8 GHz" }
                     FpvTab.Dji -> c.windowMhz?.let { "DroneID autour de ${fmt(it, 1)} MHz" } ?: "DroneID de DJI, 2,4 et 5,8 GHz"
+                    FpvTab.Rc -> c.windowMhz?.let { "Écoute autour de ${fmt(it)} MHz" } ?: "ELRS, Crossfire, FrSky, FlySky, Spektrum…"
                 },
                 style = rf(14, 20, tnum = true),
             )
@@ -455,6 +507,7 @@ fun FpvTool(vm: MainViewModel) {
                 when {
                     c.error != null -> HeroChip(c.error!!, AntTheme.net.poor)
                     c.starting -> HeroChip("Démarrage du HackRF…", AntTheme.net.fair, blink = true)
+                    c.active && count > 0 && tab == FpvTab.Rc -> HeroChip(if (count == 1) "Radiocommande en émission" else "$count radiocommandes en émission", AntTheme.net.good, blink = true)
                     c.active && count > 0 -> HeroChip(if (count == 1) "Drone à proximité" else "$count drones à proximité", AntTheme.net.good, blink = true)
                     tab == FpvTab.Dji && c.dji != null -> HeroChip("Rafale DroneID, confirmation en cours", AntTheme.net.fair, blink = true)
                     c.active -> HeroChip("Aucun drone pour l'instant", AntTheme.net.fair, blink = true)
@@ -466,26 +519,28 @@ fun FpvTool(vm: MainViewModel) {
         SegmentedRow(FpvTab.entries.map { it to it.label }, c.tab, { if (!c.active) c.tab = it }, Modifier.fillMaxWidth(), height = 36.dp)
         if (c.active) StartButton("Arrêter", Sym.Stop) { c.stop() }
         else StartButton(
-            if (tab == FpvTab.Analog) "Chercher des drones" else "Chercher un drone DJI",
+            when (tab) { FpvTab.Analog -> "Chercher des drones"; FpvTab.Dji -> "Chercher un drone DJI"; FpvTab.Rc -> "Chercher des radiocommandes" },
             Sym.PlayArrow, enabled = d != null,
         ) { d?.let(c::start) }
         when (tab) {
             FpvTab.Analog -> AnalogPage(c, d, now)
             FpvTab.Dji -> DjiPage(c, now)
+            FpvTab.Rc -> RcPage(c, now)
         }
         SectionCard {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Bande à surveiller", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (tab == FpvTab.Analog) listOf(58 to "5,8 GHz", 24 to "2,4 GHz", 0 to "Les deux").forEach { (b, l) -> AntFilterChip(l, c.analogBand == b, { if (!c.running) c.analogBand = b }) }
-                    else listOf(0 to "2,4 + 5,8 GHz", 24 to "2,4 GHz", 58 to "5,8 GHz").forEach { (b, l) -> AntFilterChip(l, c.band == b, { if (!c.running) c.band = b }) }
+                    else if (tab == FpvTab.Dji) listOf(0 to "2,4 + 5,8 GHz", 24 to "2,4 GHz", 58 to "5,8 GHz").forEach { (b, l) -> AntFilterChip(l, c.band == b, { if (!c.running) c.band = b }) }
+                    else listOf(0 to "Toutes", 24 to "2,4 GHz", 868 to "868 MHz", 915 to "915 MHz", 433 to "433 MHz").forEach { (b, l) -> AntFilterChip(l, c.rcBand == b, { if (!c.running) c.rcBand = b }) }
                 }
                 GainSettings(
                     c.lnaGain, listOf(0, 8, 16, 24, 32, 40), { c.lnaGain = it; c.applyGains() },
                     c.vgaGain, listOf(10, 20, 30, 40), { c.vgaGain = it; c.applyGains() },
                     c.amp, { c.amp = !c.amp; c.applyGains() },
                 )
-                if (c.running) Text("Flux USB %.1f Mo/s (attendu %d)".format(Locale.FRANCE, c.usbMBps, if (tab == FpvTab.Dji) 40 else 32), style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant)
+                if (c.running) Text("Flux USB %.1f Mo/s (attendu %d)".format(Locale.FRANCE, c.usbMBps, if (tab == FpvTab.Analog) 32 else 40), style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant)
             }
         }
         SectionCard {
@@ -501,6 +556,11 @@ fun FpvTool(vm: MainViewModel) {
                             "Le HackRF écoute les fréquences où DJI envoie son DroneID (une rafale de 0,6 ms, 10 MHz de large, qui change de fréquence) : trois rafales en 20 s confirment un drone. " +
                                 "Le contenu du DroneID n'est pas décodé : la télémétrie se limite à ce que mesure le HackRF (fréquences, niveau, tendance). " +
                                 "La vidéo DJI (OcuSync, O3, O4) est numérique et chiffrée : elle n'est pas affichable. Seul le HackRF est utilisé, ni le Wi-Fi ni le Bluetooth du téléphone."
+                        FpvTab.Rc ->
+                            "Le HackRF découpe chaque bande en paquets et reconnaît une radiocommande à sa signature : modulation (chirps LoRa, FSK/FLRC ou étalement de spectre), " +
+                                "largeur, durée des paquets, cadence et sauts de fréquence. Le protocole est déduit de ces mesures, rien n'est décodé : " +
+                                "ELRS et Crossfire en mode LoRa 50 Hz, par exemple, se ressemblent. Il faut quelques secondes par bande ; « Toutes » balaie 2,4 GHz, 868, 915 et 433 MHz. " +
+                                "Une liaison au sol (radio allumée sans drone) est aussi détectée. Réception seule."
                     },
                     style = rf(13, 18), color = cs.onSurfaceVariant,
                 )
@@ -611,4 +671,50 @@ private fun DjiPage(c: FpvController, now: Long) {
         LevelChart(dj.levels)
     }
     if (!c.active) ToolButtons(ToolButton("Effacer", Sym.Delete, BtnKind.OutlineOnSurface) { c.clear() })
+}
+
+@Composable
+private fun RcPage(c: FpvController, now: Long) {
+    if (c.rcLinks.isEmpty()) {
+        Empty(
+            if (c.running) "Aucune radiocommande pour l'instant (${c.rcSweeps} ${plural(c.rcSweeps, "balayage", "balayages")}). Allume la radio et rapproche-toi."
+            else "Lance la recherche : le HackRF écoute 2,4 GHz, 868, 915 et 433 MHz et ne montre que les liaisons de pilotage qu'il reconnaît.",
+        )
+        return
+    }
+    c.rcLinks.forEach { l ->
+        val onAir = now - l.lastSeenMs < 20_000
+        SectionCard {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LeadingIcon(Sym.Gamepad, if (onAir) AntTheme.accent.accent else AntTheme.accent.container, if (onAir) AntTheme.accent.onAccent else AntTheme.accent.onContainer)
+                    Column(Modifier.weight(1f)) {
+                        Text(l.protocol, style = rf(16, 22, 600), maxLines = 2)
+                        Text("${RcBands.label(l.band)} · ${l.modulation.label}", style = rf(13, 18), color = cs.onSurfaceVariant, maxLines = 1)
+                    }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val on = AntTheme.accent
+                    val offBg = cs.surfaceContainerHighest
+                    val offFg = cs.onSurfaceVariant
+                    if (onAir) TechChip("Radiocommande active", on.accent, on.onAccent) else TechChip("Signal perdu", offBg, offFg)
+                    TechChip(if (l.confident) "Protocole reconnu" else "Protocole probable", if (l.confident) on.container else offBg, if (l.confident) on.onContainer else offFg)
+                }
+            }
+        }
+        InfoList("Mesures radio") {
+            l.alternatives?.let { InfoRow("Autres possibilités", it) }
+            l.rateHz?.let { InfoRow("Cadence", "${fmt(it)} paquets/s" + if (l.rateKnown) "" else " (mesurée)") }
+            InfoRow("Largeur", "${fmt(l.bandwidthKHz)} kHz")
+            InfoRow("Durée d'un paquet", if (l.packetUs < 1000) "${fmt(l.packetUs)} µs" else "${fmt(l.packetUs / 1000, 1)} ms")
+            InfoRow("Fréquences utilisées", "${l.channels} (sauts de fréquence)")
+            InfoRow("Niveau", "+${fmt(l.levelDb)} dB au-dessus du bruit")
+            InfoRow("Tendance", trendLabel(l.levels))
+            InfoRow("Paquets reçus", "${l.bursts}")
+            InfoRow("Vu pour la dernière fois", ago(l.lastSeenMs, now))
+            InfoRow("Présent depuis", duration(l.firstSeenMs, l.lastSeenMs))
+            LevelChart(l.levels)
+        }
+    }
+    if (!c.running) ToolButtons(ToolButton("Effacer", Sym.Delete, BtnKind.OutlineOnSurface) { c.clear() })
 }

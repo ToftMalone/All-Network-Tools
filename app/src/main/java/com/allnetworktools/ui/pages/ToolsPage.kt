@@ -75,7 +75,7 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     )
     Network.Talkie -> emptyList()
     Network.Sdr -> listOf(
-        ToolGroup("Outils", listOf(ToolEntry(Tool.Adsb, "Avions (ADS-B)", "Carte des avions sur 1090 MHz"), ToolEntry(Tool.Sonde, "Ballons-sondes", "Sondes météo RS41 vers 403 MHz"), ToolEntry(Tool.Fm, "Radio FM", "Écoute et RDS, 87,5 à 108 MHz"), ToolEntry(Tool.Ais, "Navires (AIS)", "Carte des navires sur 162 MHz"), ToolEntry(Tool.Meteor, "Satellites météo (Meteor-M)", "Images LRPT sur 137 MHz"), ToolEntry(Tool.Aprs, "Radioamateurs (APRS)", "Balises sur 144,800 MHz"), ToolEntry(Tool.Fpv, "Drones", "FPV analogique et DJI DroneID"))),
+        ToolGroup("Outils", listOf(ToolEntry(Tool.Adsb, "Avions (ADS-B)", "Carte des avions sur 1090 MHz"), ToolEntry(Tool.Sonde, "Ballons-sondes", "Sondes météo RS41 vers 403 MHz"), ToolEntry(Tool.Fm, "Radio FM", "Écoute et RDS, 87,5 à 108 MHz"), ToolEntry(Tool.Ais, "Navires (AIS)", "Carte des navires sur 162 MHz"), ToolEntry(Tool.Meteor, "Satellites météo (Meteor-M)", "Images LRPT sur 137 MHz"), ToolEntry(Tool.Aprs, "Radioamateurs (APRS)", "Balises sur 144,800 MHz"), ToolEntry(Tool.Fpv, "Drones", "FPV analogique, DJI et radiocommandes"))),
     )
 }
 

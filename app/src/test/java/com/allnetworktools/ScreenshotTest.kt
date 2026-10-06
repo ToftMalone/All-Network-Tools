@@ -539,11 +539,22 @@ class ScreenshotTest {
             ),
             running = true, watching = if (watching) ch.byName("F4") else null, image = img,
             dji = com.allnetworktools.data.sdr.DjiDetection(7, true, 2444.5, 22.0, listOf(14.0, 16.0, 19.0, 22.0), listOf(2414.5, 2429.5, 2444.5), now - 60_000, now - 2_000),
+            rc = listOf(
+                com.allnetworktools.data.sdr.RcLink(
+                    "24-1113-0", "ExpressLRS 2,4 GHz (LoRa)", "TBS Tracer, ImmersionRC Ghost", 24, com.allnetworktools.data.sdr.RcModulation.Chirp,
+                    250.0, true, 890.0, 1113.0, 18, 31.0, listOf(22.0, 24.0, 27.0, 29.0, 31.0), 412, now - 80_000, now - 1_000, true,
+                ),
+                com.allnetworktools.data.sdr.RcLink(
+                    "868-1203-0", "TBS Crossfire (150 Hz)", null, 868, com.allnetworktools.data.sdr.RcModulation.Fsk,
+                    150.0, true, 312.0, 1203.0, 9, 18.0, listOf(20.0, 19.0, 18.0, 18.0), 96, now - 40_000, now - 6_000, false,
+                ),
+            ),
         )
         vm.tools.fpv.tab = tab
     }
     @Test fun fpvAnalog() = shot("H18_fpv_analog", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it) }
     @Test fun fpvVideo() = shot("H19_fpv_video", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, watching = true) }
+    @Test fun fpvRc() = shot("H21_fpv_rc", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, tab = com.allnetworktools.ui.pages.sdr.FpvTab.Rc) }
     @Test fun fpvDji() = shot("H20_fpv_dji", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, tab = com.allnetworktools.ui.pages.sdr.FpvTab.Dji) }
     @Test fun updateDialog() = shot("Z9_update_dialog") { vm ->
         vm.updater.offerForTest(
