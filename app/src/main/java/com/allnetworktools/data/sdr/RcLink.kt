@@ -208,28 +208,26 @@ class RcBurstDetector(private val rate: Double, private val centreHz: Double, pr
 object RcBands {
     class Window(val centreMhz: Double, val band: Int)
 
-    /** 24: 2400–2480 MHz, 868: 858–878, 915: 900–930, 433: 424–444; 0 for all. */
+    /** 24: 2400–2480 MHz, 868: 858–878, 915: 900–930; 0 for all. */
     fun windows(band: Int): List<Window> = when (band) {
         24 -> listOf(2410.0, 2430.0, 2450.0, 2470.0).map { Window(it, 24) }
         868 -> listOf(Window(868.0, 868))
         915 -> listOf(910.0, 920.0).map { Window(it, 915) }
-        433 -> listOf(Window(434.0, 433))
-        else -> windows(24) + windows(868) + windows(915) + windows(433)
+        else -> windows(24) + windows(868) + windows(915)
     }
 
-    fun label(band: Int) = when (band) { 24 -> "2,4 GHz"; 868 -> "868 MHz"; 915 -> "915 MHz"; 433 -> "433 MHz"; else -> "" }
+    fun label(band: Int) = when (band) { 24 -> "2,4 GHz"; 868 -> "868 MHz"; 915 -> "915 MHz"; else -> "" }
 }
 
 /** A remote-control link the tracker has recognised. */
 data class RcLink(
     val key: String,
     val protocol: String,
-    val alternatives: String?,
+    /** Mode of the protocol the rate points to, e.g. "250 Hz" or "F1000". */
+    val variant: String,
     val band: Int,
     val modulation: RcModulation,
-    /** Packet rate when it fits a known one (or was measured), in Hz. */
-    val rateHz: Double?,
-    val rateKnown: Boolean,
+    val rateHz: Double,
     val bandwidthKHz: Double,
     val packetUs: Double,
     val channels: Int,
@@ -238,38 +236,41 @@ data class RcLink(
     val bursts: Int,
     val firstSeenMs: Long,
     val lastSeenMs: Long,
-    val confident: Boolean,
+    /** What was checked against the protocol's signature, in plain words. */
+    val checks: List<String>,
 )
 
 /** A protocol's radio signature, from its published parameters. */
 private class Signature(
     val protocol: String,
-    val alternatives: String?,
     val bands: Set<Int>,
     /** Chirp for LoRa; FSK, FLRC and DSSS links are told apart by rate and width, not by this. */
     val modulation: RcModulation,
     val bwKHz: ClosedFloatingPointRange<Double>,
-    val ratesHz: List<Double>,
+    /** Packet rates and the name of each mode. */
+    val rates: List<Pair<Double, String>>,
+    /** Hop channel spacing when the protocol uses a fixed grid, checked on the frequencies heard. */
+    val spacingKHz: Double? = null,
 )
 
+private fun hz(vararg r: Double) = r.map { it to "${Math.round(it)} Hz" }
+
 private val SIGNATURES = listOf(
-    Signature("ExpressLRS 2,4 GHz (LoRa)", "TBS Tracer, ImmersionRC Ghost", setOf(24), RcModulation.Chirp, 400.0..1300.0, listOf(50.0, 100.0, 150.0, 250.0, 333.0, 500.0)),
-    Signature("ExpressLRS 2,4 GHz (FLRC)", "F500, F1000, D250, D500", setOf(24), RcModulation.Fsk, 500.0..3200.0, listOf(500.0, 1000.0)),
-    Signature("FrSky ACCST / ACCESS 2,4 GHz", "D8, D16", setOf(24), RcModulation.Fsk, 150.0..1500.0, listOf(1000.0 / 9)),
-    Signature("FlySky AFHDS 2A", null, setOf(24), RcModulation.Fsk, 150.0..1500.0, listOf(1000.0 / 3.85)),
-    Signature("Spektrum DSMX / DSM2", null, setOf(24), RcModulation.Dsss, 500.0..3200.0, listOf(1000.0 / 22, 1000.0 / 11)),
-    Signature("ExpressLRS 868/915 MHz (LoRa)", "mLRS, TBS Crossfire 50 Hz", setOf(868, 915), RcModulation.Chirp, 250.0..800.0, listOf(25.0, 50.0, 100.0, 200.0)),
-    Signature("TBS Crossfire (150 Hz)", null, setOf(868, 915), RcModulation.Fsk, 50.0..600.0, listOf(150.0)),
-    Signature("ExpressLRS 868/915 MHz (FSK)", "K1000 et modes FSK des modules LR1121", setOf(868, 915), RcModulation.Fsk, 50.0..800.0, listOf(500.0, 1000.0)),
-    Signature("Système longue portée LoRa 433 MHz", "mLRS, ExpressLRS 433", setOf(433), RcModulation.Chirp, 50.0..800.0, listOf(25.0, 50.0, 100.0)),
+    Signature("ExpressLRS 2,4 GHz", setOf(24), RcModulation.Chirp, 650.0..1300.0, hz(50.0, 100.0, 150.0, 250.0, 333.0, 500.0), 1000.0),
+    Signature("ExpressLRS 2,4 GHz", setOf(24), RcModulation.Fsk, 900.0..3200.0, listOf(500.0 to "F500 (FLRC)", 1000.0 to "F1000 (FLRC)"), 1000.0),
+    Signature("FrSky ACCST / ACCESS 2,4 GHz", setOf(24), RcModulation.Fsk, 150.0..900.0, listOf(1000.0 / 9 to "trame de 9 ms")),
+    Signature("FlySky AFHDS 2A", setOf(24), RcModulation.Fsk, 150.0..900.0, listOf(1000.0 / 3.85 to "trame de 3,85 ms")),
+    Signature("Spektrum DSMX", setOf(24), RcModulation.Dsss, 500.0..3200.0, listOf(1000.0 / 22 to "trame de 22 ms", 1000.0 / 11 to "trame de 11 ms")),
+    Signature("ExpressLRS 868 MHz", setOf(868), RcModulation.Chirp, 400.0..850.0, hz(25.0, 50.0, 100.0, 200.0), 525.0),
+    Signature("ExpressLRS 915 MHz", setOf(915), RcModulation.Chirp, 400.0..850.0, hz(25.0, 50.0, 100.0, 200.0), 600.0),
+    Signature("TBS Crossfire", setOf(868, 915), RcModulation.Fsk, 100.0..600.0, listOf(150.0 to "150 Hz (FSK)")),
 )
 
 /**
  * Groups bursts into links and names them. A remote control sends packets of one fixed length at a fixed rate, hopping
  * over many frequencies, so bursts are grouped by band and airtime (within [DURATION_TOLERANCE]). Intervals are measured
  * inside one listening window only, so they are whole multiples of the packet period even when the link hops out of
- * view; the longest known period they all fit gives the rate. Bluetooth (packets on the 625 µs slot grid), fixed-frequency
- * senders (LoRaWAN, sensors) and bursts with no rhythm are not remote controls.
+ * view. A group is shown only when it matches a protocol's signature on every point.
  */
 class RcLinkTracker {
     private class Hit(val atMs: Long, val timeS: Double, val dwell: Int, val b: RcBurst)
@@ -322,6 +323,27 @@ class RcLinkTracker {
         return n
     }
 
+    /**
+     * Whether the gaps between the frequencies heard are whole numbers of [spacing]: a fixed hop grid. The grid's offset
+     * does not matter, so the HackRF's own frequency error does not either.
+     */
+    private fun onGrid(hits: List<Hit>, spacing: Double): Boolean {
+        val f = ArrayList<Double>()
+        for (x in hits.map { it.b.centreHz }.sorted()) if (f.isEmpty() || x - f.last() >= 0.6 * spacing) f += x
+        if (f.size < 5) return false
+        var ok = 0
+        for (i in 1 until f.size) {
+            val q = (f[i] - f[i - 1]) / spacing
+            if (abs(q - Math.round(q)) < 0.25) ok++
+        }
+        return ok >= 0.75 * (f.size - 1)
+    }
+
+    /**
+     * Names the group only when everything matches one protocol: band, modulation, width, a packet rate that the
+     * intervals follow tightly, an airtime that fits inside the period, enough hop channels and, where the protocol has
+     * one, its channel grid. Anything else (Meshtastic, LoRaWAN, sensors, Bluetooth, Wi-Fi) stays unnamed and hidden.
+     */
     private fun classify(g: Group): RcLink? {
         val hits = g.hits
         if (hits.size < MIN_BURSTS) return null
@@ -332,39 +354,31 @@ class RcLinkTracker {
         val bw = hits.map { it.b.bandwidthHz }.sorted()[hits.size * 3 / 4] / 1e3 // packets cut by the window edge are narrower
         val dur = hits.map { it.b.durationUs }.sorted()[hits.size / 2]
         val channels = channels(hits)
-        if (channels < MIN_CHANNELS) return null // fixed frequency: a sensor or a beacon, not a hopping link
+        if (channels < MIN_CHANNELS) return null // fixed frequency: Meshtastic, LoRaWAN gateways, sensors
         val d = intervals(hits)
         if (d.size < MIN_INTERVALS) return null
-        // Bluetooth sits on 625 µs slots; a remote control's rate never does by accident over this many packets.
-        if (band == 24 && !chirp && fit(d, 625e-6) > 0.9 && d.any { it < 4e-3 }) {
-            val known = SIGNATURES.filter { 24 in it.bands && it.modulation != RcModulation.Chirp }.flatMap { it.ratesHz }
-            if (known.none { fit(d, 1 / it) >= FIT }) return null
-        }
-        var best: Signature? = null
-        var bestRate: Double? = null
+        // Bluetooth sits on its 625 µs slot grid, which no remote-control rate follows.
+        if (band == 24 && !chirp && fit(d, 625e-6) > 0.9 && fit(d, 1e-3) < 0.95) return null
         for (s in SIGNATURES) {
             if (band !in s.bands || (s.modulation == RcModulation.Chirp) != chirp || bw !in s.bwKHz) continue
-            // The longest period that still fits: shorter ones (higher rates) fit any multiple too.
-            val r = s.ratesHz.sorted().firstOrNull { fit(d, 1 / it) >= FIT } ?: continue
-            if (bestRate == null || r < bestRate) { best = s; bestRate = r }
+            // The longest period that fits: shorter ones (higher rates) fit any multiple of it too.
+            val (rate, variant) = s.rates.sortedBy { it.first }.firstOrNull { fit(d, 1 / it.first) >= FIT } ?: continue
+            if (dur * 1e-6 > AIRTIME_SHARE / rate) continue // a packet longer than its slot is not this protocol
+            if (s.spacingKHz != null && !onGrid(hits, s.spacingKHz * 1e3)) continue
+            val checks = buildList {
+                add("Modulation ${s.modulation.label}")
+                add("Largeur ${Math.round(bw)} kHz")
+                add("Cadence ${Math.round(rate)} paquets/s, ${Math.round(fit(d, 1 / rate) * 100)} % des écarts conformes")
+                add("Paquet de ${Math.round(dur)} µs, dans son créneau")
+                add("Sauts sur $channels fréquences")
+                if (s.spacingKHz != null) add("Grille de canaux de ${Math.round(s.spacingKHz)} kHz")
+            }
+            return RcLink(
+                g.key, s.protocol, variant, band, s.modulation, rate, bw, dur, channels,
+                hits.last().b.levelDb, hits.takeLast(40).map { it.b.levelDb }, hits.size, g.firstMs, hits.last().atMs, checks,
+            )
         }
-        val rate = bestRate ?: run {
-            // No known profile: the shortest recurring interval, kept only if the packets really follow it.
-            val t = d.sorted().take(max(1, d.size / 4)).average()
-            if (t >= 0.9e-3 && fit(d, t, 0.05) >= FIT && channels >= 6 && hits.size >= 20) 1 / t else return null
-        }
-        val levels = hits.takeLast(40).map { it.b.levelDb }
-        val confident = best != null && channels >= 4 && hits.size >= 20
-        val protocol = best?.protocol ?: when (band) {
-            24 -> "Radiocommande 2,4 GHz à sauts de fréquence"
-            433 -> "Liaison longue portée 433 MHz (OpenLRS, DragonLink…)"
-            else -> if (!chirp) "Liaison FSK ${RcBands.label(band)} (FrSky R9, TBS Crossfire…)" else "Liaison LoRa ${RcBands.label(band)}"
-        }
-        return RcLink(
-            g.key, protocol, best?.alternatives ?: if (best == null) "Signature hors des profils connus" else null,
-            band, best?.modulation ?: mod, rate, bestRate != null, bw, dur, channels,
-            hits.last().b.levelDb, levels, hits.size, g.firstMs, hits.last().atMs, confident,
-        )
+        return null
     }
 
     fun clear() = groups.clear()
@@ -374,9 +388,10 @@ class RcLinkTracker {
         const val FORGET_MS = 45_000L
         const val MIN_PACKET_US = 60.0
         const val DURATION_TOLERANCE = 0.2
-        const val MIN_BURSTS = 8
-        const val MIN_CHANNELS = 3
-        const val MIN_INTERVALS = 5
-        const val FIT = 0.75
+        const val MIN_BURSTS = 12
+        const val MIN_CHANNELS = 5
+        const val MIN_INTERVALS = 10
+        const val FIT = 0.85
+        const val AIRTIME_SHARE = 0.8
     }
 }

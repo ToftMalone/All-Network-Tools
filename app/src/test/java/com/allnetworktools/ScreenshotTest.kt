@@ -541,12 +541,14 @@ class ScreenshotTest {
             dji = com.allnetworktools.data.sdr.DjiDetection(7, true, 2444.5, 22.0, listOf(14.0, 16.0, 19.0, 22.0), listOf(2414.5, 2429.5, 2444.5), now - 60_000, now - 2_000),
             rc = listOf(
                 com.allnetworktools.data.sdr.RcLink(
-                    "24-1113-0", "ExpressLRS 2,4 GHz (LoRa)", "TBS Tracer, ImmersionRC Ghost", 24, com.allnetworktools.data.sdr.RcModulation.Chirp,
-                    250.0, true, 890.0, 1113.0, 18, 31.0, listOf(22.0, 24.0, 27.0, 29.0, 31.0), 412, now - 80_000, now - 1_000, true,
+                    "24-1113-0", "ExpressLRS 2,4 GHz", "250 Hz", 24, com.allnetworktools.data.sdr.RcModulation.Chirp,
+                    250.0, 890.0, 1113.0, 18, 31.0, listOf(22.0, 24.0, 27.0, 29.0, 31.0), 412, now - 80_000, now - 1_000,
+                    listOf("Modulation LoRa (chirps)", "Largeur 890 kHz", "Cadence 250 paquets/s, 97 % des écarts conformes", "Paquet de 1113 µs, dans son créneau", "Sauts sur 18 fréquences", "Grille de canaux de 1000 kHz"),
                 ),
                 com.allnetworktools.data.sdr.RcLink(
-                    "868-1203-0", "TBS Crossfire (150 Hz)", null, 868, com.allnetworktools.data.sdr.RcModulation.Fsk,
-                    150.0, true, 312.0, 1203.0, 9, 18.0, listOf(20.0, 19.0, 18.0, 18.0), 96, now - 40_000, now - 6_000, false,
+                    "868-1203-0", "TBS Crossfire", "150 Hz (FSK)", 868, com.allnetworktools.data.sdr.RcModulation.Fsk,
+                    150.0, 312.0, 1203.0, 9, 18.0, listOf(20.0, 19.0, 18.0, 18.0), 96, now - 40_000, now - 6_000,
+                    listOf("Modulation FSK / FLRC", "Largeur 312 kHz", "Cadence 150 paquets/s, 100 % des écarts conformes", "Paquet de 1203 µs, dans son créneau", "Sauts sur 9 fréquences"),
                 ),
             ),
         )

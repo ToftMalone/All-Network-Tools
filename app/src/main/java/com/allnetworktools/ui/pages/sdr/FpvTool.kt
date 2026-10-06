@@ -93,7 +93,7 @@ class FpvController(private val repo: SdrRepository, private val scope: Coroutin
     var vgaGain by mutableIntStateOf(24)
     var amp by mutableStateOf(false)
     var band by mutableIntStateOf(0) // DroneID: 24, 58 or 0 for both
-    var rcBand by mutableIntStateOf(0) // remote controls: 24, 868, 915, 433 or 0 for all
+    var rcBand by mutableIntStateOf(0) // remote controls: 24, 868, 915 or 0 for all
     var analogBand by mutableIntStateOf(58) // analogue scan: 24, 58 or 0 for both
 
     var running by mutableStateOf(false)
@@ -533,7 +533,7 @@ fun FpvTool(vm: MainViewModel) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (tab == FpvTab.Analog) listOf(58 to "5,8 GHz", 24 to "2,4 GHz", 0 to "Les deux").forEach { (b, l) -> AntFilterChip(l, c.analogBand == b, { if (!c.running) c.analogBand = b }) }
                     else if (tab == FpvTab.Dji) listOf(0 to "2,4 + 5,8 GHz", 24 to "2,4 GHz", 58 to "5,8 GHz").forEach { (b, l) -> AntFilterChip(l, c.band == b, { if (!c.running) c.band = b }) }
-                    else listOf(0 to "Toutes", 24 to "2,4 GHz", 868 to "868 MHz", 915 to "915 MHz", 433 to "433 MHz").forEach { (b, l) -> AntFilterChip(l, c.rcBand == b, { if (!c.running) c.rcBand = b }) }
+                    else listOf(0 to "Toutes", 24 to "2,4 GHz", 868 to "868 MHz", 915 to "915 MHz").forEach { (b, l) -> AntFilterChip(l, c.rcBand == b, { if (!c.running) c.rcBand = b }) }
                 }
                 GainSettings(
                     c.lnaGain, listOf(0, 8, 16, 24, 32, 40), { c.lnaGain = it; c.applyGains() },
@@ -557,10 +557,10 @@ fun FpvTool(vm: MainViewModel) {
                                 "Le contenu du DroneID n'est pas décodé : la télémétrie se limite à ce que mesure le HackRF (fréquences, niveau, tendance). " +
                                 "La vidéo DJI (OcuSync, O3, O4) est numérique et chiffrée : elle n'est pas affichable. Seul le HackRF est utilisé, ni le Wi-Fi ni le Bluetooth du téléphone."
                         FpvTab.Rc ->
-                            "Le HackRF découpe chaque bande en paquets et reconnaît une radiocommande à sa signature : modulation (chirps LoRa, FSK/FLRC ou étalement de spectre), " +
-                                "largeur, durée des paquets, cadence et sauts de fréquence. Le protocole est déduit de ces mesures, rien n'est décodé : " +
-                                "ELRS et Crossfire en mode LoRa 50 Hz, par exemple, se ressemblent. Il faut quelques secondes par bande ; « Toutes » balaie 2,4 GHz, 868, 915 et 433 MHz. " +
-                                "Une liaison au sol (radio allumée sans drone) est aussi détectée. Réception seule."
+                            "Une radiocommande n'est affichée que si toute sa signature correspond à un protocole : modulation (LoRa, FLRC, FSK ou DSSS), largeur, " +
+                                "cadence exacte des paquets, durée des paquets, sauts de fréquence et grille de canaux. Tout le reste est ignoré : Meshtastic, LoRaWAN, capteurs, " +
+                                "Bluetooth, Wi-Fi. Le contenu des paquets n'est pas décodé. Il faut quelques secondes par bande ; « Toutes » balaie 2,4 GHz, 868 et 915 MHz. " +
+                                "Une radio allumée sans drone en vol est aussi détectée. Réception seule."
                     },
                     style = rf(13, 18), color = cs.onSurfaceVariant,
                 )
@@ -678,7 +678,7 @@ private fun RcPage(c: FpvController, now: Long) {
     if (c.rcLinks.isEmpty()) {
         Empty(
             if (c.running) "Aucune radiocommande pour l'instant (${c.rcSweeps} ${plural(c.rcSweeps, "balayage", "balayages")}). Allume la radio et rapproche-toi."
-            else "Lance la recherche : le HackRF écoute 2,4 GHz, 868, 915 et 433 MHz et ne montre que les liaisons de pilotage qu'il reconnaît.",
+            else "Lance la recherche : le HackRF écoute 2,4 GHz, 868 et 915 MHz et ne montre que les radiocommandes dont il identifie le protocole.",
         )
         return
     }
@@ -690,7 +690,7 @@ private fun RcPage(c: FpvController, now: Long) {
                     LeadingIcon(Sym.Gamepad, if (onAir) AntTheme.accent.accent else AntTheme.accent.container, if (onAir) AntTheme.accent.onAccent else AntTheme.accent.onContainer)
                     Column(Modifier.weight(1f)) {
                         Text(l.protocol, style = rf(16, 22, 600), maxLines = 2)
-                        Text("${RcBands.label(l.band)} · ${l.modulation.label}", style = rf(13, 18), color = cs.onSurfaceVariant, maxLines = 1)
+                        Text("${l.variant} · ${RcBands.label(l.band)} · ${l.modulation.label}", style = rf(13, 18), color = cs.onSurfaceVariant, maxLines = 2)
                     }
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -698,13 +698,23 @@ private fun RcPage(c: FpvController, now: Long) {
                     val offBg = cs.surfaceContainerHighest
                     val offFg = cs.onSurfaceVariant
                     if (onAir) TechChip("Radiocommande active", on.accent, on.onAccent) else TechChip("Signal perdu", offBg, offFg)
-                    TechChip(if (l.confident) "Protocole reconnu" else "Protocole probable", if (l.confident) on.container else offBg, if (l.confident) on.onContainer else offFg)
+                    TechChip("Protocole identifié", on.container, on.onContainer)
+                }
+            }
+        }
+        SectionCard {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Signature vérifiée", style = rf(14, 20, 600), color = AntTheme.accent.accent)
+                l.checks.forEach { ch ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Symbol(Sym.Check, size = 18.dp, tint = AntTheme.accent.accent)
+                        Text(ch, style = rf(13, 18))
+                    }
                 }
             }
         }
         InfoList("Mesures radio") {
-            l.alternatives?.let { InfoRow("Autres possibilités", it) }
-            l.rateHz?.let { InfoRow("Cadence", "${fmt(it)} paquets/s" + if (l.rateKnown) "" else " (mesurée)") }
+            InfoRow("Cadence", "${fmt(l.rateHz)} paquets/s")
             InfoRow("Largeur", "${fmt(l.bandwidthKHz)} kHz")
             InfoRow("Durée d'un paquet", if (l.packetUs < 1000) "${fmt(l.packetUs)} µs" else "${fmt(l.packetUs / 1000, 1)} ms")
             InfoRow("Fréquences utilisées", "${l.channels} (sauts de fréquence)")

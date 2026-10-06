@@ -49,7 +49,7 @@ class RcLinkTest {
      */
     private fun run(
         windowHz: Double, channels: List<Double>, periodS: Double, seconds: Double, make: (Random) -> Packet?,
-        chipRate: Double = 0.0, chipsLen: Double = 0.0, seed: Long = 7, amp: Double = 0.4,
+        chipRate: Double = 0.0, chipsLen: Double = 0.0, seed: Long = 7, amp: Double = 0.4, random: Boolean = false,
     ): Pair<List<RcBurst>, List<RcLink>> {
         val rnd = Random(seed)
         val bursts = ArrayList<RcBurst>()
@@ -58,6 +58,7 @@ class RcLinkTest {
         var fill = 0
         var phase = 0.0
         var pktStart = 0.02 // the detector learns the noise floor first
+        var gap = periodS
         var pkt: Packet? = make(rnd)
         var pktOffset = channels[rnd.nextInt(channels.size)] - windowHz
         var chip = 1.0
@@ -65,8 +66,8 @@ class RcLinkTest {
         val total = (seconds * fs).toLong()
         for (i in 0 until total) {
             val t = i / fs
-            if (t - pktStart >= periodS) {
-                pktStart += periodS; pkt = make(rnd); pktOffset = channels[rnd.nextInt(channels.size)] - windowHz; chipIdx = -1
+            if (t - pktStart >= gap) {
+                pktStart += gap; gap = if (random) periodS * (0.2 + 1.6 * rnd.nextDouble()) else periodS; pkt = make(rnd); pktOffset = channels[rnd.nextInt(channels.size)] - windowHz; chipIdx = -1
             }
             val dt = t - pktStart
             if (dt < 0) {
@@ -108,16 +109,17 @@ class RcLinkTest {
         assertTrue("bursts ${bursts.size}", bursts.size >= 40)
         assertTrue(bursts.count { it.modulation == RcModulation.Chirp } > bursts.size / 2)
         val l = links.single()
-        assertEquals("ExpressLRS 2,4 GHz (LoRa)", l.protocol)
-        assertEquals(250.0, l.rateHz!!, 1.0)
+        assertEquals("ExpressLRS 2,4 GHz", l.protocol)
+        assertEquals("250 Hz", l.variant)
+        assertEquals(RcModulation.Chirp, l.modulation)
         assertTrue(l.channels >= 4)
     }
 
     @Test fun expressLrsFlrc() {
         val (_, links) = run(2450e6, ism24, 1 / 1000.0, 0.6, { fsk(1.3e6, 330e3, 120, it) })
         val l = links.single()
-        assertEquals("ExpressLRS 2,4 GHz (FLRC)", l.protocol)
-        assertEquals(1000.0, l.rateHz!!, 5.0)
+        assertEquals("ExpressLRS 2,4 GHz", l.protocol)
+        assertEquals("F1000 (FLRC)", l.variant)
     }
 
     @Test fun frskyAccst() {
@@ -125,7 +127,7 @@ class RcLinkTest {
         val (_, links) = run(2430e6, ch, 0.009, 3.0, { fsk(250e3, 57e3, 240, it) })
         val l = links.single()
         assertEquals("FrSky ACCST / ACCESS 2,4 GHz", l.protocol)
-        assertEquals(111.1, l.rateHz!!, 1.0)
+        assertEquals(111.1, l.rateHz, 1.0)
     }
 
     @Test fun spektrumDsmx() {
@@ -133,23 +135,43 @@ class RcLinkTest {
         val (_, links) = run(2430e6, ch, 0.011, 3.0, { null }, chipRate = 1e6, chipsLen = 0.8e-3, amp = 0.1)
         val l = links.single()
         assertEquals(RcModulation.Dsss, l.modulation)
-        assertEquals("Spektrum DSMX / DSM2", l.protocol)
+        assertEquals("Spektrum DSMX", l.protocol)
     }
 
     @Test fun expressLrs900Lora() {
         val ch = (0 until 40).map { 903.5e6 + it * 0.6e6 }
         val (_, links) = run(910e6, ch, 0.01, 2.5, { lora(500e3, 7, 14, it) })
         val l = links.single()
-        assertEquals("ExpressLRS 868/915 MHz (LoRa)", l.protocol)
-        assertEquals(100.0, l.rateHz!!, 1.0)
+        assertEquals("ExpressLRS 915 MHz", l.protocol)
+        assertEquals("100 Hz", l.variant)
     }
 
     @Test fun crossfire150() {
         val ch = (0 until 20).map { 860.2e6 + it * 0.5e6 }
         val (_, links) = run(868e6, ch, 1 / 150.0, 1.5, { fsk(85e3, 50e3, 100, it) })
         val l = links.single()
-        assertEquals("TBS Crossfire (150 Hz)", l.protocol)
-        assertEquals(150.0, l.rateHz!!, 2.0)
+        assertEquals("TBS Crossfire", l.protocol)
+        assertEquals(150.0, l.rateHz, 2.0)
+    }
+
+    @Test fun meshtasticIsNotARemoteControl() {
+        // Meshtastic ShortFast style: LoRa 250 kHz on one frequency, packets at irregular times.
+        val (bursts, links) = run(868e6, listOf(869.525e6), 0.08, 2.0, { lora(250e3, 7, 24, it) }, random = true)
+        assertTrue(bursts.isNotEmpty())
+        assertTrue(links.isEmpty())
+    }
+
+    @Test fun loraWanOnSeveralChannelsIsNotARemoteControl() {
+        // LoRaWAN EU868: eight 125 kHz channels, random times, no fixed packet rate.
+        val ch = listOf(867.1e6, 867.3e6, 867.5e6, 867.7e6, 867.9e6, 868.1e6, 868.3e6, 868.5e6)
+        val (_, links) = run(868e6, ch, 0.03, 2.0, { lora(125e3, 7, 16, it) }, random = true)
+        assertTrue(links.isEmpty())
+    }
+
+    @Test fun irregularHoppingLoraIsNotExpressLrs() {
+        // Same width as ExpressLRS 2.4 GHz and hopping, but no fixed rate: not identified.
+        val (_, links) = run(2430e6, ism24, 1 / 250.0, 1.6, { lora(812.5e3, 6, 14, it) }, random = true)
+        assertTrue(links.isEmpty())
     }
 
     @Test fun fixedFrequencyBurstsAreNotRemoteControls() {
