@@ -1,10 +1,5 @@
 package com.allnetworktools
 
-import com.allnetworktools.data.drone.RemoteId
-import com.allnetworktools.data.drone.RemoteIdTracker
-import com.allnetworktools.data.drone.RidFrame
-import com.allnetworktools.data.drone.RidMessage
-import com.allnetworktools.data.drone.RidTransport
 import com.allnetworktools.data.sdr.AnalogDroneTracker
 import com.allnetworktools.data.sdr.DjiTracker
 import com.allnetworktools.data.sdr.DroneBands
@@ -14,7 +9,6 @@ import com.allnetworktools.data.sdr.FpvResult
 import com.allnetworktools.data.sdr.levelTrend
 import com.allnetworktools.ui.pages.sdr.Plane
 import com.allnetworktools.util.Export
-import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -22,89 +16,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Remote ID messages built byte by byte after the OpenDroneID encoder (opendroneid-core-c), then decoded. */
 class DronesTest {
-    private fun msg(type: Int, fill: (ByteArray) -> Unit) = ByteArray(25).also { it[0] = ((type shl 4) or 2).toByte(); fill(it) }
-    private fun ByteArray.le16(i: Int, v: Int) { this[i] = v.toByte(); this[i + 1] = (v shr 8).toByte() }
-    private fun ByteArray.le32(i: Int, v: Int) { for (k in 0 until 4) this[i + k] = (v shr (8 * k)).toByte() }
-    private fun alt(m: Double) = ((m + 1000) / 0.5).roundToInt()
-
-    private fun basic(id: String) = msg(0) { b ->
-        b[1] = ((1 shl 4) or 2).toByte() // serial number, multirotor
-        id.toByteArray().copyInto(b, 2)
-    }
-
-    private fun location() = msg(1) { b ->
-        b[1] = ((2 shl 4) or 0x2 or 0x1).toByte() // airborne, east-west half (+180°), speed multiplier
-        b[2] = 90 // 90 + 180 = 270°
-        b[3] = 10 // 10 × 0.75 + 63.75 = 71.25 m/s
-        b[4] = (-3).toByte() // −1.5 m/s
-        b.le32(5, 488_582_000); b.le32(9, 22_945_000)
-        b.le16(13, alt(150.0)); b.le16(15, alt(152.0)); b.le16(17, alt(85.0))
-    }
-
-    private fun system() = msg(4) { b ->
-        b[1] = 1
-        b.le32(2, 488_566_000); b.le32(6, 22_920_000)
-        b[17] = ((1 shl 4) or 2).toByte() // open category, class C1
-        b.le16(18, alt(66.0))
-    }
-
-    private fun operator(id: String) = msg(5) { b -> id.toByteArray().copyInto(b, 2) }
-
-    private fun pack(vararg m: ByteArray) = byteArrayOf(0xF2.toByte(), 25, m.size.toByte()) + m.fold(ByteArray(0)) { a, x -> a + x }
-
-    @Test fun decodesEveryMessageField() {
-        val msgs = RemoteId.decode(pack(basic("1581F5FHD23170001"), location(), system(), operator("FRA87ag3k5ht1lm")))
-        assertEquals(4, msgs.size)
-        val b = msgs[0] as RidMessage.BasicId
-        assertEquals("1581F5FHD23170001", b.id); assertEquals(1, b.idType); assertEquals(2, b.uaType)
-        val l = msgs[1] as RidMessage.Location
-        assertEquals(2, l.status)
-        assertEquals(270.0, l.directionDeg!!, 1e-9)
-        assertEquals(71.25, l.speedMs!!, 1e-9)
-        assertEquals(-1.5, l.verticalMs!!, 1e-9)
-        assertEquals(48.8582, l.lat!!, 1e-7); assertEquals(2.2945, l.lon!!, 1e-7)
-        assertEquals(150.0, l.altBaroM!!, 1e-9); assertEquals(152.0, l.altGeoM!!, 1e-9); assertEquals(85.0, l.heightM!!, 1e-9)
-        assertFalse(l.heightAgl)
-        val s = msgs[2] as RidMessage.System
-        assertEquals(48.8566, s.operatorLat!!, 1e-7); assertEquals(66.0, s.operatorAltM!!, 1e-9)
-        assertEquals("Ouverte · C1", RemoteId.euLabel(s.categoryEu, s.classEu))
-        assertEquals("FRA87ag3k5ht1lm", (msgs[3] as RidMessage.OperatorId).id)
-    }
-
-    @Test fun unknownValuesDecodeToNull() {
-        val l = RemoteId.decode(msg(1) { b -> b[1] = 0x3; b[2] = 181.toByte(); b[3] = 255.toByte(); b[4] = 126 })[0] as RidMessage.Location
-        assertNull(l.directionDeg); assertNull(l.speedMs); assertNull(l.verticalMs)
-        assertNull(l.lat); assertNull(l.altGeoM); assertNull(l.heightM)
-    }
-
-    @Test fun unwrapsBluetoothAndWifiTransports() {
-        val ble = byteArrayOf(0x0D, 7) + basic("1581F5FHD23170001")
-        assertEquals("1581F5FHD23170001", (RemoteId.fromBleServiceData(ble).single() as RidMessage.BasicId).id)
-        assertTrue(RemoteId.fromBleServiceData(byteArrayOf(0x0C, 7) + basic("X")).isEmpty())
-        val ie = byteArrayOf(0xFA.toByte(), 0x0B, 0xBC.toByte(), 0x0D, 3) + pack(basic("1581F5FHD23170001"), location())
-        assertEquals(2, RemoteId.fromWifiVendorElement(ie).size)
-        assertTrue(RemoteId.fromWifiVendorElement(byteArrayOf(0x50, 0x6F, 0x9A.toByte(), 0x0D, 3) + pack(location())).isEmpty())
-        assertTrue(RemoteId.decode(ByteArray(10)).isEmpty())
-    }
-
-    @Test fun trackerMergesTransportsByIdentifier() {
-        val t = RemoteIdTracker()
-        val msgs = RemoteId.decode(pack(basic("1581F5FHD23170001"), location(), system()))
-        t.add(RidFrame("AA:BB", RidTransport.Bluetooth, -60, msgs), 1_000)
-        t.add(RidFrame("60:60:1F:00:00:01", RidTransport.Wifi, -70, msgs), 2_000)
-        t.add(RidFrame("CC:DD", RidTransport.Bluetooth, -80, RemoteId.decode(location())), 2_500)
-        val list = t.snapshot(3_000)
-        assertEquals(2, list.size)
-        val dji = list.first { it.id != null }
-        assertTrue(dji.isDji)
-        assertEquals(setOf(RidTransport.Bluetooth, RidTransport.Wifi), dji.transports)
-        assertEquals(48.8566, dji.operatorLat!!, 1e-7)
-        assertEquals(2, dji.messages)
-        assertTrue(t.snapshot(200_000).isEmpty())
-    }
-
     private fun res(name: String, db: Double, q: Double) = FpvResult(FpvChannels.byName(name)!!, db, q, if (q > 0) 900 else 0, "PAL", 0)
 
     @Test fun analogTrackerKeepsOneDronePerTransmitter() {

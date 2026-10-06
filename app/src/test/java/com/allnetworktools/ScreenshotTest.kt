@@ -540,24 +540,11 @@ class ScreenshotTest {
             running = true, watching = if (watching) ch.byName("F4") else null, image = img,
             dji = com.allnetworktools.data.sdr.DjiDetection(7, true, 2444.5, 22.0, listOf(14.0, 16.0, 19.0, 22.0), listOf(2414.5, 2429.5, 2444.5), now - 60_000, now - 2_000),
         )
-        if (tab != com.allnetworktools.ui.pages.sdr.FpvTab.Analog) {
-            vm.tools.fpv.rid.setForTest(
-                listOf(
-                    com.allnetworktools.data.drone.RemoteDrone(
-                        "1581F5FHD23170001", "1581F5FHD23170001", 1, 2, 2, 48.8582, 2.2945, 152.0, 150.0, 85.0, false, 6.4, 1.5, 270.0,
-                        48.8566, 2.2920, 66.0, "FRA87ag3k5ht1lm", null, 1, 2, -71,
-                        setOf(com.allnetworktools.data.drone.RidTransport.Wifi), now - 120_000, now - 1_000, 34, emptyList(),
-                    ),
-                ),
-                running = true,
-            )
-            vm.tools.fpv.tab = tab
-        }
+        vm.tools.fpv.tab = tab
     }
     @Test fun fpvAnalog() = shot("H18_fpv_analog", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it) }
     @Test fun fpvVideo() = shot("H19_fpv_video", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, watching = true) }
     @Test fun fpvDji() = shot("H20_fpv_dji", dark = true, nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, tab = com.allnetworktools.ui.pages.sdr.FpvTab.Dji) }
-    @Test fun fpvRemoteId() = shot("H21_fpv_remote_id", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Fpv))) { fpvDemo(it, tab = com.allnetworktools.ui.pages.sdr.FpvTab.RemoteId) }
     @Test fun updateDialog() = shot("Z9_update_dialog") { vm ->
         vm.updater.offerForTest(
             com.allnetworktools.update.UpdateInfo(

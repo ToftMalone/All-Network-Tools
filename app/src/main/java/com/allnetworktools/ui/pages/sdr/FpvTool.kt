@@ -31,12 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.allnetworktools.MainViewModel
-import com.allnetworktools.data.TrackerDetect
-import com.allnetworktools.data.drone.RemoteDrone
-import com.allnetworktools.data.drone.RemoteId
-import com.allnetworktools.data.drone.RemoteIdScanner
-import com.allnetworktools.data.drone.RemoteIdTracker
-import com.allnetworktools.data.drone.RidRadios
 import com.allnetworktools.data.sdr.AnalogDrone
 import com.allnetworktools.data.sdr.AnalogDroneTracker
 import com.allnetworktools.data.sdr.AnalogVideoDecoder
@@ -80,62 +74,16 @@ import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class FpvTab(val label: String) { Analog("Analogique"), Dji("DJI"), RemoteId("Remote ID") }
-
-/** Remote ID heard by the phone's Bluetooth and Wi-Fi: identity, position and pilot of nearby drones. */
-class RidController(private val scanner: RemoteIdScanner, private val scope: CoroutineScope) {
-    var running by mutableStateOf(false)
-        private set
-    var drones by mutableStateOf<List<RemoteDrone>>(emptyList())
-        private set
-    var radios by mutableStateOf<RidRadios?>(null)
-        private set
-
-    private val tracker = RemoteIdTracker()
-    private var job: Job? = null
-
-    fun start() {
-        if (running) return
-        radios = scanner.radios()
-        running = true
-        job = scope.launch {
-            launch { scanner.frames().collect { tracker.add(it, System.currentTimeMillis()) } }
-            while (true) {
-                drones = tracker.snapshot(System.currentTimeMillis())
-                delay(1000)
-            }
-        }
-    }
-
-    fun stop() {
-        job?.cancel()
-        job = null
-        running = false
-    }
-
-    fun clear() { tracker.clear(); drones = emptyList() }
-
-    internal fun setForTest(list: List<RemoteDrone>, running: Boolean) { drones = list; this.running = running; radios = RidRadios(true, true) }
-}
+enum class FpvTab(val label: String) { Analog("Analogique"), Dji("DJI") }
 
 /**
- * Drones: analogue FPV video (5.8 and 2.4 GHz, a drone is a channel carrying real video sync), DJI (the DroneID burst
- * heard by the HackRF, plus the Remote ID DJI drones send over Wi-Fi) and Remote ID from any brand. Only drones are
- * shown, never raw signals. Receive only; nothing is recorded.
+ * Drones, with the HackRF only: analogue FPV video (5.8 and 2.4 GHz, a drone is a channel carrying real video sync) and
+ * DJI (the DroneID burst). Only drones are shown, never raw signals. Receive only; nothing is recorded.
  */
-class FpvController(
-    private val repo: SdrRepository,
-    scanner: RemoteIdScanner,
-    private val scope: CoroutineScope,
-    private val onAcquire: () -> Unit = {},
-) {
-    val rid = RidController(scanner, scope)
-
+class FpvController(private val repo: SdrRepository, private val scope: CoroutineScope, private val onAcquire: () -> Unit = {}) {
     var tab by mutableStateOf(FpvTab.Analog)
     var lnaGain by mutableIntStateOf(24)
     var vgaGain by mutableIntStateOf(24)
@@ -184,20 +132,11 @@ class FpvController(
     private enum class Mode { Scan, Digital }
     private class Watch(val channel: FpvChannel)
 
-    /** Something is listening: the HackRF or the phone's Remote ID scan. */
-    val active: Boolean get() = running || starting || rid.running
+    /** The HackRF is starting or listening. */
+    val active: Boolean get() = running || starting
 
-    /** DJI drones from Remote ID; the DroneID burst only says one is there. */
-    val djiRemote: List<RemoteDrone> get() = rid.drones.filter { it.isDji }
-
-    /** Starts what the current tab needs. [device] may be null on the Remote ID tab and on the DJI tab. */
-    fun start(device: SdrDevice?) {
-        when (tab) {
-            FpvTab.Analog -> device?.let { begin(it, Mode.Scan) }
-            FpvTab.Dji -> { rid.start(); device?.let { begin(it, Mode.Digital) } }
-            FpvTab.RemoteId -> rid.start()
-        }
-    }
+    /** Starts the analogue scan or the DroneID search, depending on the tab. */
+    fun start(device: SdrDevice) = begin(device, if (tab == FpvTab.Analog) Mode.Scan else Mode.Digital)
 
     /** Shows the picture of [ch]; starts the radio if needed. */
     fun watch(device: SdrDevice, ch: FpvChannel) {
@@ -430,7 +369,7 @@ class FpvController(
 
     fun clear() {
         if (running) return
-        analog.clear(); djiTracker.clear(); rid.clear()
+        analog.clear(); djiTracker.clear()
         drones = emptyList(); dji = null; sweeps = 0; digitalSweeps = 0
     }
 
@@ -442,7 +381,6 @@ class FpvController(
         scanning = null
         windowMhz = null
         watching = null
-        rid.stop()
         if (r != null) scope.launch(Dispatchers.IO) { r.close() }
     }
 
@@ -487,23 +425,16 @@ private fun trendLabel(levels: List<Double>) = when (levelTrend(levels)) {
     else -> "Stable"
 }
 
-private fun distanceText(m: Double) = if (m < 1000) "${fmt(m)} m" else "${fmt(m / 1000, 1)} km"
-
 @Composable
 fun FpvTool(vm: MainViewModel) {
     val c = vm.tools.fpv
     val device by vm.sdrDevice.collectAsStateWithLifecycle()
-    // The phone's position only gives distances to the drone and its pilot; it is read while this screen is open.
-    val positions by vm.positions.collectAsStateWithLifecycle()
-    val loc = positions.fused ?: positions.gnss ?: positions.network
-    val me = loc?.let { it.latitude to it.longitude }
     val d = device
     val now = System.currentTimeMillis()
     val tab = c.tab
     val count = when (tab) {
         FpvTab.Analog -> c.drones.count { !it.lost }
-        FpvTab.Dji -> maxOf(c.djiRemote.size, if (c.dji?.confirmed == true) 1 else 0)
-        FpvTab.RemoteId -> c.rid.drones.size
+        FpvTab.Dji -> if (c.dji?.confirmed == true) 1 else 0
     }
     PageColumn {
         HeroCard {
@@ -516,8 +447,7 @@ fun FpvTool(vm: MainViewModel) {
                     FpvTab.Analog -> c.scanning?.let { "Recherche sur le canal $it" }
                         ?: if (c.sweeps > 0) "${c.sweeps} ${plural(c.sweeps, "balayage terminé", "balayages terminés")}"
                         else when (c.analogBand) { 24 -> "Vidéo analogique 2,4 GHz"; 0 -> "Vidéo analogique 2,4 et 5,8 GHz"; else -> "Vidéo analogique 5,8 GHz" }
-                    FpvTab.Dji -> c.windowMhz?.let { "DroneID autour de ${fmt(it, 1)} MHz · Remote ID Wi-Fi" } ?: "DroneID par le HackRF, Remote ID par le téléphone"
-                    FpvTab.RemoteId -> "Bluetooth et Wi-Fi du téléphone"
+                    FpvTab.Dji -> c.windowMhz?.let { "DroneID autour de ${fmt(it, 1)} MHz" } ?: "DroneID de DJI, 2,4 et 5,8 GHz"
                 },
                 style = rf(14, 20, tnum = true),
             )
@@ -528,8 +458,7 @@ fun FpvTool(vm: MainViewModel) {
                     c.active && count > 0 -> HeroChip(if (count == 1) "Drone à proximité" else "$count drones à proximité", AntTheme.net.good, blink = true)
                     tab == FpvTab.Dji && c.dji != null -> HeroChip("Rafale DroneID, confirmation en cours", AntTheme.net.fair, blink = true)
                     c.active -> HeroChip("Aucun drone pour l'instant", AntTheme.net.fair, blink = true)
-                    tab == FpvTab.Analog && d == null -> HeroChip("Aucun HackRF branché", AntTheme.net.poor)
-                    tab == FpvTab.RemoteId || d == null -> HeroChip("Prêt : Bluetooth et Wi-Fi", AntTheme.net.good)
+                    d == null -> HeroChip("Aucun HackRF branché", AntTheme.net.poor)
                     else -> HeroChip("${d.name} prêt", AntTheme.net.good)
                 }
             }
@@ -537,29 +466,26 @@ fun FpvTool(vm: MainViewModel) {
         SegmentedRow(FpvTab.entries.map { it to it.label }, c.tab, { if (!c.active) c.tab = it }, Modifier.fillMaxWidth(), height = 36.dp)
         if (c.active) StartButton("Arrêter", Sym.Stop) { c.stop() }
         else StartButton(
-            when (tab) { FpvTab.Analog -> "Chercher des drones"; FpvTab.Dji -> "Chercher un drone DJI"; FpvTab.RemoteId -> "Écouter le Remote ID" },
-            Sym.PlayArrow, enabled = tab != FpvTab.Analog || d != null,
-        ) { c.start(d) }
+            if (tab == FpvTab.Analog) "Chercher des drones" else "Chercher un drone DJI",
+            Sym.PlayArrow, enabled = d != null,
+        ) { d?.let(c::start) }
         when (tab) {
             FpvTab.Analog -> AnalogPage(c, d, now)
-            FpvTab.Dji -> DjiPage(c, me, now)
-            FpvTab.RemoteId -> RemotePage(c, me, now)
+            FpvTab.Dji -> DjiPage(c, now)
         }
-        if (tab != FpvTab.RemoteId) {
-            SectionCard {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Bande à surveiller", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (tab == FpvTab.Analog) listOf(58 to "5,8 GHz", 24 to "2,4 GHz", 0 to "Les deux").forEach { (b, l) -> AntFilterChip(l, c.analogBand == b, { if (!c.running) c.analogBand = b }) }
-                        else listOf(0 to "2,4 + 5,8 GHz", 24 to "2,4 GHz", 58 to "5,8 GHz").forEach { (b, l) -> AntFilterChip(l, c.band == b, { if (!c.running) c.band = b }) }
-                    }
-                    GainSettings(
-                        c.lnaGain, listOf(0, 8, 16, 24, 32, 40), { c.lnaGain = it; c.applyGains() },
-                        c.vgaGain, listOf(10, 20, 30, 40), { c.vgaGain = it; c.applyGains() },
-                        c.amp, { c.amp = !c.amp; c.applyGains() },
-                    )
-                    if (c.running) Text("Flux USB %.1f Mo/s (attendu %d)".format(Locale.FRANCE, c.usbMBps, if (tab == FpvTab.Dji) 40 else 32), style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant)
+        SectionCard {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Bande à surveiller", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (tab == FpvTab.Analog) listOf(58 to "5,8 GHz", 24 to "2,4 GHz", 0 to "Les deux").forEach { (b, l) -> AntFilterChip(l, c.analogBand == b, { if (!c.running) c.analogBand = b }) }
+                    else listOf(0 to "2,4 + 5,8 GHz", 24 to "2,4 GHz", 58 to "5,8 GHz").forEach { (b, l) -> AntFilterChip(l, c.band == b, { if (!c.running) c.band = b }) }
                 }
+                GainSettings(
+                    c.lnaGain, listOf(0, 8, 16, 24, 32, 40), { c.lnaGain = it; c.applyGains() },
+                    c.vgaGain, listOf(10, 20, 30, 40), { c.vgaGain = it; c.applyGains() },
+                    c.amp, { c.amp = !c.amp; c.applyGains() },
+                )
+                if (c.running) Text("Flux USB %.1f Mo/s (attendu %d)".format(Locale.FRANCE, c.usbMBps, if (tab == FpvTab.Dji) 40 else 32), style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant)
             }
         }
         SectionCard {
@@ -573,11 +499,8 @@ fun FpvTool(vm: MainViewModel) {
                                 "altitude, batterie ou GPS n'apparaissent qu'incrustés dans l'image (OSD). Rien n'est enregistré."
                         FpvTab.Dji ->
                             "Le HackRF écoute les fréquences où DJI envoie son DroneID (une rafale de 0,6 ms, 10 MHz de large, qui change de fréquence) : trois rafales en 20 s confirment un drone. " +
-                                "La télémétrie vient du Remote ID que les DJI récents (Mini 3 et 4, Air 3, Mavic 3…) diffusent en Wi-Fi : position, altitude, vitesse et position du pilote. " +
-                                "La vidéo DJI (OcuSync, O3, O4) est numérique et chiffrée : elle n'est pas affichable."
-                        FpvTab.RemoteId ->
-                            "Le Remote ID est l'identification électronique obligatoire des drones (classes C1 à C6 en Europe, Remote ID aux États-Unis), diffusée en clair pour que chacun puisse la lire. " +
-                                "Le téléphone l'écoute en Bluetooth (quelques centaines de mètres) et dans les balises Wi-Fi (Android limite à une recherche toutes les 30 s). Rien n'est enregistré."
+                                "Le contenu du DroneID n'est pas décodé : la télémétrie se limite à ce que mesure le HackRF (fréquences, niveau, tendance). " +
+                                "La vidéo DJI (OcuSync, O3, O4) est numérique et chiffrée : elle n'est pas affichable. Seul le HackRF est utilisé, ni le Wi-Fi ni le Bluetooth du téléphone."
                     },
                     style = rf(13, 18), color = cs.onSurfaceVariant,
                 )
@@ -662,85 +585,30 @@ private fun AnalogPage(c: FpvController, d: SdrDevice?, now: Long) {
 }
 
 @Composable
-private fun DjiPage(c: FpvController, me: Pair<Double, Double>?, now: Long) {
-    val remote = c.djiRemote
+private fun DjiPage(c: FpvController, now: Long) {
     val dj = c.dji
-    if (remote.isEmpty() && dj?.confirmed != true) {
+    if (dj?.confirmed != true) {
         Empty(
             when {
-                !c.active -> "Lance la recherche : le HackRF écoute le DroneID de DJI et le téléphone le Remote ID qu'émettent les DJI récents. Sans HackRF, seul le Remote ID est écouté."
+                !c.active -> "Lance la recherche : le HackRF écoute le DroneID de DJI sur ses fréquences à 2,4 et 5,8 GHz."
                 dj != null -> "Une rafale DroneID a été entendue (${dj.bursts}). Il en faut trois en 20 s pour confirmer un drone DJI."
                 else -> "Aucun drone DJI pour l'instant (${c.digitalSweeps} ${plural(c.digitalSweeps, "balayage", "balayages")}). Allume le drone et rapproche-toi."
             },
         )
         return
     }
-    remote.forEach { RemoteDroneCard(it, me, now, dj?.takeIf { d -> d.confirmed }) }
-    if (remote.isEmpty() && dj != null) {
-        DroneHeader(
-            Sym.Flight, "Drone DJI", "Reconnu à son DroneID · ${dj.bursts} ${plural(dj.bursts, "rafale", "rafales")}",
-            now - dj.lastSeenMs < 30_000, "Vidéo numérique chiffrée", false, false,
-        )
-        InfoList("Télémétrie radio") {
-            InfoRow("Dernière fréquence", "${fmt(dj.lastCentreMhz, 1)} MHz")
-            InfoRow("Fréquences utilisées", dj.frequencies.joinToString(" · ") { fmt(it, 1) })
-            InfoRow("Niveau", "+${fmt(dj.lastLevelDb)} dB au-dessus du bruit")
-            InfoRow("Tendance", trendLabel(dj.levels))
-            InfoRow("Vu pour la dernière fois", ago(dj.lastSeenMs, now))
-            LevelChart(dj.levels)
-        }
-        Text(
-            "Ce drone n'émet pas de Remote ID reçu par le téléphone (ancien modèle, ou trop loin) : sa position n'est pas disponible.",
-            style = rf(12, 16), color = cs.onSurfaceVariant,
-        )
-    }
-    if (!c.active) ToolButtons(ToolButton("Effacer", Sym.Delete, BtnKind.OutlineOnSurface) { c.clear() })
-}
-
-@Composable
-private fun RemotePage(c: FpvController, me: Pair<Double, Double>?, now: Long) {
-    val r = c.rid.radios
-    if (c.rid.running && r != null && !r.bluetooth && !r.wifi) Empty("Le Bluetooth et le Wi-Fi sont coupés : le téléphone ne peut pas entendre le Remote ID.")
-    else if (c.rid.running && r != null && !r.bluetooth) Text("Bluetooth coupé : seul le Wi-Fi écoute (une mise à jour toutes les 30 s).", style = rf(12, 16), color = cs.onSurfaceVariant)
-    if (c.rid.drones.isEmpty()) {
-        Empty(if (c.rid.running) "Aucun Remote ID reçu pour l'instant. Les drones récents l'émettent dès qu'ils sont allumés." else "Lance l'écoute : le téléphone reçoit le Remote ID des drones alentour, sans HackRF.")
-        return
-    }
-    c.rid.drones.forEach { RemoteDroneCard(it, me, now, null) }
-    if (!c.active) ToolButtons(ToolButton("Effacer", Sym.Delete, BtnKind.OutlineOnSurface) { c.clear() })
-}
-
-@Composable
-private fun RemoteDroneCard(dr: RemoteDrone, me: Pair<Double, Double>?, now: Long, droneId: DjiDetection?) {
-    val brand = dr.manufacturer?.let { "Drone $it" } ?: "Drone"
-    val type = RemoteId.uaTypeLabel(dr.uaType)
     DroneHeader(
-        Sym.Flight, listOfNotNull(brand, type?.lowercase(Locale.FRANCE)).joinToString(" · "),
-        dr.id?.let { "${RemoteId.idTypeLabel(dr.idType)} $it" } ?: "Identifiant pas encore reçu",
-        now - dr.lastSeenMs < 15_000,
-        if (dr.isDji) "Vidéo numérique chiffrée" else "Vidéo non détectable", false,
-        dr.lat != null || dr.heightM != null,
+        Sym.Flight, "Drone DJI", "Reconnu à son DroneID · ${dj.bursts} ${plural(dj.bursts, "rafale", "rafales")}",
+        now - dj.lastSeenMs < 30_000, "Vidéo numérique chiffrée", false, false,
     )
-    InfoList("Télémétrie") {
-        RemoteId.statusLabel(dr.status)?.let { InfoRow("État", it) }
-        if (dr.lat != null && dr.lon != null) {
-            InfoRow("Position", "${fmt(dr.lat, 5)}, ${fmt(dr.lon, 5)}")
-            if (me != null) InfoRow("Distance", distanceText(TrackerDetect.distanceM(me.first, me.second, dr.lat, dr.lon)))
-        }
-        dr.heightM?.let { InfoRow(if (dr.heightAgl) "Hauteur sol" else "Hauteur / décollage", "${fmt(it)} m") }
-        (dr.altGeoM ?: dr.altBaroM)?.let { InfoRow("Altitude", "${fmt(it)} m") }
-        dr.speedMs?.let { InfoRow("Vitesse", "${fmt(it, 1)} m/s · ${fmt(it * 3.6)} km/h") }
-        dr.verticalMs?.let { InfoRow("Vitesse verticale", "${if (it > 0) "+" else ""}${fmt(it, 1)} m/s") }
-        dr.directionDeg?.let { InfoRow("Cap", "${fmt(it)}°") }
-        if (dr.operatorLat != null && dr.operatorLon != null) {
-            InfoRow("Pilote", "${fmt(dr.operatorLat, 5)}, ${fmt(dr.operatorLon, 5)}")
-            if (me != null) InfoRow("Distance du pilote", distanceText(TrackerDetect.distanceM(me.first, me.second, dr.operatorLat, dr.operatorLon)))
-        }
-        dr.operatorId?.let { InfoRow("Exploitant", it) }
-        dr.description?.let { InfoRow("Description", it) }
-        RemoteId.euLabel(dr.categoryEu, dr.classEu)?.let { InfoRow("Catégorie UE", it) }
-        InfoRow("Reçu par", dr.transports.joinToString(" et ") { it.label } + " · ${dr.rssi} dBm")
-        InfoRow("Vu pour la dernière fois", ago(dr.lastSeenMs, now))
-        if (droneId != null) InfoRow("DroneID (HackRF)", "${droneId.bursts} ${plural(droneId.bursts, "rafale", "rafales")} · ${fmt(droneId.lastCentreMhz, 1)} MHz")
+    InfoList("Télémétrie radio") {
+        InfoRow("Dernière fréquence", "${fmt(dj.lastCentreMhz, 1)} MHz")
+        InfoRow("Fréquences utilisées", dj.frequencies.joinToString(" · ") { fmt(it, 1) })
+        InfoRow("Niveau", "+${fmt(dj.lastLevelDb)} dB au-dessus du bruit")
+        InfoRow("Tendance", trendLabel(dj.levels))
+        InfoRow("Vu pour la dernière fois", ago(dj.lastSeenMs, now))
+        InfoRow("Présent depuis", duration(dj.firstSeenMs, dj.lastSeenMs))
+        LevelChart(dj.levels)
     }
+    if (!c.active) ToolButtons(ToolButton("Effacer", Sym.Delete, BtnKind.OutlineOnSurface) { c.clear() })
 }

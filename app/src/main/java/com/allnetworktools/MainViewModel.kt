@@ -40,7 +40,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Why a network card or page is unavailable. */
-enum class Blocker { NoHardware, WifiOff, BluetoothOff, NearbyPermission, Airplane, PhonePermission, NoSim, LocationPermission, LocationOff, SdrMissing }
+enum class Blocker { NoHardware, WifiOff, BluetoothOff, NearbyPermission, Airplane, PhonePermission, NoSim, LocationPermission, LocationOff, SdrMissing, CableMissing }
 
 sealed interface Page {
     data object Home : Page
@@ -157,7 +157,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val blockers: StateFlow<Map<Network, Blocker?>> = combine(
         combine(permissions, wifiEnabled, bluetoothEnabled, airplane, locationEnabled, ::CoreAvail),
         sdrDevice,
-    ) { (p, wifi, bt, plane, loc), sdr ->
+        radioCable,
+    ) { (p, wifi, bt, plane, loc), sdr, cable ->
         mapOf(
             Network.Wifi to when {
                 !g.radios.hasWifi -> Blocker.NoHardware
@@ -183,8 +184,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 else -> null
             },
             Network.Sdr to if (sdr == null) Blocker.SdrMissing else null,
-            // Always open: channel lists can be edited without the radio, the cable is only needed to read and write it.
-            Network.Talkie to null,
+            Network.Talkie to if (cable == null) Blocker.CableMissing else null,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 

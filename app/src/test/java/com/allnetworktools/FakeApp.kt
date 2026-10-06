@@ -268,12 +268,6 @@ class FakeApp : AntApplication() {
             override fun hasPermission(c: com.allnetworktools.data.radio.RadioCable) = true
         }
     }
-    override val remoteId by lazy {
-        object : com.allnetworktools.data.drone.RemoteIdScanner(this@FakeApp) {
-            override fun radios() = com.allnetworktools.data.drone.RidRadios(bluetooth = true, wifi = true)
-            override fun frames(): Flow<com.allnetworktools.data.drone.RidFrame> = kotlinx.coroutines.flow.emptyFlow()
-        }
-    }
     override val sdr by lazy {
         object : com.allnetworktools.data.sdr.SdrRepository(this@FakeApp) {
             override val device: Flow<com.allnetworktools.data.sdr.SdrDevice?> = Scenario.sdrDevice

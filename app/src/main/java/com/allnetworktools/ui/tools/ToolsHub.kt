@@ -62,7 +62,7 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
         com.allnetworktools.ui.pages.sdr.AprsController(app.sdr, scope) { spectrum.stop(); adsb.stop(); sonde.stop(); fm.stop(); ais.stop(); meteor.stop(); fpv.stop() }
     }
     val fpv: com.allnetworktools.ui.pages.sdr.FpvController by lazy {
-        com.allnetworktools.ui.pages.sdr.FpvController(app.sdr, app.remoteId, scope) { spectrum.stop(); adsb.stop(); sonde.stop(); fm.stop(); ais.stop(); aprs.stop(); meteor.stop() }
+        com.allnetworktools.ui.pages.sdr.FpvController(app.sdr, scope) { spectrum.stop(); adsb.stop(); sonde.stop(); fm.stop(); ais.stop(); aprs.stop(); meteor.stop() }
     }
     val meteor: com.allnetworktools.ui.pages.sdr.MeteorController by lazy {
         com.allnetworktools.ui.pages.sdr.MeteorController(app.sdr, app.weatherTles, scope) { spectrum.stop(); adsb.stop(); sonde.stop(); fm.stop(); ais.stop(); aprs.stop(); fpv.stop() }
