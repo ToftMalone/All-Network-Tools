@@ -292,6 +292,8 @@ class Sonde(val serial: String, val model: String) {
     var frames = 0
     var lastSeenMs = 0L
     val track = ArrayList<DoubleArray>() // lat, lon, altitude
+    /** Wind profile from the sonde's own drift: altitude, east and north speed, one sample per 100 m layer. */
+    val winds = LinkedHashMap<Int, DoubleArray>()
 }
 
 /** Groups frames by serial number. A frame whose identity was lost goes to the last sonde heard. */
@@ -312,6 +314,10 @@ class SondeTracker {
             s.lat = f.lat; s.lon = f.lon; s.altitudeM = f.altitudeM
             s.maxAltitudeM = maxOf(s.maxAltitudeM ?: f.altitudeM, f.altitudeM)
             s.speedMs = f.speedMs; s.courseDeg = f.courseDeg; s.climbMs = f.climbMs
+            if (f.speedMs != null && f.courseDeg != null) {
+                val (e, n) = SondeLanding.components(f.speedMs, f.courseDeg)
+                s.winds[(f.altitudeM / 100).toInt()] = doubleArrayOf(f.altitudeM, e, n)
+            }
             // One point every ~10 m of altitude change keeps a whole flight (up to ~35 km) to a few thousand points.
             val prev = s.track.lastOrNull()
             if (prev == null || kotlin.math.abs(prev[2] - f.altitudeM) >= 10 || s.track.size < 2) {

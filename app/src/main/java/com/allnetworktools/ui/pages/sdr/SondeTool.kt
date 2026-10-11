@@ -49,6 +49,8 @@ import com.allnetworktools.data.sdr.AdsbTracker
 import com.allnetworktools.data.sdr.Decimator
 import com.allnetworktools.data.sdr.FloatDecimator
 import com.allnetworktools.data.sdr.HackRf
+import com.allnetworktools.data.sdr.Landing
+import com.allnetworktools.data.sdr.SondeLanding
 import com.allnetworktools.data.sdr.Meteomodem
 import com.allnetworktools.data.sdr.MeteomodemDemodulator
 import com.allnetworktools.data.sdr.Rs41
@@ -110,6 +112,8 @@ data class SondeInfo(
     val ageS: Int,
     /** Latitude, longitude pairs of the flight so far. */
     val track: List<Pair<Double, Double>>,
+    /** Predicted landing point while the sonde falls under its parachute. */
+    val landing: Landing? = null,
 )
 
 /**
@@ -212,7 +216,8 @@ class SondeController(private val repo: SdrRepository, private val scope: Corout
                     tracker.prune(now)
                     val snapshot = tracker.sondes.values.map { s ->
                         SondeInfo(s.serial, s.model, s.lat, s.lon, s.altitudeM, s.maxAltitudeM, s.climbMs, s.speedMs, s.courseDeg, s.batteryV,
-                            s.satellites, s.frameNumber, s.frames, ((now - s.lastSeenMs) / 1000).toInt(), s.track.map { it[0] to it[1] })
+                            s.satellites, s.frameNumber, s.frames, ((now - s.lastSeenMs) / 1000).toInt(), s.track.map { it[0] to it[1] },
+                            landingOf(s))
                     }.sortedBy { it.ageS }
                     val total = count
                     scope.launch { sondes = snapshot; totalFrames = total }
@@ -250,6 +255,15 @@ class SondeController(private val repo: SdrRepository, private val scope: Corout
         private const val SAMPLE_RATE = 2_000_000
         private const val POOL = 32
     }
+}
+
+/** Landing prediction from the sonde's last position and its own wind profile. */
+private fun landingOf(s: com.allnetworktools.data.sdr.Sonde): Landing? {
+    val lat = s.lat ?: return null
+    val lon = s.lon ?: return null
+    val alt = s.altitudeM ?: return null
+    val climb = s.climbMs ?: return null
+    return SondeLanding.predict(lat, lon, alt, climb, s.winds.values.toList())
 }
 
 private fun meters(v: Double) = "%,d m".format(Locale.FRANCE, v.roundToInt()).replace(' ', ' ')
@@ -369,6 +383,14 @@ private fun SondeRow(s: SondeInfo, me: Pair<Double, Double>?, selected: Boolean,
                     .joinToString(" · ").ifEmpty { "En attente du GPS" },
                 style = rf(13, 18, tnum = true), maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
+            s.landing?.let { l ->
+                val dist = me?.let { "%.1f km de toi".format(Locale.FRANCE, AdsbTracker.haversineKm(it.first, it.second, l.lat, l.lon)) }
+                val where = "%.4f, %.4f".format(Locale.ROOT, l.lat, l.lon)
+                Text(
+                    listOfNotNull("Chute prévue dans ${(l.inSeconds / 60).roundToInt().coerceAtLeast(1)} min", dist, where).joinToString(" · "),
+                    style = rf(13, 18, 600, tnum = true), color = AntTheme.accent.accent, maxLines = 2,
+                )
+            }
             Text(
                 listOfNotNull(
                     s.maxAltitudeM?.takeIf { s.climbMs != null && s.climbMs < -0.5 }?.let { "éclaté à ${meters(it)}" },
@@ -422,6 +444,23 @@ private class SondeOverlay(private val density: Float) : Overlay() {
             paint.style = Paint.Style.FILL
             paint.color = 0xFFFFFFFF.toInt(); c.drawCircle(pt.x.toFloat(), pt.y.toFloat(), r + 2 * density, paint)
             paint.color = color; c.drawCircle(pt.x.toFloat(), pt.y.toFloat(), r, paint)
+            s.landing?.let { l ->
+                // Predicted landing: a cross, joined to the sonde by a dashed line.
+                val sx = pt.x.toFloat()
+                val sy = pt.y.toFloat()
+                proj.toPixels(GeoPoint(l.lat, l.lon), pt)
+                paint.style = Paint.Style.STROKE
+                paint.color = color
+                paint.strokeWidth = 2 * density
+                paint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(6 * density, 5 * density), 0f)
+                c.drawLine(sx, sy, pt.x.toFloat(), pt.y.toFloat(), paint)
+                paint.pathEffect = null
+                paint.strokeWidth = 3 * density
+                val k = 7 * density
+                c.drawLine(pt.x - k, pt.y - k, pt.x + k, pt.y + k, paint)
+                c.drawLine(pt.x - k, pt.y + k, pt.x + k, pt.y - k, paint)
+                proj.toPixels(GeoPoint(s.lat!!, s.lon!!), pt)
+            }
             val label = s.serial + (s.altitudeM?.let { " · " + meters(it) } ?: "")
             text.color = 0xFFFFFFFF.toInt()
             text.style = Paint.Style.STROKE; text.strokeWidth = 3 * density

@@ -455,7 +455,7 @@ class ScreenshotTest {
         vm.tools.sonde.setForTest(
             listOf(
                 com.allnetworktools.ui.pages.sdr.SondeInfo("V3420117", "RS41", track.last().first, track.last().second, 18_432.0, 18_432.0, 5.2, 14.0, 62.0, 2.9, 9, 3051, 3012, 0, track),
-                com.allnetworktools.ui.pages.sdr.SondeInfo("805-2-31234", "M10", 49.21, 1.62, 6_210.0, 33_870.0, -12.4, 9.0, 80.0, 2.6, 8, 7120, 640, 4, listOf(49.30 to 1.40, 49.25 to 1.50, 49.21 to 1.62)),
+                com.allnetworktools.ui.pages.sdr.SondeInfo("805-2-31234", "M10", 49.21, 1.62, 6_210.0, 33_870.0, -12.4, 9.0, 80.0, 2.6, 8, 7120, 640, 4, listOf(49.30 to 1.40, 49.25 to 1.50, 49.21 to 1.62), com.allnetworktools.data.sdr.Landing(49.17, 1.71, 640.0)),
             ),
             403_000_000L,
         )
