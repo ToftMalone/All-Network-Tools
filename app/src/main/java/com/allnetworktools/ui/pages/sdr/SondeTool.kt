@@ -49,6 +49,8 @@ import com.allnetworktools.data.sdr.AdsbTracker
 import com.allnetworktools.data.sdr.Decimator
 import com.allnetworktools.data.sdr.FloatDecimator
 import com.allnetworktools.data.sdr.HackRf
+import com.allnetworktools.data.sdr.Meteomodem
+import com.allnetworktools.data.sdr.MeteomodemDemodulator
 import com.allnetworktools.data.sdr.Rs41
 import com.allnetworktools.data.sdr.Rs41Demodulator
 import com.allnetworktools.data.sdr.SdrDevice
@@ -92,6 +94,8 @@ import org.osmdroid.views.overlay.Overlay
 /** Immutable copy of a sonde for the UI. */
 data class SondeInfo(
     val serial: String,
+    /** "RS41", "M10", "M10+" or "M20". */
+    val model: String,
     val lat: Double?,
     val lon: Double?,
     val altitudeM: Double?,
@@ -109,8 +113,9 @@ data class SondeInfo(
 )
 
 /**
- * Vaisala RS41 radiosondes on 400–406 MHz. The HackRF runs at 2 MS/s tuned 500 kHz below the sonde; the channel is
- * brought to baseband and decimated by 40 to 50 kS/s, about ten samples per bit.
+ * Radiosondes on 400–406 MHz: Vaisala RS41 and the Meteomodem M10 / M20 that Météo-France launches. The HackRF runs at
+ * 2 MS/s tuned 500 kHz below the sonde; the channel is brought to baseband at 500 kS/s, then decimated to 50 kS/s for
+ * the RS41 (4800 bit/s) and to 100 kS/s for the Meteomodem sondes (9600 bit/s). Both decoders listen at once.
  */
 class SondeController(private val repo: SdrRepository, private val scope: CoroutineScope, private val onAcquire: () -> Unit = {}) {
     var frequencyMhz by mutableStateOf("403.000")
@@ -178,6 +183,10 @@ class SondeController(private val repo: SdrRepository, private val scope: Corout
         val tracker = SondeTracker()
         var count = 0
         val demod = Rs41Demodulator(SAMPLE_RATE / 40.0) { f -> Rs41.parse(f)?.let { tracker.update(it, System.currentTimeMillis()); count++ } }
+        val mDemod = MeteomodemDemodulator(SAMPLE_RATE / 20.0) { f -> Meteomodem.parse(f)?.let { tracker.update(it, System.currentTimeMillis()); count++ } }
+        val d3 = FloatDecimator(5, 0.05)
+        val cRe = FloatArray(8192)
+        val cIm = FloatArray(8192)
         val d1 = Decimator(4, 0.07, taps = 48)
         val d2 = FloatDecimator(10, 0.024)
         val aRe = FloatArray(32768)
@@ -194,13 +203,15 @@ class SondeController(private val repo: SdrRepository, private val scope: Corout
                     free.offer(item.first)
                     val m = d2.process(aRe, aIm, k, bRe, bIm)
                     demod.feed(bRe, bIm, m)
+                    val q = d3.process(aRe, aIm, k, cRe, cIm)
+                    mDemod.feed(cRe, cIm, q)
                 }
                 val now = System.currentTimeMillis()
                 if (now - last >= 1000) {
                     last = now
                     tracker.prune(now)
                     val snapshot = tracker.sondes.values.map { s ->
-                        SondeInfo(s.serial, s.lat, s.lon, s.altitudeM, s.maxAltitudeM, s.climbMs, s.speedMs, s.courseDeg, s.batteryV,
+                        SondeInfo(s.serial, s.model, s.lat, s.lon, s.altitudeM, s.maxAltitudeM, s.climbMs, s.speedMs, s.courseDeg, s.batteryV,
                             s.satellites, s.frameNumber, s.frames, ((now - s.lastSeenMs) / 1000).toInt(), s.track.map { it[0] to it[1] })
                     }.sortedBy { it.ageS }
                     val total = count
@@ -271,7 +282,7 @@ fun SondeTool(vm: MainViewModel) {
                 Text(plural(c.sondes.size, "sonde", "sondes"), Modifier.padding(bottom = 8.dp), style = rf(18, 24, 500))
             }
             Text(
-                "Vaisala RS41 · ${c.listeningHz?.let { "%.3f".format(Locale.FRANCE, it / 1e6) } ?: c.frequencyMhz.replace('.', ',')} MHz",
+                "RS41, M10 et M20 · ${c.listeningHz?.let { "%.3f".format(Locale.FRANCE, it / 1e6) } ?: c.frequencyMhz.replace('.', ',')} MHz",
                 style = rf(14, 20),
             )
             Row(Modifier.padding(top = 12.dp)) {
@@ -326,7 +337,8 @@ fun SondeTool(vm: MainViewModel) {
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Symbol(Sym.Info, size = 22.dp, tint = AntTheme.accent.accent)
                 Text(
-                    "Les stations météo lâchent des ballons deux fois par jour (vers 11 h et 23 h UTC). Leur sonde RS41 diffuse en clair sa " +
+                    "Les stations météo lâchent des ballons deux fois par jour (vers 11 h et 23 h UTC). Météo-France utilise surtout des sondes " +
+                        "Meteomodem M10 et M20, d'autres pays des Vaisala RS41 : les trois sont décodées en même temps. La sonde diffuse en clair sa " +
                         "position GPS chaque seconde jusqu'à ~35 km d'altitude, puis redescend en parachute. Réception seule.",
                     style = rf(13, 18), color = cs.onSurfaceVariant,
                 )
@@ -349,7 +361,7 @@ private fun SondeRow(s: SondeInfo, me: Pair<Double, Double>?, selected: Boolean,
         }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(s.serial, Modifier.weight(1f), style = rf(15, 20, 600), maxLines = 1)
+                Text("${s.model} · ${s.serial}", Modifier.weight(1f), style = rf(15, 20, 600), maxLines = 1)
                 Text(if (s.ageS <= 1) "à l'instant" else "il y a ${s.ageS} s", style = rf(12, 16, tnum = true), color = cs.onSurfaceVariant)
             }
             Text(

@@ -4,7 +4,7 @@ import com.allnetworktools.data.sdr.Decimator
 import com.allnetworktools.data.sdr.FloatDecimator
 import com.allnetworktools.data.sdr.Rs41
 import com.allnetworktools.data.sdr.Rs41Demodulator
-import com.allnetworktools.data.sdr.Rs41Frame
+import com.allnetworktools.data.sdr.SondeFrame
 import com.allnetworktools.data.sdr.SondeTracker
 import java.util.Random
 import kotlin.math.PI
@@ -116,7 +116,7 @@ class Rs41Test {
             iq[2 * i] = (cos(ph) * 40 + rnd.nextGaussian() * 25).toInt().coerceIn(-127, 127).toByte()
             iq[2 * i + 1] = (sin(ph) * 40 + rnd.nextGaussian() * 25).toInt().coerceIn(-127, 127).toByte()
         }
-        val got = ArrayList<Rs41Frame>()
+        val got = ArrayList<SondeFrame>()
         val demod = Rs41Demodulator(50_000.0) { f -> Rs41.parse(f)?.let { got += it } }
         val d1 = Decimator(4, 0.07, taps = 48)
         val d2 = FloatDecimator(10, 0.024)
@@ -140,14 +140,14 @@ class Rs41Test {
         val rnd = Random(5)
         val re = FloatArray(200_000) { rnd.nextGaussian().toFloat() }
         val im = FloatArray(200_000) { rnd.nextGaussian().toFloat() }
-        val got = ArrayList<Rs41Frame>()
+        val got = ArrayList<SondeFrame>()
         Rs41Demodulator(50_000.0) { f -> Rs41.parse(f)?.let { got += it } }.feed(re, im, re.size)
         assertTrue(got.isEmpty())
     }
 
     @Test fun trackerGroupsBySerialAndKeepsTheTrack() {
         val t = SondeTracker()
-        fun fr(serial: String?, alt: Double) = Rs41Frame(serial, 1, 2.9, 48.8, 2.1, alt, 3.0, 90.0, 5.0, 8)
+        fun fr(serial: String?, alt: Double) = SondeFrame("RS41", serial, 1, 2.9, 48.8, 2.1, alt, 3.0, 90.0, 5.0, 8)
         t.update(fr("S1234567", 1000.0), 0)
         t.update(fr(null, 1005.0), 1000) // status block lost: same sonde as before
         t.update(fr("S1234567", 1020.0), 2000)

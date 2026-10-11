@@ -46,10 +46,10 @@ object Export {
 
     /** One line per sonde, its flight path in the last column as "lat lon" pairs separated by '|'. */
     fun sondes(list: List<SondeInfo>, nowMs: Long): String = csv(
-        listOf("derniere_trame_utc", "numero", "latitude", "longitude", "altitude_m", "altitude_max_m", "vitesse_verticale_m_s", "vitesse_m_s", "route_deg", "batterie_v", "satellites", "trames", "trajet"),
+        listOf("derniere_trame_utc", "modele", "numero", "latitude", "longitude", "altitude_m", "altitude_max_m", "vitesse_verticale_m_s", "vitesse_m_s", "route_deg", "batterie_v", "satellites", "trames", "trajet"),
         list.map { s ->
             listOf(
-                utc(nowMs - s.ageS * 1000L), s.serial, s.lat, s.lon, s.altitudeM, s.maxAltitudeM, s.climbMs, s.speedMs, s.courseDeg, s.batteryV, s.satellites, s.frames,
+                utc(nowMs - s.ageS * 1000L), s.model, s.serial, s.lat, s.lon, s.altitudeM, s.maxAltitudeM, s.climbMs, s.speedMs, s.courseDeg, s.batteryV, s.satellites, s.frames,
                 s.track.joinToString("|") { (la, lo) -> "${cell(la)} ${cell(lo)}" },
             )
         },

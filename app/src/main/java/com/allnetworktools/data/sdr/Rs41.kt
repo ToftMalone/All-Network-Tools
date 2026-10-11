@@ -8,8 +8,10 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** What one RS41 frame told about its sonde. */
-data class Rs41Frame(
+/** What one radiosonde frame (RS41, M10 or M20) told about its sonde. */
+data class SondeFrame(
+    /** Model: "RS41", "M10", "M10+" or "M20". */
+    val model: String,
     val serial: String?,
     val frameNumber: Int?,
     val batteryV: Double?,
@@ -74,7 +76,7 @@ object Rs41 {
     }
 
     /** Parses a descrambled frame; blocks with a bad CRC are skipped. Null if no block was valid. */
-    fun parse(frame: ByteArray): Rs41Frame? {
+    fun parse(frame: ByteArray): SondeFrame? {
         val len = minOf(length(frame), frame.size)
         var pos = 0x39
         var serial: String? = null
@@ -125,7 +127,7 @@ object Rs41 {
             pos += 2 + n + 2
         }
         if (valid == 0) return null
-        return Rs41Frame(serial, nb, batt, geo?.first, geo?.second, geo?.third, speed, course, climb, sats)
+        return SondeFrame("RS41", serial, nb, batt, geo?.first, geo?.second, geo?.third, speed, course, climb, sats)
     }
 }
 
@@ -276,7 +278,7 @@ class FloatDecimator(private val decim: Int, cutoff: Double, taps: Int = 64) {
 }
 
 /** What is known about one sonde, built from its successive frames. */
-class Sonde(val serial: String) {
+class Sonde(val serial: String, val model: String) {
     var frameNumber: Int? = null
     var batteryV: Double? = null
     var lat: Double? = null
@@ -292,15 +294,15 @@ class Sonde(val serial: String) {
     val track = ArrayList<DoubleArray>() // lat, lon, altitude
 }
 
-/** Groups RS41 frames by serial number. A frame whose status block was lost goes to the last sonde heard. */
+/** Groups frames by serial number. A frame whose identity was lost goes to the last sonde heard. */
 class SondeTracker {
     val sondes = LinkedHashMap<String, Sonde>()
     private var last: String? = null
 
-    fun update(f: Rs41Frame, nowMs: Long) {
+    fun update(f: SondeFrame, nowMs: Long) {
         val serial = f.serial ?: last ?: return
         last = serial
-        val s = sondes.getOrPut(serial) { Sonde(serial) }
+        val s = sondes.getOrPut(serial) { Sonde(serial, f.model) }
         s.frames++
         s.lastSeenMs = nowMs
         f.frameNumber?.let { s.frameNumber = it }
