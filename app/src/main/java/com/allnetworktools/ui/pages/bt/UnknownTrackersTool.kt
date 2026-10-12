@@ -72,7 +72,9 @@ class TrackerCandidate(val address: String, signal: TrackerSignal) {
     var probeTries = 0
     var lastProbeMs = 0L
     val kind: TrackerKind get() = gattKind ?: signal.kind
-    val title: String get() = device?.name ?: gattName?.takeIf { gattKind == null } ?: kind.label
+    /** True once a connection read what the tag tells about itself. */
+    var probed = false
+    val title: String get() = device?.name ?: gattName ?: kind.label
     var assessment by mutableStateOf(FollowAssessment(FollowLevel.Nearby, 0, null, 0, 0))
 }
 
@@ -182,7 +184,7 @@ class UnknownTrackersController(private val context: android.content.Context?, p
         if (probeJob?.isActive == true || candidates.values.any { it.sound != SoundUi.Idle && it.sound !is SoundUi.Message }) return
         val t = candidates.values.filter {
             it.signal.net == TrackerNet.AppleFindMy && it.signal.kind != TrackerKind.AirTag && it.signal.kind != TrackerKind.AirPods &&
-                it.gattKind == null && it.gattName == null && it.probeTries < 3 && now - it.lastProbeMs > 60_000L &&
+                !it.probed && it.probeTries < 3 && now - it.lastProbeMs > 60_000L &&
                 it.device != null && now - it.lastHeardMs < 10_000L
         }.minByOrNull { it.firstHeardMs } ?: return
         probe(t, now)
@@ -208,9 +210,12 @@ class UnknownTrackersController(private val context: android.content.Context?, p
                 t.probeState = "Échec : ${r.error}" + if (t.probeTries < 3) " (nouvel essai dans 1 min)" else ""
                 return@launch
             }
-            t.gattName = r.name
-            t.gattKind = TrackerDetect.kindFromProbe(r.name, r.airTagService, r.model)
-            t.probeState = "Connecté : nom « ${r.name ?: "—"} », modèle « ${r.model ?: "—"} », ${r.services} services" +
+            t.probed = true
+            // Prefer the model the accessory gives ("AirPods Pro"), then its name; "left"/"right" name one AirPod.
+            t.gattName = r.findMyModel ?: r.model ?: r.name?.takeUnless { it == "left" || it == "right" }
+            t.gattKind = TrackerDetect.kindFromProbe(r.name, r.airTagService, r.model, r.findMyModel)
+            t.probeState = "Connecté : nom « ${r.name ?: "—"} », modèle « ${r.findMyModel ?: r.model ?: "—"} »" +
+                (r.findMyMaker?.let { ", fabricant « $it »" } ?: "") + ", ${r.services} services" +
                 if (r.airTagService) ", service AirTag présent" else ""
         }
     }

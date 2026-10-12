@@ -98,6 +98,10 @@ class NewToolsTest {
         assertEquals(com.allnetworktools.data.TrackerKind.AirTag, TrackerDetect.kindFromProbe(null, true))
         assertEquals(com.allnetworktools.data.TrackerKind.AirPods, TrackerDetect.kindFromProbe("left", false))
         assertEquals(null, TrackerDetect.kindFromProbe("Chipolo ONE Spot", false))
+        // AirPods Pro: empty device name, model read from the Find My accessory information service.
+        assertEquals(com.allnetworktools.data.TrackerKind.AirPods, TrackerDetect.kindFromProbe(null, false, null, "AirPods Pro"))
+        // AirPods Pro: empty device name, model read from the Find My accessory information service.
+        assertEquals(com.allnetworktools.data.TrackerKind.AirPods, TrackerDetect.kindFromProbe(null, false, null, "AirPods Pro"))
         // An iPhone's Nearby Info frame (0x10) is not a tracker.
         assertNull(TrackerDetect.classify(Ad.parseHex("0AFF4C0010050B1C8E3D21")))
     }

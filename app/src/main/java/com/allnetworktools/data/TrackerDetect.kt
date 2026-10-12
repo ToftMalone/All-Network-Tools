@@ -122,13 +122,12 @@ object TrackerDetect {
      * Kind given by what a Find My accessory tells over GATT: its name ("AirTag", "left"/"right" for one AirPod) or
      * the first-generation AirTag service. Null when that says nothing more than the advertisement.
      */
-    fun kindFromProbe(name: String?, airTagService: Boolean, model: String? = null): TrackerKind? {
+    fun kindFromProbe(name: String?, airTagService: Boolean, vararg models: String?): TrackerKind? {
         val n = name?.trim()?.lowercase()
-        val m = model?.trim()?.lowercase()
+        val m = models.filterNotNull().map { it.lowercase() }
         return when {
-            n != null && n.startsWith("airtag") -> TrackerKind.AirTag
-            m != null && m.contains("airtag") -> TrackerKind.AirTag
-            n != null && (n == "left" || n == "right" || n.startsWith("airpods")) -> TrackerKind.AirPods
+            n != null && n.startsWith("airtag") || m.any { "airtag" in it } -> TrackerKind.AirTag
+            n != null && (n == "left" || n == "right" || n.startsWith("airpods")) || m.any { "airpods" in it } -> TrackerKind.AirPods
             airTagService -> TrackerKind.AirTag
             else -> null
         }
