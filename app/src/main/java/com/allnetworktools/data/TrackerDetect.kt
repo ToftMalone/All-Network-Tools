@@ -39,6 +39,8 @@ data class TrackerSignal(
      * whose address rotates (SmartTag: epoch counter + rotating identifier).
      */
     val linkKey: String? = null,
+    /** Apple Find My status byte, shown to help tell what the tag is. */
+    val appleStatus: Int? = null,
     val kind: TrackerKind = when (net) {
         TrackerNet.AppleFindMy -> TrackerKind.FindMyAccessory
         TrackerNet.GoogleFindHub -> TrackerKind.GoogleTag
@@ -81,7 +83,7 @@ object TrackerDetect {
             while (i + 2 <= d.size) {
                 val t = d.u8(i)
                 val l = d.u8(i + 1)
-                if (t == 0x12) return TrackerSignal(TrackerNet.AppleFindMy, l >= 0x19, kind = appleKind(d, i + 2, l))
+                if (t == 0x12) return TrackerSignal(TrackerNet.AppleFindMy, l >= 0x19, appleStatus = if (l >= 1 && i + 2 < d.size) d.u8(i + 2) else null, kind = appleKind(d, i + 2, l))
                 if (t == 0) break
                 i += 2 + l
             }
@@ -120,10 +122,12 @@ object TrackerDetect {
      * Kind given by what a Find My accessory tells over GATT: its name ("AirTag", "left"/"right" for one AirPod) or
      * the first-generation AirTag service. Null when that says nothing more than the advertisement.
      */
-    fun kindFromProbe(name: String?, airTagService: Boolean): TrackerKind? {
+    fun kindFromProbe(name: String?, airTagService: Boolean, model: String? = null): TrackerKind? {
         val n = name?.trim()?.lowercase()
+        val m = model?.trim()?.lowercase()
         return when {
             n != null && n.startsWith("airtag") -> TrackerKind.AirTag
+            m != null && m.contains("airtag") -> TrackerKind.AirTag
             n != null && (n == "left" || n == "right" || n.startsWith("airpods")) -> TrackerKind.AirPods
             airTagService -> TrackerKind.AirTag
             else -> null

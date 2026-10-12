@@ -67,6 +67,8 @@ class TrackerCandidate(val address: String, signal: TrackerSignal) {
     /** Name read over GATT from a Find My accessory, and the kind it reveals (an AirTag hides as an accessory). */
     var gattName by mutableStateOf<String?>(null)
     var gattKind by mutableStateOf<TrackerKind?>(null)
+    /** Where the GATT identification stands, shown on the details page. */
+    var probeState by mutableStateOf<String?>(null)
     var probeTries = 0
     var lastProbeMs = 0L
     val kind: TrackerKind get() = gattKind ?: signal.kind
@@ -177,19 +179,39 @@ class UnknownTrackersController(private val context: android.content.Context?, p
      * accessory is in fact an AirTag. Up to three tries a minute apart, never while a tag is ringing.
      */
     private fun probeNext(now: Long) {
-        val ctx = context ?: return
         if (probeJob?.isActive == true || candidates.values.any { it.sound != SoundUi.Idle && it.sound !is SoundUi.Message }) return
         val t = candidates.values.filter {
-            it.signal.net == TrackerNet.AppleFindMy && it.signal.kind == TrackerKind.FindMyAccessory && it.gattKind == null &&
-                it.gattName == null && it.probeTries < 3 && now - it.lastProbeMs > 60_000L && it.device != null && now - it.lastHeardMs < 10_000L
+            it.signal.net == TrackerNet.AppleFindMy && it.signal.kind != TrackerKind.AirTag && it.signal.kind != TrackerKind.AirPods &&
+                it.gattKind == null && it.gattName == null && it.probeTries < 3 && now - it.lastProbeMs > 60_000L &&
+                it.device != null && now - it.lastHeardMs < 10_000L
         }.minByOrNull { it.firstHeardMs } ?: return
+        probe(t, now)
+    }
+
+    /** Identifies one tag now, from the details page. */
+    fun identify(t: TrackerCandidate) {
+        if (t.sound == SoundUi.Connecting || t.sound is SoundUi.Playing) return
+        probeJob?.cancel()
+        t.probeTries = 0
+        probe(t, System.currentTimeMillis())
+    }
+
+    private fun probe(t: TrackerCandidate, now: Long) {
+        val ctx = context ?: return
         val address = t.device?.address ?: return
         t.probeTries++
         t.lastProbeMs = now
+        t.probeState = "Connexion au tag…"
         probeJob = scope?.launch {
-            val r = probeFindMy(ctx, address) ?: return@launch
+            val r = probeFindMy(ctx, address)
+            if (r.error != null) {
+                t.probeState = "Échec : ${r.error}" + if (t.probeTries < 3) " (nouvel essai dans 1 min)" else ""
+                return@launch
+            }
             t.gattName = r.name
-            t.gattKind = TrackerDetect.kindFromProbe(r.name, r.airTagService)
+            t.gattKind = TrackerDetect.kindFromProbe(r.name, r.airTagService, r.model)
+            t.probeState = "Connecté : nom « ${r.name ?: "—"} », modèle « ${r.model ?: "—"} », ${r.services} services" +
+                if (r.airTagService) ", service AirTag présent" else ""
         }
     }
 
@@ -357,6 +379,7 @@ fun TrackerDetailTool(
             return@PageColumn
         }
         TrackerHero(t, now, onLocate, c::ring, c::stopSound)
+        if (t.signal.net == TrackerNet.AppleFindMy) ProbeCard(t) { c.identify(t) }
         SignalCard(t)
         IdentityCard(t.device)
         AdvertCard(t.device)
@@ -433,6 +456,26 @@ private fun TrackerHero(t: TrackerCandidate, now: Long, onLocate: (BleDevice) ->
             is SoundUi.Message -> Text(snd.text, Modifier.padding(top = 8.dp), style = rf(12, 16), color = if (snd.error) cs.error else cs.onSurfaceVariant)
             else -> Unit
         }
+    }
+}
+
+/** How the tag was identified: the advertisement's status byte, then what it said once connected. */
+@Composable
+private fun ProbeCard(t: TrackerCandidate, onIdentify: () -> Unit) {
+    SectionCard {
+        Text("Identification", style = rf(14, 20, 600), color = AntTheme.accent.accent)
+        Text(
+            "Octet d'état Localiser : " + (t.signal.appleStatus?.let { "0x%02X".format(it) } ?: "—") + " → " + t.signal.kind.label,
+            Modifier.padding(top = 8.dp), style = rf(13, 18, tnum = true),
+        )
+        Text(
+            t.probeState ?: "Pas encore de connexion au tag.",
+            Modifier.padding(top = 4.dp), style = rf(13, 18), color = cs.onSurfaceVariant,
+        )
+        PillButton(
+            "Identifier", onIdentify, Modifier.fillMaxWidth().padding(top = 12.dp), icon = Sym.Search, height = 44.dp,
+            bg = cs.surface, fg = AntTheme.accent.accent, enabled = t.device != null && t.probeState != "Connexion au tag…",
+        )
     }
 }
 
