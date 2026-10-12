@@ -32,6 +32,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -170,6 +171,14 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
     if (blocker != null && !internetTool) {
         BlockedPage(net, blocker)
         return
+    }
+    if (net == Network.Wifi && page is Page.ToolPage) {
+        // Android 17: ask for the local network up front, otherwise the system interrupts the scans with a device picker.
+        val actions = LocalActions.current
+        val perms by vm.permissions.collectAsStateWithLifecycle()
+        LaunchedEffect(Unit) {
+            if (PermGroup.LocalNetwork !in perms && !actions.isPermanentlyDenied(PermGroup.LocalNetwork)) actions.request(PermGroup.LocalNetwork)
+        }
     }
     when (page) {
         Page.Dashboard -> when (net) {
