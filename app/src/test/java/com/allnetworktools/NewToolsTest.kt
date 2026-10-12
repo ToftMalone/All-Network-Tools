@@ -87,6 +87,12 @@ class NewToolsTest {
         assertEquals(true, separated.separated)
         val near = TrackerDetect.classify(Ad.parseHex("07FF4C0012022400"))!!
         assertEquals(false, near.separated)
+        // Status byte bits 4–5: 0x10 an AirTag, 0x20 another Find My accessory, 0x30 AirPods, 0x00 an Apple device.
+        assertEquals(com.allnetworktools.data.TrackerKind.AirTag, separated.kind)
+        assertEquals(com.allnetworktools.data.TrackerKind.FindMyAccessory, near.kind)
+        assertEquals(com.allnetworktools.data.TrackerKind.AirPods, TrackerDetect.classify(Ad.parseHex("07FF4C0012023100"))!!.kind)
+        assertEquals(com.allnetworktools.data.TrackerKind.AppleDevice, TrackerDetect.classify(Ad.parseHex("07FF4C0012020000"))!!.kind)
+        assertEquals(com.allnetworktools.data.TrackerKind.SmartTag, TrackerDetect.classify(Ad.parseHex("07165AFD10223344"))!!.kind)
         // An iPhone's Nearby Info frame (0x10) is not a tracker.
         assertNull(TrackerDetect.classify(Ad.parseHex("0AFF4C0010050B1C8E3D21")))
     }

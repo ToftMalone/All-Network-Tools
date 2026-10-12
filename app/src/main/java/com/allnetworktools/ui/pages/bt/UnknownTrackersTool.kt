@@ -1,14 +1,14 @@
 package com.allnetworktools.ui.pages.bt
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.allnetworktools.data.BleDevice
@@ -27,8 +28,8 @@ import com.allnetworktools.data.FollowLevel
 import com.allnetworktools.data.PositionSet
 import com.allnetworktools.data.Sighting
 import com.allnetworktools.data.TrackerDetect
+import com.allnetworktools.data.TrackerKind
 import com.allnetworktools.data.TrackerSignal
-import kotlinx.coroutines.launch
 import com.allnetworktools.ui.components.LeadingIcon
 import com.allnetworktools.ui.components.PillButton
 import com.allnetworktools.ui.components.SectionCard
@@ -47,6 +48,7 @@ import com.allnetworktools.ui.tools.ToolEmpty
 import com.allnetworktools.util.fmt
 import com.allnetworktools.util.plural
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** A tag seen during the session, with where and when. */
 class TrackerCandidate(val address: String, signal: TrackerSignal) {
@@ -57,6 +59,8 @@ class TrackerCandidate(val address: String, signal: TrackerSignal) {
     val addresses = mutableSetOf(address)
     var lastLinkKey: String? = signal.linkKey
     var lastHeardMs = 0L
+    /** When the tag was first heard: the list keeps this order so rows never jump around. */
+    var firstHeardMs = 0L
     var sound by mutableStateOf<SoundUi>(SoundUi.Idle)
     var assessment by mutableStateOf(FollowAssessment(FollowLevel.Nearby, 0, null, 0, 0))
 }
@@ -137,7 +141,7 @@ class UnknownTrackersController(private val context: android.content.Context?, p
             val c = candidates.values.firstOrNull { d.address in it.addresses }
                 ?: sig.linkKey?.let { k -> candidates.values.firstOrNull { it.lastLinkKey == k && it.signal.net == sig.net && now - it.lastHeardMs < 20 * 60_000L } }
                     ?.also { it.addresses += d.address }
-                ?: TrackerCandidate(d.address, sig).also { candidates[d.address] = it }
+                ?: TrackerCandidate(d.address, sig).also { it.firstHeardMs = now; candidates[d.address] = it }
             c.device = d
             c.signal = sig
             sig.linkKey?.let { c.lastLinkKey = it }
@@ -156,7 +160,7 @@ class UnknownTrackersController(private val context: android.content.Context?, p
 
     internal fun setForTest(list: List<TrackerCandidate>, start: Long, travelled: Double) {
         candidates.clear()
-        list.forEach { candidates[it.address] = it }
+        list.forEach { if (it.firstHeardMs == 0L) it.firstHeardMs = it.sightings.firstOrNull()?.timeMs ?: start; candidates[it.address] = it }
         sessionStart = start
         travelledM = travelled
     }
@@ -190,7 +194,8 @@ fun UnknownTrackersTool(
     val awake = AntTheme.settings.keepAwake
     var now by androidx.compose.runtime.remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { delay(1000); now = System.currentTimeMillis() } }
-    val list = c.candidates.values.sortedWith(compareBy<TrackerCandidate> { it.assessment.level.ordinal }.thenByDescending { it.assessment.durationMs })
+    // In the order they were first heard: a new tag goes to the end and the others stay where they are.
+    val list = c.candidates.values.sortedWith(compareBy<TrackerCandidate>({ it.firstHeardMs }, { it.address }))
     val following = list.count { it.assessment.level == FollowLevel.Following }
     val watch = list.count { it.assessment.level == FollowLevel.Watch }
     PageColumn {
@@ -240,18 +245,60 @@ fun UnknownTrackersTool(
     }
 }
 
+/** Icon of each kind of tag, as in AirGuard: a disc for the AirTag, a key ring for the SmartTag, a phone for an Apple device… */
+internal fun kindIcon(k: TrackerKind) = when (k) {
+    TrackerKind.AirTag -> Sym.Adjust
+    TrackerKind.FindMyAccessory -> Sym.LocationOn
+    TrackerKind.AppleDevice -> Sym.Smartphone
+    TrackerKind.AirPods -> Sym.Headphones
+    TrackerKind.GoogleTag -> Sym.Sell
+    TrackerKind.SmartTag -> Sym.Key
+    TrackerKind.Tile -> Sym.CropSquare
+}
+
+private val clock = java.text.SimpleDateFormat("HH:mm", java.util.Locale.FRANCE)
+
 @Composable
 private fun TrackerRow(t: TrackerCandidate, onClick: () -> Unit) {
     val col = levelColor(t.assessment.level)
+    val acc = AntTheme.accent
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 14.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        LeadingIcon(kindIcon(t.signal.kind), acc.container, acc.onContainer, 44.dp, RoundedCornerShape(14.dp), 24.dp)
         Column(Modifier.weight(1f)) {
-            Text(t.device?.name ?: t.signal.net.maker, style = rf(16, 22, 600), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            Text(t.assessment.level.label, style = rf(13, 18, 500), color = col)
+            Text(t.device?.name ?: t.signal.kind.label, style = rf(16, 22, 600), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(
+                t.assessment.level.label + (if (t.firstHeardMs > 0) " · vu à ${clock.format(java.util.Date(t.firstHeardMs))}" else ""),
+                style = rf(13, 18, 500), color = col, maxLines = 1,
+            )
         }
+        SignalBars(t.device?.rssi)
         Symbol(Sym.ChevronRight, size = 22.dp, tint = cs.onSurfaceVariant)
+    }
+}
+
+/** Four bars, like a phone's signal: −95 dBm and below none, −60 dBm and above all four. */
+@Composable
+private fun SignalBars(rssi: Int?) {
+    val lit = when {
+        rssi == null -> 0
+        rssi >= -60 -> 4
+        rssi >= -72 -> 3
+        rssi >= -84 -> 2
+        rssi >= -95 -> 1
+        else -> 0
+    }
+    val on = AntTheme.accent.accent
+    val off = cs.outlineVariant
+    Row(Modifier.height(18.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        for (i in 0 until 4) {
+            androidx.compose.foundation.layout.Box(
+                Modifier.size(width = 4.dp, height = (6 + 4 * i).dp).clip(RoundedCornerShape(1.dp))
+                    .background(if (i < lit) on else off),
+            )
+        }
     }
 }
 
@@ -289,9 +336,9 @@ private fun TrackerHero(t: TrackerCandidate, now: Long, onLocate: (BleDevice) ->
     val acc = AntTheme.accent
     HeroCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            LeadingIcon(Sym.Sell, col, if (a.level == FollowLevel.Following) cs.onError else Color.White, 56.dp, RoundedCornerShape(20.dp), 28.dp)
+            LeadingIcon(kindIcon(t.signal.kind), col, if (a.level == FollowLevel.Following) cs.onError else Color.White, 56.dp, RoundedCornerShape(20.dp), 28.dp)
             Column(Modifier.weight(1f)) {
-                Text(t.device?.name ?: t.signal.net.maker, style = gs(22, 28, 500), maxLines = 2)
+                Text(t.device?.name ?: t.signal.kind.label, style = gs(22, 28, 500), maxLines = 2)
                 Text(t.signal.net.label, style = rf(13, 18), maxLines = 1)
             }
             if (t.device != null) {

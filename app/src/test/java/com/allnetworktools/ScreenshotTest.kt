@@ -366,6 +366,8 @@ class ScreenshotTest {
                 tag("F2:6B:91:0C:3A:58", "1EFF4C00121910" + "5A".repeat(22) + "0201", 38, walk, -61),
                 tag("C4:07:3B:E2:19:A0", "02010403025AFD17165AFD12C24A037F21348D05197CC6BE000000ED90DFA7", 7, walk.take(3), -79),
                 tag("E8:12:77:40:BC:03", "07FF4C0012022400", 21, walk.take(2), -70),
+                tag("D1:5E:02:9A:44:7C", "07FF4C0012020000", 3, walk.take(1), -88),
+                tag("CF:33:10:8B:21:E6", "0303EDFE", 2, walk.take(1), -93),
             ),
             System.currentTimeMillis() - 41 * 60_000L, 2380.0,
         )

@@ -18,6 +18,17 @@ enum class TrackerNet(val label: String, val maker: String) {
  * from its owner (Apple offline-finding frame, Google "unwanted tracking protection" frame), false when
  * it announces its owner is nearby, and null when the protocol does not tell.
  */
+/** What kind of object sends the frames, as far as the frames tell. */
+enum class TrackerKind(val label: String) {
+    AirTag("AirTag"),
+    FindMyAccessory("Accessoire Localiser"),
+    AppleDevice("Appareil Apple"),
+    AirPods("AirPods"),
+    GoogleTag("Tag Google Localiser"),
+    SmartTag("Galaxy SmartTag"),
+    Tile("Tile"),
+}
+
 data class TrackerSignal(
     val net: TrackerNet,
     val separated: Boolean?,
@@ -28,6 +39,12 @@ data class TrackerSignal(
      * whose address rotates (SmartTag: epoch counter + rotating identifier).
      */
     val linkKey: String? = null,
+    val kind: TrackerKind = when (net) {
+        TrackerNet.AppleFindMy -> TrackerKind.FindMyAccessory
+        TrackerNet.GoogleFindHub -> TrackerKind.GoogleTag
+        TrackerNet.SamsungFind -> TrackerKind.SmartTag
+        TrackerNet.Tile -> TrackerKind.Tile
+    },
 )
 
 data class Sighting(val timeMs: Long, val lat: Double?, val lon: Double?, val rssi: Int)
@@ -64,7 +81,7 @@ object TrackerDetect {
             while (i + 2 <= d.size) {
                 val t = d.u8(i)
                 val l = d.u8(i + 1)
-                if (t == 0x12) return TrackerSignal(TrackerNet.AppleFindMy, l >= 0x19)
+                if (t == 0x12) return TrackerSignal(TrackerNet.AppleFindMy, l >= 0x19, kind = appleKind(d, i + 2, l))
                 if (t == 0) break
                 i += 2 + l
             }
@@ -82,6 +99,20 @@ object TrackerDetect {
         if (0xFD5A in uuids) return TrackerSignal(TrackerNet.SamsungFind, null)
         if (uuids.any { it == 0xFEED || it == 0xFEEC || it == 0xFD84 }) return TrackerSignal(TrackerNet.Tile, null)
         return null
+    }
+
+    /**
+     * Find My status byte, bits 4–5: the kind of Apple object (as read by the open-source AirGuard app):
+     * 0x10 AirTag, 0x20 third-party Find My accessory, 0x30 AirPods, 0x00 an Apple device (iPhone, iPad, Mac…).
+     */
+    private fun appleKind(d: ByteArray, o: Int, len: Int): TrackerKind {
+        if (len < 1 || o >= d.size) return TrackerKind.FindMyAccessory
+        return when (d.u8(o) and 0x30) {
+            0x10 -> TrackerKind.AirTag
+            0x20 -> TrackerKind.FindMyAccessory
+            0x30 -> TrackerKind.AirPods
+            else -> TrackerKind.AppleDevice
+        }
     }
 
     /**

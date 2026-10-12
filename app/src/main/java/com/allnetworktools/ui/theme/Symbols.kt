@@ -52,6 +52,8 @@ object Sym {
     const val Description = "description"
     const val Devices = "devices"
     const val DevicesOther = "devices_other"
+    const val Adjust = "adjust"
+    const val CropSquare = "crop_square"
     const val DirectionsCar = "directions_car"
     const val Dns = "dns"
     const val Download = "download"
