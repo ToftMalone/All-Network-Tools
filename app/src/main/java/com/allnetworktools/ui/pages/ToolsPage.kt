@@ -68,10 +68,10 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
         ToolGroup("Sécurité", listOf(ToolEntry(Tool.UnknownTrackers, "Traqueurs inconnus", "AirTag, SmartTag, Tile qui vous suivent"))),
     )
     Network.Cellular -> listOf(
-        ToolGroup("Consommation", listOf(ToolEntry(Tool.DataUsage, "Données mobiles", "Par SIM et par app"), ToolEntry(Tool.CellDetail, "Cellule de service", servingLabel ?: "Identifiants et mesures"))),
+        ToolGroup("Cellules", listOf(ToolEntry(Tool.Neighbors, "Cellules voisines", "Cellules NR et LTE détectées par le modem"))),
     )
     Network.Gnss -> listOf(
-        ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"), ToolEntry(Tool.Passes, "Passages de satellites", "Levers et couchers prévus"))),
+        ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"))),
     )
     Network.Talkie -> emptyList()
     Network.Sdr -> listOf(
@@ -79,10 +79,10 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     )
 }
 
-private fun featuredSubtitle(net: Network) = when (net) {
+private fun featuredSubtitle(net: Network, servingLabel: String?) = when (net) {
     Network.Wifi -> "Réseaux alentour et occupation des canaux"
     Network.Bluetooth -> "Appareils à proximité, en direct, avec filtres"
-    Network.Cellular -> "Cellules NR et LTE détectées par le modem"
+    Network.Cellular -> servingLabel ?: "Identifiants et mesures de la cellule connectée"
     Network.Gnss -> "Sky plot et carte du monde des satellites"
     Network.Sdr -> "Spectre et chute d'eau, de 1 MHz à 6 GHz"
     Network.Talkie -> "Lire, modifier et écrire les mémoires par câble USB"
@@ -92,7 +92,7 @@ private fun featuredSubtitle(net: Network) = when (net) {
 private fun featuredBadge(net: Network, vm: MainViewModel): String? = when (net) {
     Network.Wifi -> vm.wifiScan.collectAsStateWithLifecycle().value?.let { "${it.size} ${plural(it.size, "réseau", "réseaux")}" }
     Network.Bluetooth -> vm.ble.collectAsStateWithLifecycle().value.size.let { "$it ${plural(it, "appareil")}" }
-    Network.Cellular -> vm.cell.collectAsStateWithLifecycle().value.state?.neighbors?.size?.let { "$it ${plural(it, "cellule")}" }
+    Network.Cellular -> vm.cell.collectAsStateWithLifecycle().value.state?.serving?.tech?.short
     Network.Gnss -> vm.gnss.collectAsStateWithLifecycle().value.let { "${it.used.size}/${it.visible.size} satellites" }
     Network.Talkie -> vm.tools.radioChannels.let { c -> c.count.takeIf { it > 0 }?.let { "$it ${plural(it, "canal", "canaux")}" } }
     Network.Sdr -> vm.tools.spectrum.let { if (it.running && it.tunedHz > 0) "%.1f MHz".format(java.util.Locale.FRANCE, it.tunedHz / 1e6) else null }
@@ -121,7 +121,7 @@ fun ToolsPage(net: Network, vm: MainViewModel) {
                 }
             }
             Text(net.featured.title, Modifier.padding(top = 16.dp), style = gs(26, 32, 500), color = acc.onContainer)
-            Text(featuredSubtitle(net), Modifier.padding(top = 2.dp).graphicsLayer { alpha = 0.85f }, style = rf(14, 20), color = acc.onContainer)
+            Text(featuredSubtitle(net, servingLabel), Modifier.padding(top = 2.dp).graphicsLayer { alpha = 0.85f }, style = rf(14, 20), color = acc.onContainer)
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.End) {
                 PillButton("Lancer", { open(net.featured) }, icon = Sym.PlayArrow, height = 48.dp)
             }

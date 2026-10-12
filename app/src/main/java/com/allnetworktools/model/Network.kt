@@ -23,7 +23,7 @@ enum class Network(
         get() = when (this) {
             Wifi -> Tool.WifiScan
             Bluetooth -> Tool.BleScan
-            Cellular -> Tool.Neighbors
+            Cellular -> Tool.CellDetail
             Gnss -> Tool.Sky
             Sdr -> Tool.Spectrum
             Talkie -> Tool.RadioChannels
@@ -73,13 +73,11 @@ enum class Tool(
     UnknownTrackers(Network.Bluetooth, "Traqueurs inconnus", Sym.GppMaybe, Sym.RestartAlt),
     TrackerDetail(Network.Bluetooth, "Traqueur", Sym.Sell, parent = ToolParent.Other(UnknownTrackers)),
 
+    CellDetail(Network.Cellular, "Cellule de service", Sym.CellTower, Sym.ContentCopy, implemented = true),
     Neighbors(Network.Cellular, "Cellules voisines", Sym.CellTower, implemented = true),
-    DataUsage(Network.Cellular, "Données mobiles", Sym.DataUsage, Sym.CalendarMonth),
-    CellDetail(Network.Cellular, "Détail de la cellule", Sym.CellTower, Sym.ContentCopy, ToolParent.Other(Neighbors)),
 
     Sky(Network.Gnss, "Ciel GNSS", Sym.SatelliteAlt, implemented = true),
     PositionCompare(Network.Gnss, "Comparer les positions", Sym.ShareLocation, Sym.Refresh),
-    Passes(Network.Gnss, "Passages de satellites", Sym.Orbit, Sym.Refresh),
 
     Spectrum(Network.Sdr, "Analyseur de spectre", Sym.BarChart),
     Adsb(Network.Sdr, "Avions (ADS-B)", Sym.Flight),

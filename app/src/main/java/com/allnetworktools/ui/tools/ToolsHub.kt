@@ -3,7 +3,6 @@ package com.allnetworktools.ui.tools
 import com.allnetworktools.AntApplication
 import com.allnetworktools.data.net.LanScanner
 import com.allnetworktools.ui.pages.bt.GattController
-import com.allnetworktools.ui.pages.cell.DataUsageController
 import com.allnetworktools.ui.pages.bt.TrackerController
 import com.allnetworktools.ui.pages.wifi.DnsController
 import com.allnetworktools.ui.pages.wifi.LanController
@@ -32,9 +31,7 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val gatt by lazy { GattController(app, scope, app.bluetooth.identities) }
     val bleIdentify by lazy { com.allnetworktools.ui.pages.bt.BleIdentifyController(scope, app.bluetooth) }
     val tracker by lazy { TrackerController(app, scope) }
-    val dataUsage by lazy { DataUsageController(scope, app.usage) }
     val positionCompare = com.allnetworktools.ui.pages.gnss.PositionCompareController()
-    val passes by lazy { com.allnetworktools.ui.pages.gnss.PassesController(app.tles, scope) }
     private val probes by lazy { com.allnetworktools.data.RealProbes() }
     private val links by lazy { com.allnetworktools.data.LinkReader(app) }
     val audit by lazy { com.allnetworktools.ui.pages.wifi.AuditController(probes, links, scope) }

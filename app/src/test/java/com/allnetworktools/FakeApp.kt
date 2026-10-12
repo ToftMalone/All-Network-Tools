@@ -45,7 +45,6 @@ object Scenario {
     var gnssDenied = false
     var throttled = false
     var bleEmpty = false
-    var usageGranted = false
     var evilTwin = false
 
     /** Set when a measurement flow starts being collected: the home screen must not start any. */
@@ -58,7 +57,7 @@ object Scenario {
 private fun Context.fakePermissions() = object : PermissionsRepository(this@fakePermissions) {
     override val state: StateFlow<PermissionSnapshot> = MutableStateFlow(
         PermissionSnapshot(
-            PermGroup.entries.toSet() - (if (Scenario.usageGranted) emptySet() else setOf(PermGroup.UsageAccess)) -
+            PermGroup.entries.toSet() -
                 (if (Scenario.gnssDenied) setOf(PermGroup.Location) else emptySet()),
         ),
     )
@@ -239,7 +238,6 @@ class FakeApp : AntApplication() {
     override val bluetooth by lazy { fakeBluetooth() }
     override val cell by lazy { fakeCell() }
     override val gnss by lazy { fakeGnss() }
-    override val usage by lazy { fakeUsage() }
     override val tles by lazy {
         object : com.allnetworktools.data.orbit.TleRepository(null) {
             override suspend fun load(forceRefresh: Boolean) =
@@ -284,17 +282,6 @@ class FakeApp : AntApplication() {
                 ),
             )
         }
-    }
-}
-
-private fun Context.fakeUsage() = object : com.allnetworktools.data.UsageRepository(this@fakeUsage) {
-    override suspend fun mobile(period: com.allnetworktools.data.UsagePeriod): com.allnetworktools.data.UsageReport {
-        val (start, _, _) = range(period, 1_790_000_000_000)
-        val n = when (period) { com.allnetworktools.data.UsagePeriod.Day -> 15; com.allnetworktools.data.UsagePeriod.Week -> 7; else -> 27 }
-        val buckets = (0 until n).map { i -> ((0.25 + ((i * 37) % 11) / 11.0) * 160_000_000).toLong() }
-        val apps = listOf("YouTube" to 1.42, "Chrome" to 0.81, "Instagram" to 0.6, "Spotify" to 0.39, "Google Maps" to 0.21, "WhatsApp" to 0.18, "Système Android" to 0.09)
-            .mapIndexed { i, (l, g) -> com.allnetworktools.data.AppUsage(10_000 + i, l, (g * 1e9).toLong()) }
-        return com.allnetworktools.data.UsageReport(period, start, 1_790_000_000_000, 3_700_000_000, buckets, buckets.indices.map { start + it * 86_400_000L }, apps)
     }
 }
 

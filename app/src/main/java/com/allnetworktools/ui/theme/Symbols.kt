@@ -47,7 +47,6 @@ object Sym {
     const val Contrast = "contrast"
     const val DarkMode = "dark_mode"
     const val DataObject = "data_object"
-    const val DataUsage = "data_usage"
     const val Delete = "delete"
     const val Description = "description"
     const val Devices = "devices"

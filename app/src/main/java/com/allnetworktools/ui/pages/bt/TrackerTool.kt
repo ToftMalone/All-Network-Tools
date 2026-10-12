@@ -94,6 +94,14 @@ class TrackerController(private val context: Context, private val scope: Corouti
     val history = mutableStateListOf<Float>()
     private var lastPacket = 0L
     private var lastHeard = 0L
+
+    /** When each device was first heard, so the list to pick from keeps the order of discovery and never jumps around. */
+    private val discovered = HashMap<String, Long>()
+
+    fun inDiscoveryOrder(list: List<BleDevice>, now: Long = System.currentTimeMillis()): List<BleDevice> {
+        list.forEach { discovered.getOrPut(it.address) { now } }
+        return list.sortedWith(compareBy<BleDevice>({ discovered[it.address] }, { it.address }))
+    }
     private var p = 4f
 
     /** Compass heading of the phone (degrees), fed by the screen; null without a compass. */
@@ -188,7 +196,8 @@ class TrackerController(private val context: Context, private val scope: Corouti
 }
 
 @Composable
-fun TrackerTool(c: TrackerController, nearby: List<BleDevice>) {
+fun TrackerTool(c: TrackerController, heard: List<BleDevice>) {
+    val nearby = androidx.compose.runtime.remember(heard) { c.inDiscoveryOrder(heard) }
     val haptics = AntTheme.haptics
     val actions = LocalActions.current
     LaunchedEffect(nearby) { c.feed(nearby) }
@@ -251,9 +260,9 @@ private fun PickDevice(nearby: List<BleDevice>, onFollow: (BleDevice) -> Unit) {
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        nearby.take(20).forEachIndexed { i, d ->
+        nearby.take(40).forEachIndexed { i, d ->
             Row(
-                Modifier.rise(i).fillMaxWidth().clip(groupShape(i, minOf(nearby.size, 20))).background(cs.surfaceContainerLow)
+                Modifier.rise(i).fillMaxWidth().clip(groupShape(i, minOf(nearby.size, 40))).background(cs.surfaceContainerLow)
                     .padding(start = 14.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {

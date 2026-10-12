@@ -86,7 +86,6 @@ class AppActions(
 
     fun request(group: PermGroup) {
         when {
-            group == PermGroup.UsageAccess -> launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
             group.permissions.isEmpty() -> vm.refreshPermissions()
             isPermanentlyDenied(group) -> {
                 openAppSettings()

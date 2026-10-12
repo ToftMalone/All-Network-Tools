@@ -57,7 +57,6 @@ class ScreenshotTest {
         Scenario.gnssDenied = false
         Scenario.throttled = false
         Scenario.bleEmpty = false
-        Scenario.usageGranted = false
         Scenario.evilTwin = false
         Scenario.wifiStarted = false
         Scenario.bleStarted = false
@@ -257,12 +256,6 @@ class ScreenshotTest {
     private fun cellTool(t: Tool, arg: String? = null) = NavState(Network.Cellular, Page.ToolPage(t, arg))
     private fun gnssTool(t: Tool) = NavState(Network.Gnss, Page.ToolPage(t))
 
-    @Test fun dataUsageDenied() = shot("94_data_usage_denied", nav = cellTool(Tool.DataUsage))
-    @Test fun dataUsage() {
-        Scenario.usageGranted = true
-        runBlocking { app.settings.setDataPlanGb(20) }
-        shot("95_data_usage", nav = cellTool(Tool.DataUsage))
-    }
     @Test fun cellDetail() = shot("96_cell_detail", nav = cellTool(Tool.CellDetail, "serving"))
     @Test fun positionCompare() = shot("97_position_compare", nav = gnssTool(Tool.PositionCompare))
     @Test fun positionCompareDark() = shot("98_position_compare_dark", dark = true, nav = gnssTool(Tool.PositionCompare))
@@ -383,27 +376,6 @@ class ScreenshotTest {
         Scenario.bleEmpty = true
         vm.tools.unknownTrackers.reset()
     }
-    @Test fun passes() = shot("DA_passes", nav = gnssTool(Tool.Passes)) { vm -> precomputePasses(vm) }
-    @Test fun passesDark() = shot("DB_passes_dark", dark = true, nav = gnssTool(Tool.Passes)) { vm ->
-        vm.tools.passes.systems = setOf(com.allnetworktools.data.orbit.GnssSystem.Galileo)
-        precomputePasses(vm)
-    }
-
-    private fun precomputePasses(vm: MainViewModel) = runBlocking {
-        val c = vm.tools.passes
-        val t = app.tles.load()
-        val obs = com.allnetworktools.data.orbit.Observer(48.857, 2.352, 42.0)
-        val now = System.currentTimeMillis()
-        val sats = t.sats.filter { it.system in c.systems }
-        val end = now + c.hours * 3_600_000L
-        val plan = com.allnetworktools.ui.pages.gnss.PassPlan(
-            obs, now, end, c.mask.toDouble(),
-            com.allnetworktools.data.orbit.PassPredictor.visibleCounts(sats, obs, now, end, c.mask.toDouble(), c.hours * 3_600_000L / 96),
-            sats.flatMap { com.allnetworktools.data.orbit.PassPredictor.passes(it, obs, now, end, c.mask.toDouble()) }, sats,
-        )
-        c.setForTest(t, plan)
-    }
-
     @Test fun audit() = shot("E0_wifi_audit", nav = tool(Tool.Audit)) { vm ->
         val conn = com.allnetworktools.data.WifiConnection("Freebox-7A2C", "a4:3e:51:7c:2a:9f", -54, 5180, null, null, 6, "WPA3-Personnel (SAE)", "192.168.1.42", 24, "192.168.1.254", emptyList(), null, null)
         val link = com.allnetworktools.data.LinkSnapshot(true, "192.168.1.254", emptyList(), listOf("192.168.1.254"), "192.168.1.254", false, null, true, false)

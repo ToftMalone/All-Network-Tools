@@ -50,6 +50,7 @@ import com.allnetworktools.MainViewModel
 import com.allnetworktools.NavState
 import com.allnetworktools.Page
 import com.allnetworktools.model.Network
+import com.allnetworktools.model.Tool
 import com.allnetworktools.model.ToolParent
 import com.allnetworktools.ui.home.DockTab
 import com.allnetworktools.ui.home.FloatingDock
@@ -88,7 +89,8 @@ fun AntApp(vm: MainViewModel) {
 }
 
 private fun parentPage(page: Page): Page = when (page) {
-    is Page.ToolPage -> when (val p = page.tool.parent) {
+    // A neighbouring cell opened from the list goes back to the list; the serving cell goes back to the tools.
+    is Page.ToolPage -> if (page.tool == Tool.CellDetail && page.arg != null && page.arg != "serving") Page.ToolPage(Tool.Neighbors) else when (val p = page.tool.parent) {
         ToolParent.Tools -> Page.Tools
         ToolParent.Dashboard -> Page.Dashboard
         is ToolParent.Other -> Page.ToolPage(p.tool)
