@@ -29,6 +29,8 @@ import com.allnetworktools.data.PositionSet
 import com.allnetworktools.data.Sighting
 import com.allnetworktools.data.TrackerDetect
 import com.allnetworktools.data.TrackerKind
+import com.allnetworktools.data.TrackerNet
+import com.allnetworktools.data.probeFindMy
 import com.allnetworktools.data.TrackerSignal
 import com.allnetworktools.ui.components.LeadingIcon
 import com.allnetworktools.ui.components.PillButton
@@ -62,6 +64,13 @@ class TrackerCandidate(val address: String, signal: TrackerSignal) {
     /** When the tag was first heard: the list keeps this order so rows never jump around. */
     var firstHeardMs = 0L
     var sound by mutableStateOf<SoundUi>(SoundUi.Idle)
+    /** Name read over GATT from a Find My accessory, and the kind it reveals (an AirTag hides as an accessory). */
+    var gattName by mutableStateOf<String?>(null)
+    var gattKind by mutableStateOf<TrackerKind?>(null)
+    var probeTries = 0
+    var lastProbeMs = 0L
+    val kind: TrackerKind get() = gattKind ?: signal.kind
+    val title: String get() = device?.name ?: gattName?.takeIf { gattKind == null } ?: kind.label
     var assessment by mutableStateOf(FollowAssessment(FollowLevel.Nearby, 0, null, 0, 0))
 }
 
@@ -84,6 +93,8 @@ class UnknownTrackersController(private val context: android.content.Context?, p
         val s = sound ?: return
         val address = t.device?.address ?: return
         if (t.sound == SoundUi.Connecting) return
+        // One connection at a time: the ring goes first.
+        probeJob?.cancel()
         candidates.values.forEach { if (it !== t && it.sound is SoundUi.Playing) it.sound = SoundUi.Idle }
         t.sound = SoundUi.Connecting
         scope?.launch {
@@ -155,6 +166,30 @@ class UnknownTrackersController(private val context: android.content.Context?, p
             c.assessment = TrackerDetect.assess(sig, c.sightings)
             // A rotating identifier changes with the epoch while the address stays: remember both.
             if (sig.linkKey != null) c.lastLinkKey = sig.linkKey
+        }
+        probeNext(now)
+    }
+
+    private var probeJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Connects to one Find My accessory at a time to read its name, as AirGuard does: the only way to know an
+     * accessory is in fact an AirTag. Up to three tries a minute apart, never while a tag is ringing.
+     */
+    private fun probeNext(now: Long) {
+        val ctx = context ?: return
+        if (probeJob?.isActive == true || candidates.values.any { it.sound != SoundUi.Idle && it.sound !is SoundUi.Message }) return
+        val t = candidates.values.filter {
+            it.signal.net == TrackerNet.AppleFindMy && it.signal.kind == TrackerKind.FindMyAccessory && it.gattKind == null &&
+                it.gattName == null && it.probeTries < 3 && now - it.lastProbeMs > 60_000L && it.device != null && now - it.lastHeardMs < 10_000L
+        }.minByOrNull { it.firstHeardMs } ?: return
+        val address = t.device?.address ?: return
+        t.probeTries++
+        t.lastProbeMs = now
+        probeJob = scope?.launch {
+            val r = probeFindMy(ctx, address) ?: return@launch
+            t.gattName = r.name
+            t.gattKind = TrackerDetect.kindFromProbe(r.name, r.airTagService)
         }
     }
 
@@ -266,9 +301,9 @@ private fun TrackerRow(t: TrackerCandidate, onClick: () -> Unit) {
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        LeadingIcon(kindIcon(t.signal.kind), acc.container, acc.onContainer, 44.dp, RoundedCornerShape(14.dp), 24.dp)
+        LeadingIcon(kindIcon(t.kind), acc.container, acc.onContainer, 44.dp, RoundedCornerShape(14.dp), 24.dp)
         Column(Modifier.weight(1f)) {
-            Text(t.device?.name ?: t.signal.kind.label, style = rf(16, 22, 600), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(t.title, style = rf(16, 22, 600), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             Text(
                 t.assessment.level.label + (if (t.firstHeardMs > 0) " · vu à ${clock.format(java.util.Date(t.firstHeardMs))}" else ""),
                 style = rf(13, 18, 500), color = col, maxLines = 1,
@@ -336,9 +371,9 @@ private fun TrackerHero(t: TrackerCandidate, now: Long, onLocate: (BleDevice) ->
     val acc = AntTheme.accent
     HeroCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            LeadingIcon(kindIcon(t.signal.kind), col, if (a.level == FollowLevel.Following) cs.onError else Color.White, 56.dp, RoundedCornerShape(20.dp), 28.dp)
+            LeadingIcon(kindIcon(t.kind), col, if (a.level == FollowLevel.Following) cs.onError else Color.White, 56.dp, RoundedCornerShape(20.dp), 28.dp)
             Column(Modifier.weight(1f)) {
-                Text(t.device?.name ?: t.signal.kind.label, style = gs(22, 28, 500), maxLines = 2)
+                Text(t.title, style = gs(22, 28, 500), maxLines = 2)
                 Text(t.signal.net.label, style = rf(13, 18), maxLines = 1)
             }
             if (t.device != null) {

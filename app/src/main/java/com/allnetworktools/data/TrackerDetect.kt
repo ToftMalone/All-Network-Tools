@@ -103,7 +103,8 @@ object TrackerDetect {
 
     /**
      * Find My status byte, bits 4–5: the kind of Apple object (as read by the open-source AirGuard app):
-     * 0x10 AirTag, 0x20 third-party Find My accessory, 0x30 AirPods, 0x00 an Apple device (iPhone, iPad, Mac…).
+     * 0x10 AirTag, 0x20 Find My accessory, 0x30 AirPods, 0x00 an Apple device (iPhone, iPad, Mac…). Recent AirTags
+     * (and the second generation) send 0x20 too: [kindFromProbe] then tells them apart once connected.
      */
     private fun appleKind(d: ByteArray, o: Int, len: Int): TrackerKind {
         if (len < 1 || o >= d.size) return TrackerKind.FindMyAccessory
@@ -112,6 +113,20 @@ object TrackerDetect {
             0x20 -> TrackerKind.FindMyAccessory
             0x30 -> TrackerKind.AirPods
             else -> TrackerKind.AppleDevice
+        }
+    }
+
+    /**
+     * Kind given by what a Find My accessory tells over GATT: its name ("AirTag", "left"/"right" for one AirPod) or
+     * the first-generation AirTag service. Null when that says nothing more than the advertisement.
+     */
+    fun kindFromProbe(name: String?, airTagService: Boolean): TrackerKind? {
+        val n = name?.trim()?.lowercase()
+        return when {
+            n != null && n.startsWith("airtag") -> TrackerKind.AirTag
+            n != null && (n == "left" || n == "right" || n.startsWith("airpods")) -> TrackerKind.AirPods
+            airTagService -> TrackerKind.AirTag
+            else -> null
         }
     }
 

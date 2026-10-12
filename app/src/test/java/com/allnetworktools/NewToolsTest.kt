@@ -93,6 +93,11 @@ class NewToolsTest {
         assertEquals(com.allnetworktools.data.TrackerKind.AirPods, TrackerDetect.classify(Ad.parseHex("07FF4C0012023100"))!!.kind)
         assertEquals(com.allnetworktools.data.TrackerKind.AppleDevice, TrackerDetect.classify(Ad.parseHex("07FF4C0012020000"))!!.kind)
         assertEquals(com.allnetworktools.data.TrackerKind.SmartTag, TrackerDetect.classify(Ad.parseHex("07165AFD10223344"))!!.kind)
+        // Recent AirTags announce themselves as accessories: the name read once connected tells.
+        assertEquals(com.allnetworktools.data.TrackerKind.AirTag, TrackerDetect.kindFromProbe("AirTag", false))
+        assertEquals(com.allnetworktools.data.TrackerKind.AirTag, TrackerDetect.kindFromProbe(null, true))
+        assertEquals(com.allnetworktools.data.TrackerKind.AirPods, TrackerDetect.kindFromProbe("left", false))
+        assertEquals(null, TrackerDetect.kindFromProbe("Chipolo ONE Spot", false))
         // An iPhone's Nearby Info frame (0x10) is not a tracker.
         assertNull(TrackerDetect.classify(Ad.parseHex("0AFF4C0010050B1C8E3D21")))
     }
