@@ -67,7 +67,7 @@ fun isNewerVersion(remote: String, local: String): Boolean {
 open class AppUpdater(
     private val context: Context,
     private val currentVersion: String,
-    private val repo: String = "ToftMalone/All-Network-Tools",
+    private val repo: String = "ToftMalone/All-Radio-Tools",
 ) {
     private val prefs = context.getSharedPreferences("updates", Context.MODE_PRIVATE)
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)

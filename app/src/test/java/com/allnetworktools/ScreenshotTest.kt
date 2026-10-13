@@ -537,7 +537,7 @@ class ScreenshotTest {
             com.allnetworktools.update.UpdateInfo(
                 "0.9", "v0.9",
                 "- Nouvel outil « Drones FPV » dans l'onglet SDR\n- Meshtastic : correction de la réception des vrais nœuds\n- Le raccourci principal du dock devient le spectre",
-                "https://github.com/ToftMalone/All-Network-Tools/releases/download/v0.9/AllRadioTools-v0.9.apk", 4_590_146, null,
+                "https://github.com/ToftMalone/All-Radio-Tools/releases/download/v0.9/AllRadioTools-v0.9.apk", 4_590_146, null,
             ),
         )
     }
