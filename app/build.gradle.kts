@@ -18,6 +18,10 @@ android {
     }
 
     buildTypes {
+        // Installs next to the published app: its own package and name ("All Radio Tools Debug", src/debug/res).
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
