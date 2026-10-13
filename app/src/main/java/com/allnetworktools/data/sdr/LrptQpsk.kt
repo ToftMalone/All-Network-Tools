@@ -29,7 +29,8 @@ fun rootRaisedCosine(alpha: Double, sps: Int, span: Int): FloatArray {
  * symbol (4 at 288 kS/s).
  *
  * Acquisition: the matched-filtered signal is raised to the fourth power, which removes the modulation and leaves a line
- * at four times the carrier offset; an FFT locates it. Tracking: the offset is removed, a Gardner detector with cubic
+ * at four times the carrier offset; an FFT locates it. A tone or an interferer gives that line too, so the squared
+ * magnitude must also show a line at the 72 kHz symbol rate, which only a modulated signal has. Tracking: the offset is removed, a Gardner detector with cubic
  * interpolation recovers the symbol clock and a decision-directed Costas loop the carrier phase. The four-fold phase
  * ambiguity is left to the frame synchroniser.
  *
@@ -45,6 +46,7 @@ class QpskDemodulator(
     private val onSymbol: (Int, Int) -> Unit,
 ) {
     private val sps = sampleRate / symbolRate
+    private val symbolBin = (symbolRate / sampleRate * ACQ_N).toInt()
     private val rrc = rootRaisedCosine(0.6, sps.toInt(), 8)
     private val taps = rrc.size
 
@@ -54,7 +56,7 @@ class QpskDemodulator(
     private var hPos = 0
 
     // Acquisition.
-    private val acqN = 32768
+    private val acqN = ACQ_N
     private val acqRe = FloatArray(acqN)
     private val acqIm = FloatArray(acqN)
     private var acqFill = 0
@@ -99,6 +101,13 @@ class QpskDemodulator(
     private var power = 1.0
     private var evm = 0.5
     private var bad = 0
+
+    /** Ratio of the symbol-rate line of |x|² to the average of its spectrum at the last acquisition attempt. */
+    var symbolLineRatio = 0.0
+        private set
+
+    /** Forgets the current signal and looks for a new one. */
+    fun restart() = reset()
 
     private fun reset() {
         tracking = false; acqFill = 0; hRe.fill(0f); hIm.fill(0f)
@@ -153,7 +162,23 @@ class QpskDemodulator(
         val delta = if (abs(d) > 1e-12) (0.5 * (a - c) / d).coerceIn(-0.5, 0.5) else 0.0
         var bin = best + delta
         if (bin >= acqN / 2) bin -= acqN
-        cfoHz = bin * sampleRate / acqN / 4
+        val cfo = bin * sampleRate / acqN / 4
+        // A modulated signal: |x|² carries a line at the symbol rate (raised-cosine pulses); noise and tones do not.
+        var mean = 0f
+        for (k in 0 until acqN) { val m = acqRe[k] * acqRe[k] + acqIm[k] * acqIm[k]; fr[k] = m; mean += m }
+        mean /= acqN
+        for (k in 0 until acqN) { fr[k] = (fr[k] - mean) * window[k]; fi[k] = 0f }
+        fft.forward(fr, fi)
+        var line = 0f
+        var avg = 0.0
+        for (k in 1 until acqN / 2) {
+            val p = fr[k] * fr[k] + fi[k] * fi[k]
+            avg += p
+            if (abs(k - symbolBin) <= 3 && p > line) line = p
+        }
+        symbolLineRatio = line / (avg / (acqN / 2 - 1))
+        if (symbolLineRatio < SYMBOL_LINE_THRESHOLD) return
+        cfoHz = cfo
         startTracking()
     }
 
@@ -231,12 +256,16 @@ class QpskDemodulator(
             symbols++
             onSymbol((pr * SOFT_SCALE).toInt().coerceIn(-127, 127), (pi * SOFT_SCALE).toInt().coerceIn(-127, 127))
             // Lost the signal (or a false acquisition): start over.
-            if (symbols > 4000) { if (evm > 0.45) bad++ else bad = 0; if (bad > 20_000) { reset(); return } }
+            // Noise alone sits at an error of about 0.40 (2 dB): above 0.36 nothing can be decoded.
+            if (symbols > 4000) { if (evm > LOST_EVM) bad++ else bad = 0; if (bad > 20_000) { reset(); return } }
         }
     }
 
     companion object {
+        private const val ACQ_N = 32768
         private const val LINE_THRESHOLD = 20.0
+        private const val SYMBOL_LINE_THRESHOLD = 12.0
+        private const val LOST_EVM = 0.36
         private const val KP = 0.02
         private const val KI = 2e-5
         private const val ALPHA = 0.04f

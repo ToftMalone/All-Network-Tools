@@ -98,12 +98,20 @@ class LrptReceiver(private val onStrip: (apid: Int, row: Int, strip: ByteArray) 
     private val link = LrptLink { onFrame(it) }
     private val qpsk = QpskDemodulator { i, q -> link.symbol(i, q) }
     private var wasTracking = false
+    private var lastSync = 0L
+
+    /** A real Meteor-M signal gives frame sync within seconds; without it the lock was a false one. */
+    private val syncTimeoutSymbols = 72_000L * 15
 
     private fun newAssembler() = PacketAssembler(zoneStart) { onPacket(it) }
 
     fun feed(buf: ByteArray, len: Int) {
         val n = decimator.process(buf, len, aRe, aIm, 0)
         qpsk.feed(aRe, aIm, n)
+        if (qpsk.tracking) {
+            if (!wasTracking || link.locked || qpsk.symbols < lastSync) lastSync = qpsk.symbols
+            if (qpsk.symbols - lastSync > syncTimeoutSymbols) { qpsk.restart(); link.reset() }
+        }
         if (wasTracking && !qpsk.tracking) link.reset()
         wasTracking = qpsk.tracking
     }

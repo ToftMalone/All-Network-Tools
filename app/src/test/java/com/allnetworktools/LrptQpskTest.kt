@@ -132,4 +132,23 @@ class LrptQpskTest {
         assertTrue(!d.tracking)
         assertEquals(0, got.size)
     }
+
+    /** Out of a pass: noise, or a steady tone (birdie, interferer), must not be taken for the satellite. */
+    @Test fun noiseAndTonesAreNotASignal() {
+        val fs = 288_000.0
+        val rnd = Random(11)
+        val n = 288_000 * 4
+        for (toneHz in listOf<Double?>(null, 23_000.0, -41_500.0)) {
+            val re = FloatArray(n)
+            val im = FloatArray(n)
+            for (i in 0 until n) {
+                val ph = if (toneHz == null) 0.0 else 2 * PI * toneHz * i / fs
+                val a = if (toneHz == null) 0.0 else 0.5
+                re[i] = (a * cos(ph) + rnd.nextGaussian() * 0.3).toFloat()
+                im[i] = (a * sin(ph) + rnd.nextGaussian() * 0.3).toFloat()
+            }
+            val d = run(re, im, ArrayList())
+            assertTrue("tone $toneHz taken for QPSK", !d.tracking)
+        }
+    }
 }
