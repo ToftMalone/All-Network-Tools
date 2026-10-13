@@ -293,7 +293,7 @@ fun AprsTool(vm: MainViewModel) {
                 Text("Fréquence", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("144.800" to "Europe", "144.390" to "Amérique du Nord", "145.825" to "Satellites (ISS)").forEach { (f, l) ->
-                        AntFilterChip("${f.replace('.', ',')} · $l", c.frequencyMhz == f, { if (!c.running) c.frequencyMhz = f })
+                        AntFilterChip("${f.replace('.', ',')} · $l", c.frequencyMhz == f, { if (c.frequencyMhz != f && !c.starting) { if (c.running) c.stop(); c.frequencyMhz = f } })
                     }
                 }
                 if (!c.running) HostInputField(c.frequencyMhz, { c.frequencyMhz = it }, "Fréquence (MHz)", Sym.Stream, keyboardType = KeyboardType.Decimal)

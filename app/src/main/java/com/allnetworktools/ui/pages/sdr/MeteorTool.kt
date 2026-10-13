@@ -350,7 +350,7 @@ fun MeteorTool(vm: MainViewModel) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     MeteorSats.all.forEach { s ->
                         val f = "%.3f".format(Locale.US, s.freqMhz)
-                        AntFilterChip("${s.name} · ${mhz(s.freqMhz)}", c.frequencyMhz == f, { if (!c.running) c.frequencyMhz = f })
+                        AntFilterChip("${s.name} · ${mhz(s.freqMhz)}", c.frequencyMhz == f, { if (c.frequencyMhz != f && !c.starting) { if (c.running) c.stop(); c.frequencyMhz = f } })
                     }
                 }
                 if (!c.running) HostInputField(c.frequencyMhz, { c.frequencyMhz = it }, "Fréquence (MHz)", Sym.Stream, keyboardType = KeyboardType.Decimal)

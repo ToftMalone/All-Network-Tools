@@ -98,7 +98,7 @@ fun SpectrumTool(vm: MainViewModel) {
                 }
                 Text("Largeur affichée (au prochain lancement)", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(2, 5, 10, 20).forEach { s -> AntFilterChip("$s MHz", c.spanMhz == s, { if (!c.running) c.spanMhz = s }) }
+                    listOf(2, 5, 10, 20).forEach { s -> AntFilterChip("$s MHz", c.spanMhz == s, { if (c.spanMhz != s && !c.starting) { if (c.running) c.stop(); c.spanMhz = s } }) }
                 }
                 GainSettings(
                     c.lnaGain, listOf(0, 8, 16, 24, 32, 40), { c.lnaGain = it; c.applyGains() },

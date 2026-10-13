@@ -516,7 +516,7 @@ fun FpvTool(vm: MainViewModel) {
                 }
             }
         }
-        SegmentedRow(FpvTab.entries.map { it to it.label }, c.tab, { if (!c.active) c.tab = it }, Modifier.fillMaxWidth(), height = 36.dp)
+        SegmentedRow(FpvTab.entries.map { it to it.label }, c.tab, { if (it != c.tab && !c.starting) { if (c.running) c.stop(); c.tab = it } }, Modifier.fillMaxWidth(), height = 36.dp)
         if (c.active) StartButton("Arrêter", Sym.Stop) { c.stop() }
         else StartButton(
             when (tab) { FpvTab.Analog -> "Chercher des drones"; FpvTab.Dji -> "Chercher un drone DJI"; FpvTab.Rc -> "Chercher des radiocommandes" },
@@ -531,9 +531,9 @@ fun FpvTool(vm: MainViewModel) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Bande à surveiller", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (tab == FpvTab.Analog) listOf(0 to "Toutes", 24 to "2,4 GHz", 58 to "5,8 GHz").forEach { (b, l) -> AntFilterChip(l, c.analogBand == b, { if (!c.running) c.analogBand = b }) }
-                    else if (tab == FpvTab.Dji) listOf(0 to "Toutes", 24 to "2,4 GHz", 58 to "5,8 GHz").forEach { (b, l) -> AntFilterChip(l, c.band == b, { if (!c.running) c.band = b }) }
-                    else listOf(0 to "Toutes", 868 to "868 MHz", 915 to "915 MHz", 24 to "2,4 GHz").forEach { (b, l) -> AntFilterChip(l, c.rcBand == b, { if (!c.running) c.rcBand = b }) }
+                    if (tab == FpvTab.Analog) listOf(0 to "Toutes", 24 to "2,4 GHz", 58 to "5,8 GHz").forEach { (b, l) -> AntFilterChip(l, c.analogBand == b, { if (c.analogBand != b && !c.starting) { if (c.running) c.stop(); c.analogBand = b } }) }
+                    else if (tab == FpvTab.Dji) listOf(0 to "Toutes", 24 to "2,4 GHz", 58 to "5,8 GHz").forEach { (b, l) -> AntFilterChip(l, c.band == b, { if (c.band != b && !c.starting) { if (c.running) c.stop(); c.band = b } }) }
+                    else listOf(0 to "Toutes", 868 to "868 MHz", 915 to "915 MHz", 24 to "2,4 GHz").forEach { (b, l) -> AntFilterChip(l, c.rcBand == b, { if (c.rcBand != b && !c.starting) { if (c.running) c.stop(); c.rcBand = b } }) }
                 }
                 GainSettings(
                     c.lnaGain, listOf(0, 8, 16, 24, 32, 40), { c.lnaGain = it; c.applyGains() },
