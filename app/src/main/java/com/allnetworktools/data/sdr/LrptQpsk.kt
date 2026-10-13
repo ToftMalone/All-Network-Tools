@@ -29,8 +29,8 @@ fun rootRaisedCosine(alpha: Double, sps: Int, span: Int): FloatArray {
  * symbol (4 at 288 kS/s).
  *
  * Acquisition: the matched-filtered signal is raised to the fourth power, which removes the modulation and leaves a line
- * at four times the carrier offset; an FFT locates it. A tone or an interferer gives that line too, so the squared
- * magnitude must also show a line at the 72 kHz symbol rate, which only a modulated signal has. Tracking: the offset is removed, a Gardner detector with cubic
+ * at four times the carrier offset; an FFT locates it, only where Doppler and the clock error can put the satellite. A tone
+ * gives that line too: up to three lines are tried in turn, and one whose decisions barely change is dropped. Tracking: the offset is removed, a Gardner detector with cubic
  * interpolation recovers the symbol clock and a decision-directed Costas loop the carrier phase. The four-fold phase
  * ambiguity is left to the frame synchroniser.
  *
@@ -57,6 +57,10 @@ class QpskDemodulator(
 
     // Acquisition.
     private val acqN = ACQ_N
+    private val pw = FloatArray(ACQ_N)
+    private val candidates = DoubleArray(MAX_CANDIDATES)
+    private var nCand = 0
+    private var candIdx = 0
     private val acqRe = FloatArray(acqN)
     private val acqIm = FloatArray(acqN)
     private var acqFill = 0
@@ -83,6 +87,13 @@ class QpskDemodulator(
     var symbols = 0L
         private set
 
+    // Unmodulated carriers: the decisions of a tone barely change from one symbol to the next.
+    private var repeat = 0.25
+    private var prevQuad = -1
+
+    /** A QPSK signal followed for long enough, with symbols clean enough to be decoded. */
+    val confirmed: Boolean get() = tracking && symbols > CONFIRM_SYMBOLS && evm < LOST_EVM && repeat < 0.35
+
     // Carrier removal (NCO) and the Costas loop.
     private var ncoPhase = 0.0
     private var ncoInc = 0.0
@@ -102,7 +113,7 @@ class QpskDemodulator(
     private var evm = 0.5
     private var bad = 0
 
-    /** Ratio of the symbol-rate line of |x|² to the average of its spectrum at the last acquisition attempt. */
+    /** Ratio of the symbol-rate line of |x|² to the average of its spectrum at the last acquisition attempt (shown only). */
     var symbolLineRatio = 0.0
         private set
 
@@ -143,47 +154,69 @@ class QpskDemodulator(
             fi[k] = (2 * a2 * b2) * window[k]
         }
         fft.forward(fr, fi)
-        var best = 0
-        var bestP = -1f
         var sum = 0.0
-        for (k in 0 until acqN) {
-            val p = fr[k] * fr[k] + fi[k] * fi[k]
-            sum += p
-            if (p > bestP) { bestP = p; best = k }
+        for (k in 0 until acqN) { pw[k] = fr[k] * fr[k] + fi[k] * fi[k]; sum += pw[k] }
+        val avg = (sum / acqN).toFloat()
+        // Only offsets the satellite can have (Doppler and the HackRF clock): a birdie elsewhere in the band is ignored.
+        val maxBin = (4 * MAX_CFO_HZ / sampleRate * acqN).toInt()
+        nCand = 0
+        var bestRatio = 0.0
+        val taken = IntArray(MAX_CANDIDATES)
+        repeat(MAX_CANDIDATES) {
+            var best = -1
+            var bestP = 0f
+            for (s in -maxBin..maxBin) {
+                val k = Math.floorMod(s, acqN)
+                if (pw[k] <= bestP) continue
+                if ((0 until nCand).any { c -> abs(Math.floorMod(k - taken[c] + acqN / 2, acqN) - acqN / 2) < 16 }) continue
+                if (pw[k] < pw[Math.floorMod(k - 1, acqN)] || pw[k] < pw[Math.floorMod(k + 1, acqN)]) continue
+                best = k; bestP = pw[k]
+            }
+            if (best < 0) return@repeat
+            val ratio = (bestP / avg).toDouble()
+            if (nCand == 0) bestRatio = ratio
+            if (ratio < LINE_THRESHOLD) return@repeat
+            // Parabolic interpolation of the peak position.
+            fun lp(k: Int) = Math.log(pw[Math.floorMod(k, acqN)].toDouble() + 1e-30)
+            val a = lp(best - 1)
+            val b = lp(best)
+            val c = lp(best + 1)
+            val d = a - 2 * b + c
+            val delta = if (abs(d) > 1e-12) (0.5 * (a - c) / d).coerceIn(-0.5, 0.5) else 0.0
+            var bin = best + delta
+            if (bin >= acqN / 2) bin -= acqN
+            taken[nCand] = best
+            candidates[nCand++] = bin * sampleRate / acqN / 4
         }
-        lineRatio = bestP / (sum / acqN)
-        if (lineRatio < LINE_THRESHOLD) return
-        // Parabolic interpolation of the peak position.
-        fun pw(k: Int): Double { val j = Math.floorMod(k, acqN); return (fr[j] * fr[j] + fi[j] * fi[j]).toDouble() + 1e-30 }
-        val a = Math.log(pw(best - 1))
-        val b = Math.log(pw(best))
-        val c = Math.log(pw(best + 1))
-        val d = a - 2 * b + c
-        val delta = if (abs(d) > 1e-12) (0.5 * (a - c) / d).coerceIn(-0.5, 0.5) else 0.0
-        var bin = best + delta
-        if (bin >= acqN / 2) bin -= acqN
-        val cfo = bin * sampleRate / acqN / 4
-        // A modulated signal: |x|² carries a line at the symbol rate (raised-cosine pulses); noise and tones do not.
+        lineRatio = bestRatio
+        // For the display: |x|² carries a line at the symbol rate (raised-cosine pulses) when a modulated signal is there.
         var mean = 0f
         for (k in 0 until acqN) { val m = acqRe[k] * acqRe[k] + acqIm[k] * acqIm[k]; fr[k] = m; mean += m }
         mean /= acqN
         for (k in 0 until acqN) { fr[k] = (fr[k] - mean) * window[k]; fi[k] = 0f }
         fft.forward(fr, fi)
         var line = 0f
-        var avg = 0.0
+        var sAvg = 0.0
         for (k in 1 until acqN / 2) {
             val p = fr[k] * fr[k] + fi[k] * fi[k]
-            avg += p
+            sAvg += p
             if (abs(k - symbolBin) <= 3 && p > line) line = p
         }
-        symbolLineRatio = line / (avg / (acqN / 2 - 1))
-        if (symbolLineRatio < SYMBOL_LINE_THRESHOLD) return
-        cfoHz = cfo
+        symbolLineRatio = line / (sAvg / (acqN / 2 - 1))
+        if (nCand == 0) return
+        candIdx = 0
+        cfoHz = candidates[0]
         startTracking()
+    }
+
+    /** The line followed was not the satellite (a tone, or noise): try the next one, else search again. */
+    private fun nextCandidate() {
+        if (++candIdx < nCand) { cfoHz = candidates[candIdx]; startTracking() } else reset()
     }
 
     private fun startTracking() {
         tracking = true
+        repeat = 0.25; prevQuad = -1
         ncoPhase = 0.0
         ncoInc = 2 * PI * cfoHz / sampleRate
         theta = 0.0; freq = 0.0; integ = 0.0
@@ -256,15 +289,23 @@ class QpskDemodulator(
             symbols++
             onSymbol((pr * SOFT_SCALE).toInt().coerceIn(-127, 127), (pi * SOFT_SCALE).toInt().coerceIn(-127, 127))
             // Lost the signal (or a false acquisition): start over.
+            val quad = (if (pr > 0) 2 else 0) + (if (pi > 0) 1 else 0)
+            repeat += ((if (quad == prevQuad) 1.0 else 0.0) - repeat) * 0.002
+            prevQuad = quad
+            // Random data repeats a decision a quarter of the time, a tone nearly always.
+            if (symbols > TONE_CHECK_SYMBOLS && repeat > 0.45) { nextCandidate(); return }
             // Noise alone sits at an error of about 0.40 (2 dB): above 0.36 nothing can be decoded.
-            if (symbols > 4000) { if (evm > LOST_EVM) bad++ else bad = 0; if (bad > 20_000) { reset(); return } }
+            if (symbols > 4000) { if (evm > LOST_EVM) bad++ else bad = 0; if (bad > 20_000) { nextCandidate(); return } }
         }
     }
 
     companion object {
         private const val ACQ_N = 32768
         private const val LINE_THRESHOLD = 20.0
-        private const val SYMBOL_LINE_THRESHOLD = 12.0
+        private const val MAX_CANDIDATES = 3
+        private const val MAX_CFO_HZ = 15_000.0
+        private const val TONE_CHECK_SYMBOLS = 3000L
+        private const val CONFIRM_SYMBOLS = 8000L
         private const val LOST_EVM = 0.36
         private const val KP = 0.02
         private const val KI = 2e-5

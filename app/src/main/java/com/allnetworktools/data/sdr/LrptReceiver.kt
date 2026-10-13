@@ -55,6 +55,9 @@ class LrptLink(private val onFrame: (ByteArray) -> Unit) {
 /** Counters of every stage of the chain, for the screen. */
 data class LrptStatus(
     val carrier: Boolean = false,
+    /** Strongest fourth-power line and symbol-rate line at the last search, against the noise: what the search sees. */
+    val lineRatio: Double = 0.0,
+    val symbolLineRatio: Double = 0.0,
     val snrDb: Double = 0.0,
     val cfoHz: Double = 0.0,
     val locked: Boolean = false,
@@ -139,7 +142,7 @@ class LrptReceiver(private val onStrip: (apid: Int, row: Int, strip: ByteArray) 
     }
 
     fun status() = LrptStatus(
-        carrier = qpsk.tracking, snrDb = qpsk.snrDb, cfoHz = qpsk.cfoHz, locked = link.locked, hypothesis = link.hypothesis,
+        carrier = qpsk.confirmed, lineRatio = qpsk.lineRatio, symbolLineRatio = qpsk.symbolLineRatio, snrDb = qpsk.snrDb, cfoHz = qpsk.cfoHz, locked = link.locked, hypothesis = link.hypothesis,
         frames = frames, rsOk = rsOk, rsFail = rsFail, corrected = frameDecoder.corrected,
         basis = frameDecoder.dualBasis?.let { if (it) "base duale" else "base conventionnelle" },
         zoneStart = zoneStart, packets = packets, segmentsOk = segments.good, segmentsBad = segments.bad, layout = segments.layout,

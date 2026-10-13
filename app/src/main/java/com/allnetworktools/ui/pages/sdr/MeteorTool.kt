@@ -418,7 +418,8 @@ private fun StagesCard(st: LrptStatus, running: Boolean) {
             Stage(
                 "Signal QPSK", st.carrier,
                 if (st.carrier) "décalage %+.1f kHz · rapport signal/bruit %.0f dB".format(Locale.FRANCE, st.cfoHz / 1000, st.snrDb)
-                else if (running) "en attente d'une émission à 72 ksymboles/s" else "à l'arrêt",
+                else if (running) "en attente d'une émission à 72 ksymboles/s · raie ×%.0f (20 requis), rythme ×%.0f".format(Locale.FRANCE, st.lineRatio, st.symbolLineRatio)
+                else "à l'arrêt",
             ),
             Stage(
                 "Synchronisation des trames", st.locked,

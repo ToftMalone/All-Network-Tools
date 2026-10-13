@@ -138,7 +138,7 @@ class LrptQpskTest {
         val fs = 288_000.0
         val rnd = Random(11)
         val n = 288_000 * 4
-        for (toneHz in listOf<Double?>(null, 23_000.0, -41_500.0)) {
+        for (toneHz in listOf<Double?>(null, 4_000.0, 23_000.0, -41_500.0)) {
             val re = FloatArray(n)
             val im = FloatArray(n)
             for (i in 0 until n) {
@@ -148,7 +148,29 @@ class LrptQpskTest {
                 im[i] = (a * sin(ph) + rnd.nextGaussian() * 0.3).toFloat()
             }
             val d = run(re, im, ArrayList())
-            assertTrue("tone $toneHz taken for QPSK", !d.tracking)
+            assertTrue("tone $toneHz taken for QPSK", !d.confirmed)
         }
+    }
+
+    /** A satellite next to a carrier (birdie) in the same window, stronger at its own frequency, is still found. */
+    @Test fun satelliteNextToATone() {
+        val fs = 288_000.0
+        val rnd = Random(5)
+        val bits = IntArray(2 * 150_000) { rnd.nextInt(2) }
+        val (re, im) = QpskTx.waveform(bits, 4.0, 0.3, 20.0, 3_000.0, fs, 6.0, 9)
+        for (i in re.indices) {
+            val ph = 2 * PI * -7_000.0 * i / fs
+            re[i] += (0.4 * cos(ph)).toFloat(); im[i] += (0.4 * sin(ph)).toFloat()
+        }
+        val d = QpskDemodulator { _, _ -> }
+        var found = false
+        var k = 0
+        while (k < re.size) {
+            val n = minOf(4096, re.size - k)
+            d.feed(re.copyOfRange(k, k + n), im.copyOfRange(k, k + n), n)
+            if (d.confirmed && abs(d.cfoHz - 3_000.0) < 300) found = true
+            k += n
+        }
+        assertTrue("never locked on the satellite", found)
     }
 }
