@@ -32,8 +32,7 @@ L'écran d'accueil propose six réseaux. Chacun a son tableau de bord, son outil
 | Whois | Propriétaire d'un domaine ou d'une adresse IP |
 | Wi-Fi Direct | Appareils Wi-Fi Direct à proximité |
 | Audit du réseau | Chiffrement, WPS, PMF, box |
-| Faux points d'accès | SSID dupliqués, « evil twin » |
-| Portail captif et DNS | Portail captif, DNS falsifié |
+| Faux points d'accès | « Evil twin » du réseau Wi-Fi connecté |
 | Homme du milieu | Détection d'ARP spoofing et de DHCP pirate |
 
 ### 🔵 Bluetooth

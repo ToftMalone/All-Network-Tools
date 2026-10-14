@@ -31,7 +31,6 @@ import com.allnetworktools.data.MitmEvent
 import com.allnetworktools.data.MitmWatch
 import com.allnetworktools.data.NetProbes
 import com.allnetworktools.data.NetworkAudit
-import com.allnetworktools.data.PortalDnsCheck
 import com.allnetworktools.data.SecCheck
 import com.allnetworktools.data.WifiAp
 import com.allnetworktools.data.WifiConnection
@@ -175,70 +174,7 @@ fun AuditTool(c: AuditController, conn: WifiConnection?, scan: List<WifiAp>?) {
     }
 }
 
-// ---- 2. Captive portal and DNS --------------------------------------------------------------------
-
-class PortalDnsController(private val probes: NetProbes, private val links: LinkReader?, private val scope: CoroutineScope) {
-    var checks by mutableStateOf<List<SecCheck>?>(null)
-        private set
-    var running by mutableStateOf(false)
-        private set
-    var network by mutableStateOf<String?>(null)
-        private set
-
-    fun run(label: String) {
-        if (running) return
-        running = true
-        scope.launch {
-            checks = PortalDnsCheck.run(probes, links?.read())
-            network = label
-            running = false
-        }
-    }
-
-    internal fun setForTest(c: List<SecCheck>, label: String) {
-        checks = c
-        network = label
-    }
-}
-
-@Composable
-fun PortalDnsTool(c: PortalDnsController, networkLabel: String) {
-    LaunchedEffect(Unit) { if (c.checks == null) c.run(networkLabel) }
-    TopBarAction(Sym.Refresh) { c.run(networkLabel) }
-    PageColumn {
-        val checks = c.checks
-        HeroCard {
-            if (checks == null) {
-                Text("Portail captif et DNS", style = gs(24, 30, 500))
-                Text("Tests en cours sur $networkLabel…", Modifier.padding(top = 4.dp), style = rf(14, 20))
-                IndeterminateBar(Modifier.padding(top = 16.dp))
-            } else {
-                val (bad, warn) = summary(checks)
-                Text(
-                    when {
-                        bad > 0 -> "Trafic manipulé"
-                        warn > 0 -> "À surveiller"
-                        else -> "Rien d'anormal"
-                    },
-                    style = gs(30, 36, 500),
-                )
-                Text("Réseau testé : ${c.network}", Modifier.padding(top = 4.dp), style = rf(14, 20))
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HeroChip("${checks.count { it.level == CheckLevel.Good }} tests réussis", AntTheme.net.good)
-                    if (bad > 0) HeroChip("$bad ${if (bad > 1) "anomalies" else "anomalie"}", cs.error)
-                    if (c.running) HeroChip("Nouveau test…", AntTheme.net.fair, blink = true)
-                }
-            }
-        }
-        if (checks != null) CheckList("Résultats", checks)
-        Note(
-            "Tests : page HTTP de contrôle de Google (réponse vide attendue), noms à adresse fixe (one.one.one.one, dns.google), nom inventé qui doit être inexistant, " +
-                "et requête DNS vers ${PortalDnsCheck.Blackhole}, une adresse réservée où aucun serveur n'existe : une réponse prouve que le réseau capte le DNS.",
-        )
-    }
-}
-
-// ---- 3. Man in the middle -----------------------------------------------------------------------
+// ---- 2. Man in the middle -----------------------------------------------------------------------
 
 class MitmController(private val probes: NetProbes, private val links: LinkReader?, private val scope: CoroutineScope) {
     var current by mutableStateOf<GatewaySnapshot?>(null)

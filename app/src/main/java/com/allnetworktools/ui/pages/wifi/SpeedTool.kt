@@ -35,8 +35,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.allnetworktools.data.HistoryStore
-import com.allnetworktools.data.SpeedRecord
 import com.allnetworktools.data.net.SpeedServer
 import com.allnetworktools.data.net.SpeedStage
 import com.allnetworktools.data.net.SpeedTest
@@ -75,19 +73,8 @@ import kotlinx.coroutines.launch
 
 fun mbps(v: Float) = if (v >= 100) fmt(v) else fmt(v, 1)
 
-fun relativeDate(atMs: Long): String {
-    val now = Calendar.getInstance()
-    val at = Calendar.getInstance().apply { timeInMillis = atMs }
-    val time = SimpleDateFormat("HH:mm", Locale.FRANCE).format(at.time)
-    val days = now.get(Calendar.DAY_OF_YEAR) - at.get(Calendar.DAY_OF_YEAR) + 365 * (now.get(Calendar.YEAR) - at.get(Calendar.YEAR))
-    return when (days) {
-        0 -> "Aujourd'hui, $time"
-        1 -> "Hier, $time"
-        else -> SimpleDateFormat("d MMM, HH:mm", Locale.FRANCE).format(at.time)
-    }
-}
 
-class SpeedController(private val scope: CoroutineScope, private val history: HistoryStore) {
+class SpeedController(private val scope: CoroutineScope) {
     var phase by mutableStateOf(Phase.Idle)
     var stage by mutableStateOf(SpeedStage.Ping)
     var current by mutableFloatStateOf(0f)
@@ -97,8 +84,6 @@ class SpeedController(private val scope: CoroutineScope, private val history: Hi
     var up by mutableStateOf<Float?>(null)
     var server by mutableStateOf<SpeedServer?>(null)
     private var job: Job? = null
-
-    val records = history.speed
 
     fun loadServer() {
         if (server == null) scope.launch { server = SpeedTest.server() }
@@ -126,7 +111,6 @@ class SpeedController(private val scope: CoroutineScope, private val history: Hi
             }
             current = down ?: 0f
             phase = Phase.Results
-            history.addSpeed(SpeedRecord(System.currentTimeMillis(), networkLabel, networkIcon, down ?: 0f, up ?: 0f, ping ?: 0f, jitter ?: 0f))
         }
     }
 
@@ -144,7 +128,6 @@ fun SpeedTool(c: SpeedController, networkLabel: String, networkIcon: String) {
     val acc = AntTheme.accent
     LaunchedEffect(Unit) { c.loadServer() }
     LaunchedEffect(c.phase) { if (c.phase == Phase.Results) haptics.confirm() }
-    val records by c.records.collectAsState()
     if (c.phase == Phase.Results) {
         TopBarAction(Sym.IosShare) {
             actions.share(
@@ -179,12 +162,15 @@ fun SpeedTool(c: SpeedController, networkLabel: String, networkIcon: String) {
                     running && !showPing -> c.current
                     else -> 0f
                 }
+                // The figure glides between samples instead of jumping every 250 ms.
+                val shown by animateFloatAsState(value, tween(400), label = "speedValue")
                 SpeedGauge(
                     value = value,
                     big = when {
                         showPing -> fmt(c.current)
                         c.phase == Phase.Error -> "—"
-                        else -> mbps(value)
+                        c.phase == Phase.Results -> mbps(value)
+                        else -> mbps(shown)
                     },
                     unit = if (showPing) "ms · ping" else "Mb/s",
                     label = when {
@@ -215,17 +201,8 @@ fun SpeedTool(c: SpeedController, networkLabel: String, networkIcon: String) {
         when (c.phase) {
             Phase.Running -> ToolButtons(ToolButton("Annuler", Sym.Close, BtnKind.OutlineOnSurface) { c.cancel() })
             Phase.Results -> ToolButtons(ToolButton("Relancer le test", Sym.Refresh, BtnKind.Big, start))
-            Phase.Idle -> if (records.isNotEmpty()) ToolButtons(ToolButton("Démarrer le test", Sym.PlayArrow, BtnKind.Big, start))
+            Phase.Idle -> ToolButtons(ToolButton("Démarrer le test", Sym.PlayArrow, BtnKind.Big, start))
             else -> Unit
-        }
-        if (c.phase == Phase.Idle && records.isEmpty()) {
-            ToolEmpty(Sym.Speed, "Aucun test enregistré", "Lancez un premier test pour suivre l'évolution de votre débit.", "Démarrer", start)
-        }
-        if ((c.phase == Phase.Idle || c.phase == Phase.Results) && records.isNotEmpty()) {
-            SectionTitle("Historique")
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                records.take(10).forEachIndexed { i, r -> HistoryItem(r, i, minOf(10, records.size)) }
-            }
         }
     }
 }
@@ -317,23 +294,3 @@ private fun PhaseSteps(c: SpeedController) {
     }
 }
 
-@Composable
-private fun HistoryItem(r: SpeedRecord, index: Int, count: Int) {
-    val acc = AntTheme.accent
-    Row(
-        Modifier.rise(index).fillMaxWidth().clip(groupShape(index, count)).background(cs.surfaceContainerLow).padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(Modifier.size(44.dp).clip(CircleShape).background(cs.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-            Symbol(r.icon, size = 22.dp, filled = true, tint = acc.accent)
-        }
-        Column(Modifier.weight(1f)) {
-            Text(relativeDate(r.atMs), style = rf(14, 20, 600))
-            Text(r.network, style = rf(12, 16), color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            Text("↓ ${mbps(r.downMbps)}", style = rf(12, 17, 700, tnum = true))
-            Text("↑ ${mbps(r.upMbps)} · ${fmt(r.pingMs)} ms", style = rf(12, 17, tnum = true), color = cs.onSurfaceVariant)
-        }
-    }
-}

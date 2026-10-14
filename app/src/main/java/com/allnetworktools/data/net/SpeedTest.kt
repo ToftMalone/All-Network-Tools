@@ -32,8 +32,11 @@ data class SpeedServer(val city: String?, val colo: String?, val isp: String?)
 /** Throughput test against Cloudflare's public speed test endpoints. */
 object SpeedTest {
     private const val BASE = "https://speed.cloudflare.com"
-    private const val PHASE_MS = 8_000L
-    private const val WARMUP_MS = 1_000L
+    private const val PHASE_MS = 10_000L
+    /** TCP slow start: the first seconds are left out of the result. */
+    private const val WARMUP_MS = 2_000L
+    /** The live value is the throughput over this sliding window, not 250 ms bursts. */
+    private const val WINDOW_MS = 2_000L
     private const val STREAMS = 4
 
     suspend fun server(): SpeedServer = withContext(Dispatchers.IO) {
@@ -117,7 +120,10 @@ object SpeedTest {
         send(SpeedSample(SpeedStage.Done, down, ping, jitter, down, up))
     }
 
-    /** Runs [STREAMS] transfers for [PHASE_MS], emitting the throughput every 250 ms; returns the mean after warm-up. */
+    /**
+     * Runs [STREAMS] transfers for [PHASE_MS] and returns the mean after warm-up. Every 250 ms it emits the throughput of
+     * the last [WINDOW_MS] (or since the start, at first): reads arrive in bursts, and a 250 ms rate jumps around.
+     */
     private suspend fun kotlinx.coroutines.channels.ProducerScope<SpeedSample>.measure(
         stage: SpeedStage,
         ping: Float,
@@ -130,20 +136,24 @@ object SpeedTest {
         fun elapsed() = (System.nanoTime() - start) / 1_000_000L
         val active = { elapsed() < PHASE_MS && isActive }
         val jobs = List(STREAMS) { launch(Dispatchers.IO) { runCatching { transfer(counter, active) }.onFailure { if (elapsed() < PHASE_MS) throw it } } }
-        var warmBytes = 0L
-        var lastBytes = 0L
-        var lastT = 0L
+        var warmBytes = -1L
+        var warmT = 0L
+        val marks = ArrayDeque<Pair<Long, Long>>().apply { add(0L to 0L) }
         while (elapsed() < PHASE_MS) {
             delay(250)
             val t = elapsed()
             val b = counter.get()
-            if (t >= WARMUP_MS && warmBytes == 0L) warmBytes = b
-            val mbps = (b - lastBytes) * 8f / ((t - lastT).coerceAtLeast(1) / 1000f) / 1e6f
-            lastBytes = b; lastT = t
+            if (t >= WARMUP_MS && warmBytes < 0) { warmBytes = b; warmT = t }
+            marks.addLast(t to b)
+            while (marks.size > 2 && t - marks[1].first >= WINDOW_MS) marks.removeFirst()
+            val (t0, b0) = marks.first()
+            val mbps = (b - b0) * 8f / ((t - t0).coerceAtLeast(1) / 1000f) / 1e6f
             send(SpeedSample(stage, mbps, ping, jitter, down))
         }
+        val endT = elapsed()
+        val endBytes = counter.get()
         jobs.forEach { it.cancel() }
-        val bytes = counter.get() - warmBytes
-        bytes * 8f / ((PHASE_MS - WARMUP_MS) / 1000f) / 1e6f
+        if (warmBytes < 0) { warmBytes = 0; warmT = 0 }
+        (endBytes - warmBytes) * 8f / ((endT - warmT).coerceAtLeast(1) / 1000f) / 1e6f
     }
 }

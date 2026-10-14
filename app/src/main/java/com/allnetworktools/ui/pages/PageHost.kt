@@ -220,7 +220,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
                 vm.navigate { it.copy(page = Page.ToolPage(Tool.Neighbors)) }
             }
             Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed,
-            Tool.Whois, Tool.EvilTwin, Tool.Audit, Tool.PortalDns, Tool.Mitm -> WifiToolRoute(vm, page)
+            Tool.Whois, Tool.EvilTwin, Tool.Audit, Tool.Mitm -> WifiToolRoute(vm, page)
             else -> ComingSoon(page.tool)
         }
         else -> Unit
@@ -228,7 +228,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
 }
 
 /** Tools that only need an Internet connection, usable over mobile data with Wi-Fi off. */
-private val InternetTools = setOf(Tool.Ping, Tool.Trace, Tool.Dns, Tool.Speed, Tool.Ports, Tool.Whois, Tool.PortalDns)
+private val InternetTools = setOf(Tool.Ping, Tool.Trace, Tool.Dns, Tool.Speed, Tool.Ports, Tool.Whois)
 
 @Composable
 private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
@@ -250,11 +250,6 @@ private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
         Tool.Dns -> DnsTool(tools.dns, conn?.dns?.firstOrNull { '.' in it })
         Tool.Whois -> com.allnetworktools.ui.pages.wifi.WhoisTool(tools.whois)
         Tool.Audit -> com.allnetworktools.ui.pages.wifi.AuditTool(tools.audit, conn, vm.wifiScan.collectAsStateWithLifecycle().value)
-        Tool.PortalDns -> {
-            // The modem is only read when there is no Wi-Fi connection to name.
-            val cell = if (conn == null) vm.cell.collectAsStateWithLifecycle().value.state else null
-            com.allnetworktools.ui.pages.wifi.PortalDnsTool(tools.portalDns, conn?.ssid ?: cell?.operator?.let { "$it (données mobiles)" } ?: "réseau actif")
-        }
         Tool.Mitm -> com.allnetworktools.ui.pages.wifi.MitmTool(tools.mitm, conn)
         Tool.EvilTwin -> com.allnetworktools.ui.pages.wifi.EvilTwinTool(
             tools.evilTwin, conn, vm.wifiScan, vm::startWifiScan, perms.location && locationOn,

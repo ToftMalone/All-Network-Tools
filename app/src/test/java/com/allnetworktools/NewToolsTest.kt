@@ -212,28 +212,12 @@ class NewToolsTest {
         override suspend fun connectivityCheck() = http
         override suspend fun systemResolve(host: String) = answers[host] ?: hijackNx?.let { listOf(it) } ?: emptyList()
         override suspend fun udpQuery(server: String, host: String) =
-            if (server == com.allnetworktools.data.PortalDnsCheck.Blackhole) (if (intercept) listOf("1.1.1.1") else null) else answers[host]
+            if (server == "192.0.2.53") (if (intercept) listOf("1.1.1.1") else null) else answers[host]
         override suspend fun firstHop() = hop
         override suspend fun tcpOpen(host: String, port: Int) = port == 80
     }
 
     private val cleanLink = com.allnetworktools.data.LinkSnapshot(true, "192.168.1.254", emptyList(), listOf("192.168.1.254"), "192.168.1.254", false, null, true, false)
-
-    @Test fun cleanNetworkPassesPortalAndDnsChecks() = kotlinx.coroutines.runBlocking {
-        val r = com.allnetworktools.data.PortalDnsCheck.run(FakeProbes(), cleanLink, "abc")
-        assertTrue(r.none { it.level == com.allnetworktools.data.CheckLevel.Bad || it.level == com.allnetworktools.data.CheckLevel.Warn })
-    }
-
-    @Test fun detectsPortalForgeryAndInterception() = kotlinx.coroutines.runBlocking {
-        val r = com.allnetworktools.data.PortalDnsCheck.run(
-            FakeProbes(http = Triple(302, 0, "http://portal.hotel/login"), answers = mapOf("one.one.one.one" to listOf("10.0.0.1"), "dns.google" to listOf("8.8.8.8")), hijackNx = "93.184.216.34", intercept = true),
-            cleanLink, "abc",
-        ).map { it.title }
-        assertTrue("Portail captif" in r)
-        assertTrue("Réponse DNS falsifiée" in r)
-        assertTrue("Domaines inexistants redirigés" in r)
-        assertTrue("DNS intercepté" in r)
-    }
 
     @Test fun auditsTheConnectedNetwork() {
         val conn = com.allnetworktools.data.WifiConnection("Box", "a4:3e:51:00:00:01", -50, 2437, null, null, 4, "WPA2-Personnel (PSK)", "192.168.1.2", 24, "192.168.1.254", emptyList(), null, null)

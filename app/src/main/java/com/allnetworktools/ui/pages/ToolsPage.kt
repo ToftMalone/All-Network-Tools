@@ -55,7 +55,6 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
             listOf(
                 ToolEntry(Tool.Audit, "Audit du réseau", "Chiffrement, WPS, PMF, box"),
                 ToolEntry(Tool.EvilTwin, "Faux points d'accès", "SSID dupliqués, evil twin"),
-                ToolEntry(Tool.PortalDns, "Portail et DNS", "Portail captif, DNS falsifié"),
                 ToolEntry(Tool.Mitm, "Homme du milieu", "ARP spoofing, DHCP pirate"),
             ),
         ),

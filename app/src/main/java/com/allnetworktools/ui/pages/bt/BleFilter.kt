@@ -56,6 +56,14 @@ const val RssiOff = -100
 
 /** BLE scanner filters, kept in the ViewModel so they survive navigation. */
 class BleFilterState {
+    /** When each address was first listed: the scanner keeps that order so rows do not jump around. */
+    private val discovered = HashMap<String, Long>()
+
+    fun inDiscoveryOrder(list: List<BleDevice>, now: Long = System.currentTimeMillis()): List<BleDevice> {
+        list.forEach { discovered.getOrPut(it.address) { now } }
+        return list.sortedWith(compareBy<BleDevice>({ discovered[it.address] }, { it.address }))
+    }
+
     var text by mutableStateOf("")
     var nameMode by mutableStateOf(NameMode.All)
     var raw by mutableStateOf("")

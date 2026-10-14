@@ -60,7 +60,6 @@ enum class Tool(
     Whois(Network.Wifi, "Whois", Sym.TravelExplore, Sym.IosShare),
     EvilTwin(Network.Wifi, "Faux points d'accès", Sym.WifiTetheringError, Sym.Refresh),
     Audit(Network.Wifi, "Audit du réseau", Sym.Shield, Sym.Refresh),
-    PortalDns(Network.Wifi, "Portail captif et DNS", Sym.Language, Sym.Refresh),
     Mitm(Network.Wifi, "Homme du milieu", Sym.SwapHoriz, Sym.RestartAlt),
     WifiDirect(Network.Wifi, "Wi-Fi Direct", Sym.WifiTethering),
 

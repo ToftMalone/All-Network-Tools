@@ -23,7 +23,7 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val trace by lazy { TraceController(scope) }
     val ports by lazy { PortsController(scope) }
     val dns by lazy { DnsController(scope) }
-    val speed by lazy { SpeedController(scope, app.history) }
+    val speed by lazy { SpeedController(scope) }
     val whois by lazy { com.allnetworktools.ui.pages.wifi.WhoisController(scope) }
     val bleFilter = com.allnetworktools.ui.pages.bt.BleFilterState()
     val gatt by lazy { GattController(app, scope, app.bluetooth.identities) }
@@ -33,7 +33,6 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     private val probes by lazy { com.allnetworktools.data.RealProbes() }
     private val links by lazy { com.allnetworktools.data.LinkReader(app) }
     val audit by lazy { com.allnetworktools.ui.pages.wifi.AuditController(probes, links, scope) }
-    val portalDns by lazy { com.allnetworktools.ui.pages.wifi.PortalDnsController(probes, links, scope) }
     val mitm by lazy { com.allnetworktools.ui.pages.wifi.MitmController(probes, links, scope) }
     val evilTwin = com.allnetworktools.ui.pages.wifi.EvilTwinController()
     val unknownTrackers = com.allnetworktools.ui.pages.bt.UnknownTrackersController(app, scope)

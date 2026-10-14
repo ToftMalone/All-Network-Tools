@@ -91,7 +91,7 @@ object NetworkAudit {
     fun score(list: List<SecCheck>): Int = (100 - 30 * list.count { it.level == CheckLevel.Bad } - 10 * list.count { it.level == CheckLevel.Warn }).coerceIn(0, 100)
 }
 
-// ---- 2. Captive portal and DNS tampering -------------------------------------------------------
+// ---- 2. Network probes --------------------------------------------------------------------------
 
 /** Network probes, replaced by fakes in tests. */
 interface NetProbes {
@@ -149,64 +149,6 @@ class RealProbes : NetProbes {
 
     companion object {
         const val ConnectivityUrl = "http://connectivitycheck.gstatic.com/generate_204"
-    }
-}
-
-object PortalDnsCheck {
-    /** Names whose addresses never change: any other answer is a forged one. */
-    val Anchors = mapOf(
-        "one.one.one.one" to setOf("1.1.1.1", "1.0.0.1"),
-        "dns.google" to setOf("8.8.8.8", "8.8.4.4"),
-    )
-
-    /** Documentation address (RFC 5737): nothing listens there, so a DNS answer means port 53 is intercepted. */
-    const val Blackhole = "192.0.2.53"
-
-    suspend fun run(p: NetProbes, link: LinkSnapshot?, random: String = java.util.UUID.randomUUID().toString().take(12)): List<SecCheck> = buildList {
-        // Captive portal / HTTP interception.
-        val cc = p.connectivityCheck()
-        add(
-            when {
-                cc == null -> SecCheck(CheckLevel.Info, "Test HTTP impossible", "Le serveur de test de Google n'a pas répondu : pas d'accès Internet, ou flux HTTP bloqué.")
-                cc.first == 204 && cc.second == 0 -> SecCheck(CheckLevel.Good, "Pas de portail captif", "La page de test HTTP arrive intacte : le réseau ne détourne ni ne modifie le trafic web non chiffré.")
-                cc.first in 300..399 -> SecCheck(CheckLevel.Warn, "Portail captif", "Le réseau redirige le trafic web" + (cc.third?.let { " vers ${it.take(80)}" } ?: "") + " : une page de connexion est probablement requise.")
-                else -> SecCheck(CheckLevel.Bad, "Trafic web modifié", "La page de test (réponse vide attendue) revient avec le code ${cc.first} et ${cc.second} octets : le réseau injecte ou remplace du contenu HTTP.")
-            },
-        )
-        if (link != null) {
-            if (link.captivePortal) add(SecCheck(CheckLevel.Warn, "Portail signalé par Android", "Android a détecté une page de connexion sur ce réseau."))
-            else if (!link.validated) add(SecCheck(CheckLevel.Warn, "Accès Internet non validé", "Android n'a pas pu vérifier l'accès à Internet sur ce réseau."))
-        }
-        // Forged answers for names with fixed addresses.
-        Anchors.forEach { (host, expected) ->
-            val got = p.systemResolve(host)
-            when {
-                got == null -> add(SecCheck(CheckLevel.Info, "$host non résolu", "Le résolveur du système n'a pas répondu."))
-                got.isNotEmpty() && got.all { it in expected } -> add(SecCheck(CheckLevel.Good, "$host → ${got.joinToString()}", "Adresse authentique : le DNS du réseau ne falsifie pas cette réponse."))
-                else -> add(SecCheck(CheckLevel.Bad, "Réponse DNS falsifiée", "$host devrait donner ${expected.joinToString(" ou ")}, le DNS a répondu ${got.ifEmpty { listOf("« domaine inexistant »") }.joinToString()}."))
-            }
-        }
-        // Answers for a domain that does not exist.
-        val fake = "$random.example.com"
-        val nx = p.systemResolve(fake)
-        when {
-            nx == null -> Unit
-            nx.isEmpty() -> add(SecCheck(CheckLevel.Good, "Domaines inexistants signalés", "Un nom qui n'existe pas renvoie bien une erreur : pas de redirection publicitaire ou de portail DNS."))
-            else -> add(SecCheck(CheckLevel.Bad, "Domaines inexistants redirigés", "Un nom inventé ($fake) a reçu l'adresse ${nx.joinToString()} : le DNS redirige les erreurs vers une autre page."))
-        }
-        // Transparent DNS proxy: an answer from an address where no server exists.
-        val trap = p.udpQuery(Blackhole, "one.one.one.one")
-        add(
-            if (trap != null) SecCheck(CheckLevel.Bad, "DNS intercepté", "Une requête envoyée à $Blackhole, où aucun serveur n'existe, a reçu une réponse : le réseau capte tout le trafic DNS (port 53), quel que soit le serveur choisi.")
-            else SecCheck(CheckLevel.Good, "Pas d'interception du port 53", "Une requête DNS vers une adresse vide reste sans réponse, comme il se doit."),
-        )
-        val direct = p.udpQuery("1.1.1.1", "one.one.one.one")
-        if (direct != null && direct.isNotEmpty() && direct.any { it !in Anchors.getValue("one.one.one.one") }) {
-            add(SecCheck(CheckLevel.Bad, "Réponse de 1.1.1.1 falsifiée", "Interrogé directement, 1.1.1.1 a répondu ${direct.joinToString()} : la réponse a été remplacée en chemin."))
-        }
-        if (link?.privateDns == true) {
-            add(SecCheck(CheckLevel.Good, "DNS privé actif", "Vos applications passent par un DNS chiffré" + (link.privateDnsServer?.let { " ($it)" } ?: "") + ", à l'abri de ces manipulations."))
-        }
     }
 }
 

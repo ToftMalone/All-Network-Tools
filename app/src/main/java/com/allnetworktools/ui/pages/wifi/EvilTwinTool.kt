@@ -44,6 +44,7 @@ import com.allnetworktools.ui.tools.HeroCard
 import com.allnetworktools.ui.tools.HeroChip
 import com.allnetworktools.ui.tools.ToolError
 import com.allnetworktools.ui.tools.mono
+import com.allnetworktools.ui.tools.ToolEmpty
 import com.allnetworktools.util.plural
 import kotlinx.coroutines.flow.StateFlow
 
@@ -89,23 +90,29 @@ fun EvilTwinTool(
     LaunchedEffect(Unit) { startScan() }
     LaunchedEffect(scan) { scan?.let { c.feed(it) } }
     TopBarAction(Sym.Refresh) { startScan() }
-    val reports = EvilTwin.analyze(scan.orEmpty(), c.firstSeen, c.ssidFirstSeen, System.currentTimeMillis())
+    // Only the network the phone is connected to: the access points that broadcast its name.
+    val ssid = conn?.ssid?.takeIf { it.isNotBlank() }
+    val reports = if (ssid == null) emptyList() else EvilTwin.analyze(scan.orEmpty().filter { it.ssid == ssid }, c.firstSeen, c.ssidFirstSeen, System.currentTimeMillis())
     PageColumn {
         if (!locationOk) {
             ToolError(Sym.LocationOff, "Localisation requise", "Android exige la position précise, et la localisation activée, pour lire les résultats d'un scan Wi-Fi.", "Autoriser", onFixLocation)
             return@PageColumn
         }
-        val suspicious = reports.filter { it.risk <= TwinRisk.Medium }
-        val mine = conn?.ssid?.let { s -> reports.firstOrNull { it.ssid == s } }
-        val connectedFlagged = conn?.bssid != null && mine != null && conn.bssid.lowercase() in mine.flagged.map { it.lowercase() }
+        if (ssid == null) {
+            ToolEmpty(Sym.WifiOff, "Pas de Wi-Fi", "Connectez-vous à un réseau Wi-Fi : l'outil vérifie les points d'accès qui diffusent son nom.", null)
+            return@PageColumn
+        }
+        val mine = reports.firstOrNull()
+        val suspicious = mine?.flagged?.size ?: 0
+        val connectedFlagged = conn.bssid != null && mine != null && conn.bssid.lowercase() in mine.flagged.map { it.lowercase() }
         HeroCard {
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(suspicious.size.toString(), style = gs(56, 60, 500, -1.5f, tnum = true))
-                Text(plural(suspicious.size, "réseau suspect", "réseaux suspects"), Modifier.padding(bottom = 8.dp), style = rf(18, 24, 500))
+                Text(suspicious.toString(), style = gs(56, 60, 500, -1.5f, tnum = true))
+                Text(plural(suspicious, "point d'accès suspect", "points d'accès suspects"), Modifier.padding(bottom = 8.dp), style = rf(18, 24, 500))
             }
-            val aps = scan.orEmpty().size
+            val aps = mine?.aps?.size ?: 0
             Text(
-                "${reports.size} ${plural(reports.size, "nom de réseau", "noms de réseau")} et $aps ${plural(aps, "point d'accès", "points d'accès")} analysés",
+                "$aps ${plural(aps, "point d'accès diffuse", "points d'accès diffusent")} « $ssid »",
                 style = rf(14, 20),
             )
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -128,15 +135,7 @@ fun EvilTwinTool(
                 }
             }
         }
-        val shown = reports.filter { it.findings.isNotEmpty() || it.aps.size >= 2 || it.ssid == conn?.ssid }
-        shown.forEach { r -> ReportCard(r, conn) }
-        val single = reports.size - shown.size
-        if (single > 0) {
-            Text(
-                "$single ${plural(single, "autre réseau n'est diffusé", "autres réseaux ne sont diffusés")} que par un seul point d'accès, sans anomalie.",
-                Modifier.padding(horizontal = 4.dp), style = rf(12, 16), color = cs.onSurfaceVariant,
-            )
-        }
+        reports.forEach { r -> ReportCard(r, conn) }
         SectionCard {
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Symbol(Sym.Info, size = 22.dp, tint = AntTheme.accent.accent)

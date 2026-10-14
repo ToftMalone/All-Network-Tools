@@ -83,7 +83,8 @@ fun BleScanner(vm: MainViewModel) {
     TopBarAction(if (paused) Sym.PlayArrow else Sym.Pause) { haptics.segment(); paused = !paused }
 
     val f = vm.tools.bleFilter
-    val shown = devices.filter { (filter == ALL || it.kind.filter == filter) && f.matches(it) }.sortedByDescending { it.rssi }
+    // In the order the devices were first heard: a new one goes to the end, the others stay where they are.
+    val shown = f.inDiscoveryOrder(devices.filter { (filter == ALL || it.kind.filter == filter) && f.matches(it) })
     val roles = AntTheme.net.bt
     PageColumn {
         SectionCard(shape = RoundedCornerShape(32.dp)) {
