@@ -158,7 +158,7 @@ class UnknownTrackersController(private val context: android.content.Context?, p
             }
         }
         devices.forEach { d ->
-            val sig = TrackerDetect.classify(d.ads) ?: TrackerDetect.fromIdentity(d.model, d.name, d.confidence) ?: return@forEach
+            val sig = TrackerDetect.classify(d.ads) ?: return@forEach
             val c = candidates.values.firstOrNull { d.address in it.addresses }
                 ?: sig.linkKey?.let { k -> candidates.values.firstOrNull { it.lastLinkKey == k && it.signal.net == sig.net && now - it.lastHeardMs < 20 * 60_000L } }
                     ?.also { it.addresses += d.address }

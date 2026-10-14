@@ -79,17 +79,13 @@ object TrackerDetect {
             // Continuity TLV: type 0x12 is Find My. A 25-byte payload carries the full rotating key, which
             // accessories only broadcast in "offline finding" mode, i.e. away from their owner's devices.
             var i = 0
-            var pairing = false
             while (i + 2 <= d.size) {
                 val t = d.u8(i)
                 val l = d.u8(i + 1)
                 if (t == 0x12) return TrackerSignal(TrackerNet.AppleFindMy, l >= 0x19, appleStatus = if (l >= 1 && i + 2 < d.size) d.u8(i + 2) else null, kind = appleKind(d, i + 2, l))
-                // Proximity pairing: what AirPods and Beats send while out of their case, or with the lid open.
-                if (t == 0x07) pairing = true
                 if (t == 0) break
                 i += 2 + l
             }
-            if (pairing) return TrackerSignal(TrackerNet.AppleFindMy, null, kind = TrackerKind.AirPods)
         }
         val sd = Ad.serviceData(ads)
         sd[0xFEAA]?.takeIf { it.isNotEmpty() }?.let { d ->
@@ -117,21 +113,6 @@ object TrackerDetect {
             0x10 -> TrackerKind.AirTag
             0x30 -> TrackerKind.AirPods
             else -> TrackerKind.AppleDevice
-        }
-    }
-
-    /**
-     * What the BLE identification engine concluded (from the name, services or a connection), for tags whose
-     * advertisement does not give it away: AirPods and Beats, Galaxy SmartTags, AirTags, Tile.
-     */
-    fun fromIdentity(model: String?, name: String?, confidence: Int): TrackerSignal? {
-        val text = listOfNotNull(name, model.takeIf { confidence >= 50 }).joinToString(" ").lowercase()
-        return when {
-            text.isBlank() -> null
-            "airtag" in text -> TrackerSignal(TrackerNet.AppleFindMy, null, kind = TrackerKind.AirTag)
-            "airpods" in text || "powerbeats" in text || "beats" in text -> TrackerSignal(TrackerNet.AppleFindMy, null, kind = TrackerKind.AirPods)
-            "smarttag" in text.replace(" ", "") -> TrackerSignal(TrackerNet.SamsungFind, null, kind = TrackerKind.SmartTag)
-            else -> null
         }
     }
 

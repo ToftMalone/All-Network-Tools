@@ -93,12 +93,6 @@ class NewToolsTest {
         assertEquals(com.allnetworktools.data.TrackerKind.AirPods, TrackerDetect.classify(Ad.parseHex("07FF4C0012023100"))!!.kind)
         assertEquals(com.allnetworktools.data.TrackerKind.AppleDevice, TrackerDetect.classify(Ad.parseHex("07FF4C0012020000"))!!.kind)
         assertEquals(com.allnetworktools.data.TrackerKind.SmartTag, TrackerDetect.classify(Ad.parseHex("07165AFD10223344"))!!.kind)
-        // AirPods out of their case send proximity pairing (0x07), not Find My.
-        assertEquals(com.allnetworktools.data.TrackerKind.AirPods, TrackerDetect.classify(Ad.parseHex("08FF4C000719012014"))!!.kind)
-        // Names and models found by the identification engine.
-        assertEquals(com.allnetworktools.data.TrackerKind.AirPods, TrackerDetect.fromIdentity("AirPods Pro", null, 90)!!.kind)
-        assertEquals(com.allnetworktools.data.TrackerKind.SmartTag, TrackerDetect.fromIdentity(null, "Smart Tag", 0)!!.kind)
-        assertEquals(null, TrackerDetect.fromIdentity("Enceinte", "JBL Flip", 90))
         // Recent AirTags announce themselves as accessories: the name read once connected tells.
         assertEquals(com.allnetworktools.data.TrackerKind.AirTag, TrackerDetect.kindFromProbe("AirTag", false))
         assertEquals(com.allnetworktools.data.TrackerKind.AirTag, TrackerDetect.kindFromProbe(null, true))
