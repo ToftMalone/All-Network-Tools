@@ -70,7 +70,7 @@ Les décodeurs fonctionnent avec le **HackRF seul** : ni le Wi-Fi ni le Bluetoot
 
 ### 🔌 Talkie-walkie
 
-Lire, modifier et réécrire les mémoires d'un **Baofeng UV-5R** ou d'un **Radtel RT-470X** par câble de programmation USB (puces CH340, CP210x, FTDI, PL2303), avec des préréglages (PMR446, relais, marine…). La carte reste grisée sans câble branché.
+Lire, modifier et réécrire les mémoires d'un **Baofeng UV-5R**, d'un **Radtel RT-470X** ou d'un **Quansheng UV-K5 / UV-K6 / UV-5R Plus** par câble de programmation USB (puces CH340, CP210x, FTDI, PL2303), avec des préréglages (PMR446, relais, marine…). Sans câble, la carte reste consultable mais les outils ne se lancent pas.
 
 ### 📤 Exports
 

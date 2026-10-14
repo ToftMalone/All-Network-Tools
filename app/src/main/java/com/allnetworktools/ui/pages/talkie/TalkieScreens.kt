@@ -84,7 +84,7 @@ fun TalkieDashboard(vm: MainViewModel) {
             }
             Text("Canaux du talkie", Modifier.padding(top = 16.dp), style = gs(24, 30, 500), color = roles.onContainer)
             Text(
-                "Lisez la mémoire d'un Baofeng UV-5R ou d'un Radtel RT-470X, modifiez les canaux, ajoutez des préréglages et réécrivez-les.",
+                "Lisez la mémoire d'un Baofeng UV-5R, d'un Radtel RT-470X ou d'un Quansheng UV-K5 / UV-K6, modifiez les canaux, ajoutez des préréglages et réécrivez-les.",
                 Modifier.padding(top = 4.dp).graphicsLayer { alpha = 0.85f }, style = rf(14, 20), color = roles.onContainer,
             )
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.End) {

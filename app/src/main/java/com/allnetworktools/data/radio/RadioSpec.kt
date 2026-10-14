@@ -321,6 +321,196 @@ class Rt470xSpec(private val pauseMs: Long = 0) : RadioSpec {
     }
 }
 
+/**
+ * Quansheng UV-K5 family (UV-K5, UV-K5(8), UV-K6, UV-5R Plus), stock firmware 2.01.x and the modified firmwares built on it:
+ * 38400 baud, packets `AB CD len 00 · payload+CRC XOR-obfuscated · DC BA` as described by CHIRP's uvk5 driver; 200
+ * memories of 16 bytes at 0x0000, their attributes at 0x0D60 and 16-byte names at 0x0F50. Only those three areas are
+ * written back, by whole 8-byte EEPROM pages, never the calibration at the end of the memory.
+ */
+class UvK5Spec : RadioSpec {
+    override val id = "uvk5"
+    override val label = "Quansheng UV-K5 / UV-K6"
+    override val baud = 38400
+    override val slots = 200
+    override val nameLength = 10
+    override val bands = listOf(50_000_000L..76_000_000L, 108_000_000L..600_000_000L)
+    override val powers = listOf(RadioPower.High, RadioPower.Medium, RadioPower.Low)
+    override val imageSize = 0x2000
+
+    private fun u32(b: ByteArray, o: Int): Long = (0 until 4).fold(0L) { acc, i -> acc or ((b[o + i].toLong() and 0xFF) shl (8 * i)) }
+    private fun put32(b: ByteArray, o: Int, v: Long) { for (i in 0 until 4) b[o + i] = (v ushr (8 * i)).toByte() }
+
+    private fun tone(flag: Int, code: Int): Tone = when (flag) {
+        1 -> RadioTones.ctcss.getOrNull(code)?.let { Tone.Ctcss(it) } ?: Tone.None
+        2, 3 -> Dcs.getOrNull(code)?.let { Tone.Dcs(it, flag == 3) } ?: Tone.None
+        else -> Tone.None
+    }
+
+    /** Flag (0 none, 1 CTCSS, 2 DCS, 3 DCS inverted) and index, the way the radio stores a tone. */
+    private fun toneCode(t: Tone): Pair<Int, Int> = when (t) {
+        Tone.None -> 0 to 0
+        is Tone.Ctcss -> RadioTones.ctcss.indexOfFirst { kotlin.math.abs(it - t.hz) < 0.05 }.let { if (it < 0) 0 to 0 else 1 to it }
+        is Tone.Dcs -> Dcs.indexOf(t.code).let { if (it < 0) 0 to 0 else (if (t.inverted) 3 else 2) to it }
+    }
+
+    override fun decode(image: ByteArray, slot: Int): RadioChannel? {
+        val o = slot * REC
+        val attr = image[ATTR + slot].toInt() and 0xFF
+        val raw = u32(image, o)
+        if (raw == 0xFFFFFFFFL || raw == 0L || attr and 0x08 != 0) return null
+        val rx = raw * 10
+        val offset = u32(image, o + 4) * 10
+        val tx = when (image[o + 11].toInt() and 0x0F) { 1 -> rx + offset; 2 -> rx - offset; else -> rx }
+        val flags = image[o + 10].toInt() and 0xFF
+        val b12 = image[o + 12].toInt() and 0xFF
+        val name = (0 until 16).map { image[NAMES + slot * REC + it].toInt() and 0xFF }.takeWhile { it in 0x20..0x7E }.map { it.toChar() }.joinToString("").trim()
+        return RadioChannel(
+            slot, rx, tx.takeIf { it < LISTEN_ONLY_TX }, name,
+            rxTone = tone(flags and 0x0F, image[o + 8].toInt() and 0xFF),
+            txTone = tone(flags shr 4, image[o + 9].toInt() and 0xFF),
+            power = when ((b12 shr 2) and 3) { 2 -> RadioPower.High; 1 -> RadioPower.Medium; else -> RadioPower.Low },
+            wide = b12 and 0x02 == 0,
+            scan = attr and 0x80 != 0,
+        )
+    }
+
+    override fun encode(image: ByteArray, ch: RadioChannel) {
+        val o = ch.slot * REC
+        val fresh = u32(image, o) == 0xFFFFFFFFL
+        put32(image, o, ch.rxHz / 10)
+        // A listen-only memory gets a transmit frequency no UV-K5 can use (above 1 GHz): the radio refuses to transmit.
+        val tx = ch.txHz ?: LISTEN_ONLY_TX
+        val diff = tx - ch.rxHz
+        put32(image, o + 4, kotlin.math.abs(diff) / 10)
+        val (rxFlag, rxCode) = toneCode(ch.rxTone)
+        val (txFlag, txCode) = toneCode(ch.txTone)
+        image[o + 8] = rxCode.toByte()
+        image[o + 9] = txCode.toByte()
+        image[o + 10] = ((txFlag shl 4) or rxFlag).toByte()
+        val modulation = if (fresh) 0 else ((image[o + 11].toInt() shr 4) and 0x0F).takeIf { it <= 2 } ?: 0
+        image[o + 11] = ((modulation shl 4) or (if (diff > 0) 1 else if (diff < 0) 2 else 0)).toByte()
+        val p = when (ch.power) { RadioPower.High -> 2; RadioPower.Medium -> 1; RadioPower.Low -> 0 }
+        image[o + 12] = ((p shl 2) or (if (ch.wide) 0 else 0x02)).toByte()
+        image[o + 13] = 0
+        if (fresh || (image[o + 14].toInt() and 0xFF) > 6) image[o + 14] = 4 // 12.5 kHz step
+        image[o + 15] = 0
+        val name = ch.name.take(nameLength).toByteArray(Charsets.US_ASCII)
+        for (i in 0 until REC) image[NAMES + ch.slot * REC + i] = if (i < name.size) name[i] else 0
+        val oldAttr = image[ATTR + ch.slot].toInt() and 0xFF
+        val compander = if (oldAttr and 0x08 != 0) 0 else oldAttr and 0x30
+        image[ATTR + ch.slot] = ((if (ch.scan) 0x80 else 0) or compander or band(ch.rxHz)).toByte()
+    }
+
+    override fun erase(image: ByteArray, slot: Int) {
+        image.fill(0xFF.toByte(), slot * REC, slot * REC + REC)
+        image.fill(0xFF.toByte(), NAMES + slot * REC, NAMES + slot * REC + REC)
+        image[ATTR + slot] = 0x0F // free, band 7
+    }
+
+    /** Band index of the radio's frequency table. */
+    private fun band(hz: Long): Int = when {
+        hz < 76_000_000L -> 0
+        hz < 136_000_000L -> 1
+        hz < 174_000_000L -> 2
+        hz < 350_000_000L -> 3
+        hz < 400_000_000L -> 4
+        hz < 470_000_000L -> 5
+        else -> 6
+    }
+
+    // ---- protocol ------------------------------------------------------------------------------
+
+    private fun send(link: SerialLink, payload: ByteArray) {
+        val crc = UvK5Packet.crc(payload)
+        val body = UvK5Packet.xor(payload + byteArrayOf(crc.toByte(), (crc shr 8).toByte()))
+        link.write(byteArrayOf(0xAB.toByte(), 0xCD.toByte(), payload.size.toByte(), 0) + body + byteArrayOf(0xDC.toByte(), 0xBA.toByte()))
+    }
+
+    private fun receive(link: SerialLink, what: String, silentIsNoAnswer: Boolean = false): ByteArray {
+        val head = link.read(4, 1500)
+        if (head.isEmpty() && silentIsNoAnswer) throw RadioNoAnswer("Le talkie ne répond pas.")
+        if (head.size != 4 || head[0] != 0xAB.toByte() || head[1] != 0xCD.toByte() || head[3].toInt() != 0) {
+            if (silentIsNoAnswer) throw RadioNoAnswer("Réponse inattendue : ${head.hex()}")
+            throw RadioException("Réponse inattendue du talkie ($what).")
+        }
+        val body = link.readExactly(head[2].toInt() and 0xFF, 1500, what)
+        val foot = link.readExactly(4, 1500, what)
+        if (foot[2] != 0xDC.toByte() || foot[3] != 0xBA.toByte()) throw RadioException("Trame incomplète du talkie ($what).")
+        return UvK5Packet.xor(body)
+    }
+
+    private fun hello(link: SerialLink): Pair<String, Boolean> {
+        link.purge()
+        send(link, byteArrayOf(0x14, 0x05, 0x04, 0x00) + SESSION)
+        val r = receive(link, "identification", silentIsNoAnswer = true)
+        if (r.isEmpty() || r[0].toInt() != 0x15) throw RadioNoAnswer("Ce n'est pas un UV-K5.")
+        val fw = r.drop(4).takeWhile { it.toInt() != 0 }.map { (it.toInt() and 0xFF).toChar() }.joinToString("").trim()
+        return fw to ("2.01." in fw)
+    }
+
+    private fun readBlock(link: SerialLink, addr: Int, size: Int): ByteArray {
+        send(link, byteArrayOf(0x1B, 0x05, 0x08, 0x00, addr.toByte(), (addr shr 8).toByte(), size.toByte(), 0) + SESSION)
+        val r = receive(link, "bloc %04X".format(addr))
+        if (r.size < 8 + size || r[0].toInt() != 0x1C) throw RadioException("Réponse inattendue du talkie au bloc %04X.".format(addr))
+        return r.copyOfRange(8, 8 + size)
+    }
+
+    override fun download(link: SerialLink, progress: (Float) -> Unit): RadioSpec.Download {
+        val (fw, known) = hello(link)
+        val image = ByteArray(imageSize)
+        for (a in 0 until imageSize step BLOCK) {
+            readBlock(link, a, BLOCK).copyInto(image, a)
+            progress((a + BLOCK).toFloat() / imageSize)
+        }
+        return RadioSpec.Download(image, fw.ifEmpty { "UV-K5" }, known)
+    }
+
+    override fun upload(link: SerialLink, image: ByteArray, slots: Collection<Int>, progress: (Float) -> Unit) {
+        val (fw, known) = hello(link)
+        if (!known) throw RadioException("Firmware non reconnu ($fw) : l'écriture est refusée par sécurité. La lecture reste possible.")
+        val pages = slots.sorted().flatMap { s -> listOf(s * REC to REC, NAMES + s * REC to REC, ATTR + s / 8 * 8 to 8) }.distinct()
+        pages.forEachIndexed { i, (a, n) ->
+            send(link, byteArrayOf(0x1D, 0x05, (n + 8).toByte(), 0, a.toByte(), (a shr 8).toByte(), n.toByte(), 1) + SESSION + image.copyOfRange(a, a + n))
+            val r = receive(link, "écriture %04X".format(a))
+            if (r.size < 6 || r[0].toInt() != 0x1E || r[4] != a.toByte() || r[5] != (a shr 8).toByte()) {
+                throw RadioException("Le talkie a refusé le bloc %04X : rien de plus n'a été écrit.".format(a))
+            }
+            progress((i + 1f) / pages.size)
+        }
+        // The radio reads its memory at start-up: restart it so the new channels show.
+        send(link, byteArrayOf(0xDD.toByte(), 0x05, 0x00, 0x00))
+    }
+
+    private companion object {
+        const val REC = 16
+        const val ATTR = 0x0D60
+        const val NAMES = 0x0F50
+        const val BLOCK = 0x80
+        const val LISTEN_ONLY_TX = 1_000_000_000L
+        val SESSION = byteArrayOf(0x6A, 0x39, 0x57, 0x64)
+
+        /** The firmware's 104 digital codes (no 645), in its order. */
+        val Dcs = RadioTones.dcs.filter { it != 645 }
+    }
+}
+
+/** Packet helpers of the UV-K5 protocol: XOR obfuscation with a 16-byte key, CRC-16/XMODEM of the plain payload. */
+object UvK5Packet {
+    private val KEY = intArrayOf(0x16, 0x6C, 0x14, 0xE6, 0x2E, 0x91, 0x0D, 0x40, 0x21, 0x35, 0xD5, 0x40, 0x13, 0x03, 0xE9, 0x80)
+
+    fun xor(d: ByteArray): ByteArray = ByteArray(d.size) { (d[it].toInt() xor KEY[it % KEY.size]).toByte() }
+
+    fun crc(d: ByteArray): Int {
+        var c = 0
+        for (b in d) {
+            c = c xor ((b.toInt() and 0xFF) shl 8)
+            repeat(8) { c = if (c and 0x8000 != 0) (c shl 1) xor 0x1021 else c shl 1 }
+            c = c and 0xFFFF
+        }
+        return c
+    }
+}
+
 object RadioSpecs {
-    fun all(): List<RadioSpec> = listOf(Uv5rSpec(), Rt470xSpec())
+    fun all(): List<RadioSpec> = listOf(Uv5rSpec(), Rt470xSpec(), UvK5Spec())
 }

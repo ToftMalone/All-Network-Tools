@@ -441,3 +441,106 @@ class ChannelsControllerTest {
         assertEquals(128, c.channels.size)
     }
 }
+
+/** A UV-K5 answering its packet protocol from a 0x2000-byte EEPROM. */
+private class SimUvK5(memory: ByteArray, private val firmware: String = "k5_2.01.26") : SimRadio(memory) {
+    var resets = 0
+    var writes = 0
+
+    private fun reply(payload: ByteArray) {
+        val crc = com.allnetworktools.data.radio.UvK5Packet.crc(payload)
+        emit(0xAB, 0xCD, payload.size, 0)
+        emit(com.allnetworktools.data.radio.UvK5Packet.xor(payload))
+        emit(crc and 0xFF, crc shr 8, 0xDC, 0xBA)
+    }
+
+    override fun process() {
+        while (true) {
+            val head = peek(4) ?: return
+            if (head[0] != 0xAB.toByte() || head[1] != 0xCD.toByte()) { take(1); continue }
+            val len = head[2].toInt() and 0xFF
+            val frame = take(4 + len + 2 + 2) ?: return
+            val plain = com.allnetworktools.data.radio.UvK5Packet.xor(frame.copyOfRange(4, 4 + len + 2))
+            val payload = plain.copyOfRange(0, len)
+            val crc = (plain[len].toInt() and 0xFF) or ((plain[len + 1].toInt() and 0xFF) shl 8)
+            check(crc == com.allnetworktools.data.radio.UvK5Packet.crc(payload)) { "bad CRC" }
+            check(frame[frame.size - 2] == 0xDC.toByte() && frame[frame.size - 1] == 0xBA.toByte())
+            when (payload[0].toInt() and 0xFF) {
+                0x14 -> reply(byteArrayOf(0x15, 0x05, 0x24, 0x00) + firmware.toByteArray() + ByteArray(16))
+                0x1B -> {
+                    val off = (payload[4].toInt() and 0xFF) or ((payload[5].toInt() and 0xFF) shl 8)
+                    val n = payload[6].toInt() and 0xFF
+                    reply(byteArrayOf(0x1C, 0x05, (n + 4).toByte(), 0, off.toByte(), (off shr 8).toByte(), n.toByte(), 0) + memory.copyOfRange(off, off + n))
+                }
+                0x1D -> {
+                    val off = (payload[4].toInt() and 0xFF) or ((payload[5].toInt() and 0xFF) shl 8)
+                    val n = payload[6].toInt() and 0xFF
+                    check(n % 8 == 0 && off % 8 == 0) { "unaligned EEPROM write" }
+                    payload.copyInto(memory, off, 12, 12 + n)
+                    writes++
+                    reply(byteArrayOf(0x1E, 0x05, 0x02, 0x00, off.toByte(), (off shr 8).toByte()))
+                }
+                0xDD -> resets++
+            }
+        }
+    }
+}
+
+class UvK5ProtocolTest {
+    private fun memory(): ByteArray {
+        val m = ByteArray(0x2000) { 0xFF.toByte() }
+        // Calibration and settings that must never change.
+        for (i in 0x1D00 until 0x2000) m[i] = (i * 7).toByte()
+        // Memory 0: 145.500 MHz simplex, CTCSS 88.5 Hz on transmit, high power, named "APPEL".
+        val f = 14_550_000L
+        for (i in 0 until 4) m[i] = (f shr (8 * i)).toByte()
+        for (i in 4 until 8) m[i] = 0
+        m[8] = 0; m[9] = 8; m[10] = 0x10; m[11] = 0; m[12] = 0x08; m[13] = 0; m[14] = 4; m[15] = 0
+        "APPEL".toByteArray().copyInto(m, 0x0F50); for (i in 5 until 16) m[0x0F50 + i] = 0
+        m[0x0D60] = (0x80 or 2).toByte()
+        return m
+    }
+
+    @Test fun packetsAreObfuscatedLikeTheRadioExpects() {
+        // The hello packet as seen on the wire: payload XOR the first key bytes.
+        val wire = com.allnetworktools.data.radio.UvK5Packet.xor(byteArrayOf(0x14, 0x05, 0x04, 0x00, 0x6A, 0x39, 0x57, 0x64))
+        assertArrayEquals(byteArrayOf(0x02, 0x69, 0x10, 0xE6.toByte(), 0x44, 0xA8.toByte(), 0x5A, 0x24), wire)
+        assertEquals(0x31C3, com.allnetworktools.data.radio.UvK5Packet.crc("123456789".toByteArray()))
+    }
+
+    @Test fun readsEditsAndWritesBackOnlyTheChannels() {
+        val mem = memory()
+        val radio = SimUvK5(mem)
+        val spec = com.allnetworktools.data.radio.UvK5Spec()
+        val d = spec.download(radio) {}
+        assertTrue(d.known)
+        val ch = spec.decode(d.image, 0)!!
+        assertEquals(145_500_000L, ch.rxHz)
+        assertEquals(145_500_000L, ch.txHz)
+        assertEquals("APPEL", ch.name)
+        assertEquals(Tone.Ctcss(88.5), ch.txTone)
+        assertEquals(RadioPower.High, ch.power)
+        assertNull(spec.decode(d.image, 1))
+        val img = d.image.copyOf()
+        val listen = RadioChannel(1, 156_800_000L, null, "MARINE16")
+        val repeater = RadioChannel(2, 439_350_000L, 431_750_000L, "F1ZBV", Tone.Dcs(754, true), Tone.Ctcss(67.0), RadioPower.Low, wide = false)
+        spec.encode(img, listen); spec.encode(img, repeater)
+        assertNull(spec.decode(img, 1)!!.txHz)
+        assertEquals(repeater, spec.decode(img, 2))
+        val before = mem.copyOf()
+        spec.upload(radio, img, listOf(1, 2)) {}
+        assertEquals(1, radio.resets)
+        assertEquals(5, radio.writes) // 2 memories, 2 names, 1 shared attribute page
+        assertArrayEquals(before.copyOfRange(0x1D00, 0x2000), mem.copyOfRange(0x1D00, 0x2000))
+        assertEquals(repeater, spec.decode(mem, 2))
+        assertEquals("MARINE16", spec.decode(mem, 1)!!.name)
+    }
+
+    @Test fun unknownFirmwareIsReadOnly() {
+        val radio = SimUvK5(memory(), "zz_9.99")
+        val spec = com.allnetworktools.data.radio.UvK5Spec()
+        val d = spec.download(radio) {}
+        assertFalse(d.known)
+        try { spec.upload(radio, d.image, listOf(0)) {}; fail("must refuse") } catch (e: RadioException) { assertTrue(e.message!!.contains("refusée")) }
+    }
+}
