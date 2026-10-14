@@ -86,6 +86,7 @@ enum class Tool(
     Fm(Network.Sdr, "Radio FM", Sym.Radio),
     Ais(Network.Sdr, "Navires (AIS)", Sym.Boat),
     Aprs(Network.Sdr, "Radioamateurs (APRS)", Sym.Radio),
+    Acars(Network.Sdr, "Messages d'avions (ACARS)", Sym.Flight),
     Meteor(Network.Sdr, "Satellites météo (Meteor-M)", Sym.SatelliteAlt),
     Fpv(Network.Sdr, "Drones", Sym.Videocam),
 
