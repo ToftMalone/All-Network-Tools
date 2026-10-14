@@ -75,6 +75,7 @@ enum class Tool(
 
     CellDetail(Network.Cellular, "Cellule de service", Sym.CellTower, Sym.ContentCopy, implemented = true),
     Neighbors(Network.Cellular, "Cellules voisines", Sym.CellTower, implemented = true),
+    Handover(Network.Cellular, "Journal de handover", Sym.SwapCalls),
 
     Sky(Network.Gnss, "Ciel GNSS", Sym.SatelliteAlt, implemented = true),
     PositionCompare(Network.Gnss, "Comparer les positions", Sym.ShareLocation, Sym.Refresh),

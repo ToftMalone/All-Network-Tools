@@ -71,7 +71,13 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
         ToolGroup("Sécurité", listOf(ToolEntry(Tool.UnknownTrackers, "Traqueurs inconnus", "AirTag, SmartTag, Tile qui vous suivent"))),
     )
     Network.Cellular -> listOf(
-        ToolGroup("Cellules", listOf(ToolEntry(Tool.Neighbors, "Cellules voisines", "Cellules NR et LTE détectées par le modem"))),
+        ToolGroup(
+            "Cellules",
+            listOf(
+                ToolEntry(Tool.Neighbors, "Cellules voisines", "Cellules NR et LTE détectées par le modem"),
+                ToolEntry(Tool.Handover, "Journal de handover", "Changements de cellule en trajet, export CSV"),
+            ),
+        ),
     )
     Network.Gnss -> listOf(
         ToolGroup("Outils", listOf(ToolEntry(Tool.PositionCompare, "Comparer les positions", "GNSS, réseau et fusionnée"))),

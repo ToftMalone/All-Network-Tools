@@ -194,6 +194,10 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
             Tool.WifiScan -> WifiScanner(vm)
             Tool.BleScan -> BleScanner(vm)
             Tool.Neighbors -> NeighborCells(vm)
+            Tool.Handover -> {
+                val perms by vm.permissions.collectAsStateWithLifecycle()
+                com.allnetworktools.ui.pages.cell.HandoverTool(PermGroup.Notifications in perms)
+            }
             Tool.Sky -> SkyTool(vm)
             Tool.PositionCompare -> com.allnetworktools.ui.pages.gnss.PositionCompareTool(vm)
             Tool.Spectrum -> com.allnetworktools.ui.pages.sdr.SpectrumTool(vm)

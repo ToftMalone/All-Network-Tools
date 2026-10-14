@@ -22,6 +22,9 @@ enum class PermGroup(val permissions: List<String>) {
 
     /** Android 17 blocks the local network (LAN scan, ping, ports…) without it, and shows a device picker instead. */
     LocalNetwork(if (Build.VERSION.SDK_INT >= 37) listOf(Manifest.permission.ACCESS_LOCAL_NETWORK) else emptyList()),
+
+    /** The handover journal's notification, which also carries its stop button. */
+    Notifications(if (Build.VERSION.SDK_INT >= 33) listOf(Manifest.permission.POST_NOTIFICATIONS) else emptyList()),
 }
 
 data class PermissionSnapshot(val granted: Set<PermGroup>) {

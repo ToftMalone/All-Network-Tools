@@ -26,6 +26,10 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Handover journal: keeps watching the serving cell while the app is closed, until stopped. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
@@ -54,6 +58,11 @@
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/usb_devices" />
         </activity>
+
+        <service
+            android:name=".data.HandoverService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <receiver
             android:name=".update.InstallResultReceiver"

@@ -60,6 +60,7 @@ private val AllPermRows = listOf(
     PermRow(PermGroup.Nearby, Sym.BluetoothSearching, "Appareils à proximité", "Scan et connexion Bluetooth"),
     PermRow(PermGroup.Phone, Sym.SimCard, "Téléphone", "Opérateur, cellules, double SIM"),
     PermRow(PermGroup.LocalNetwork, Sym.Lan, "Réseau local", "Appareils du LAN, ping, scan de ports"),
+    PermRow(PermGroup.Notifications, Sym.Notifications, "Notifications", "Journal de handover en arrière-plan"),
 )
 
 private val Licenses = listOf(
