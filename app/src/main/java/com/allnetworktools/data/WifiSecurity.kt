@@ -89,14 +89,6 @@ object NetworkAudit {
     }
 
     fun score(list: List<SecCheck>): Int = (100 - 30 * list.count { it.level == CheckLevel.Bad } - 10 * list.count { it.level == CheckLevel.Warn }).coerceIn(0, 100)
-
-    fun grade(score: Int) = when {
-        score >= 90 -> "A"
-        score >= 75 -> "B"
-        score >= 60 -> "C"
-        score >= 40 -> "D"
-        else -> "E"
-    }
 }
 
 // ---- 2. Captive portal and DNS tampering -------------------------------------------------------

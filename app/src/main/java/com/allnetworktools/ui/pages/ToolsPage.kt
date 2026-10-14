@@ -45,7 +45,7 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     Network.Wifi -> listOf(
         ToolGroup("Analyse", listOf(ToolEntry(Tool.Speed, "Test de débit", "Ping, download, upload"))),
         ToolGroup("Réseau local", listOf(ToolEntry(Tool.Lan, "Appareils du LAN", "Découverte des hôtes"), ToolEntry(Tool.Ports, "Scan de ports", "TCP, ports courants"))),
-        ToolGroup("Découverte", listOf(ToolEntry(Tool.Upnp, "Scanner UPnP", "Box, TV, NAS, SSDP"), ToolEntry(Tool.Bonjour, "Scanner Bonjour", "Services mDNS / DNS-SD"), ToolEntry(Tool.WifiDirect, "Wi-Fi Direct", "Appareils en connexion directe"))),
+        ToolGroup("Découverte", listOf(ToolEntry(Tool.WifiDirect, "Wi-Fi Direct", "Appareils en connexion directe"))),
         ToolGroup(
             "Diagnostic",
             listOf(ToolEntry(Tool.Ping, "Ping", "Latence, gigue, pertes"), ToolEntry(Tool.Trace, "Traceroute", "Sauts jusqu'à l'hôte"), ToolEntry(Tool.Dns, "DNS Lookup", "A, AAAA, MX, TXT, NS"), ToolEntry(Tool.Whois, "Whois", "Domaine ou adresse IP")),

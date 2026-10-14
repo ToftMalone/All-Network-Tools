@@ -76,7 +76,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
-enum class PortPreset(val label: String, val sub: String) { Common("Courants", "Top 100"), Web("Web", "12 ports"), Custom("Personnalisé", "Plage") }
+enum class PortPreset(val label: String, val sub: String) { Common("Courants", "Top 100"), All("Tous", "0 – 65535"), Custom("Personnalisé", "Plage") }
 
 data class OpenPort(val port: Int, val service: String, val banner: String?, val warning: String?)
 
@@ -99,10 +99,10 @@ class PortsController(private val scope: CoroutineScope) {
 
     fun ports(): List<Int> = when (preset) {
         PortPreset.Common -> Services.Top100
-        PortPreset.Web -> Services.Web
+        PortPreset.All -> (0..65535).toList()
         PortPreset.Custom -> {
-            val a = from.toIntOrNull()?.coerceIn(1, 65535) ?: 1
-            val b = to.toIntOrNull()?.coerceIn(1, 65535) ?: a
+            val a = from.toIntOrNull()?.coerceIn(0, 65535) ?: 1
+            val b = to.toIntOrNull()?.coerceIn(0, 65535) ?: a
             (minOf(a, b)..maxOf(a, b)).toList()
         }
     }
@@ -122,7 +122,7 @@ class PortsController(private val scope: CoroutineScope) {
             }
             recent.push(host)
             var unreachable = 0
-            val sem = Semaphore(96)
+            val sem = Semaphore(if (list.size > 5000) 256 else 96)
             list.map { p ->
                 launch {
                     sem.withPermit {

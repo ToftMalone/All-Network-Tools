@@ -57,8 +57,6 @@ enum class Tool(
     Ports(Network.Wifi, "Scan de ports", Sym.Lan, Sym.IosShare),
     Dns(Network.Wifi, "DNS Lookup", Sym.Dns, Sym.History),
     Speed(Network.Wifi, "Test de débit", Sym.Speed, Sym.History),
-    Upnp(Network.Wifi, "Scanner UPnP", Sym.Router, Sym.Refresh),
-    Bonjour(Network.Wifi, "Scanner Bonjour", Sym.Cast, Sym.Refresh),
     Whois(Network.Wifi, "Whois", Sym.TravelExplore, Sym.IosShare),
     EvilTwin(Network.Wifi, "Faux points d'accès", Sym.WifiTetheringError, Sym.Refresh),
     Audit(Network.Wifi, "Audit du réseau", Sym.Shield, Sym.Refresh),

@@ -84,9 +84,13 @@ class Recents(vararg initial: String) {
 
 class PingController(private val scope: CoroutineScope) {
     var host by mutableStateOf("1.1.1.1")
+    /** Echoes to send; 0 means no limit, until stopped. */
     var count by mutableIntStateOf(10)
-    var interval by mutableFloatStateOf(0.5f)
-    var size by mutableIntStateOf(56)
+    val size = 56
+    private val intervalMs = 1000L
+
+    /** Only the last hour is kept when running without limit. */
+    private val keep = 3600
     var phase by mutableStateOf(Phase.Idle)
     var resolved by mutableStateOf<String?>(null)
     val results = mutableStateListOf<Float?>()
@@ -107,11 +111,14 @@ class PingController(private val scope: CoroutineScope) {
             }
             recent.push(host)
             resolved = Net.reverse(addr).takeIf { it != host } ?: addr.hostAddress
-            val total = count
-            for (i in 0 until total) {
+            var sent = 0
+            while (count == 0 || sent < count) {
                 val t0 = System.currentTimeMillis()
                 results += Net.ping(addr, size, 2).rttMs
-                delay(((interval * 1000).toLong() - (System.currentTimeMillis() - t0)).coerceAtLeast(0))
+                if (results.size > keep) results.removeAt(0)
+                sent++
+                if (count != 0 && sent >= count) break
+                delay((intervalMs - (System.currentTimeMillis() - t0)).coerceAtLeast(0))
             }
             phase = if (results.all { it == null }) Phase.Empty else Phase.Results
         }
@@ -150,14 +157,8 @@ fun PingTool(c: PingController, prefill: String?) {
         if (c.phase.form) {
             HostInputField(c.host, { c.host = it }, "Hôte ou adresse IP", recent = c.recent.items, onDone = start)
             ParamCard {
-                ParamRow("Paquets", "Nombre d'échos envoyés", first = true) {
-                    Stepper(c.count, { c.count = (c.count - 5).coerceAtLeast(1) }, { c.count = if (c.count == 1) 5 else (c.count + 5).coerceAtMost(100) })
-                }
-                ParamRow("Intervalle") {
-                    SegmentedRow(listOf(0.2f to "0,2 s", 0.5f to "0,5 s", 1f to "1 s"), c.interval, { c.interval = it }, Modifier.width(200.dp), height = 36.dp)
-                }
-                ParamRow("Taille") {
-                    SegmentedRow(listOf(56 to "56", 512 to "512", 1472 to "1 472"), c.size, { c.size = it }, Modifier.width(200.dp), height = 36.dp)
+                ParamRow("Paquets", "0 = illimité, un par seconde", first = true) {
+                    Stepper(c.count, { c.count = (c.count - 5).coerceAtLeast(0) }, { c.count = (c.count + 5).coerceAtMost(100) })
                 }
             }
             StartButton("Lancer le ping", enabled = c.host.isNotBlank(), onClick = start)
@@ -176,7 +177,7 @@ fun PingTool(c: PingController, prefill: String?) {
                         Text(c.resolved ?: "Résolution…", style = rf(13, 18), maxLines = 1)
                     }
                     when (c.phase) {
-                        Phase.Running -> HeroChip("$n / ${c.count}", AntTheme.accent.accent, blink = true)
+                        Phase.Running -> HeroChip(if (c.count == 0) "$n" else "$n / ${c.count}", AntTheme.accent.accent, blink = true)
                         Phase.Empty -> HeroChip("100 % perdus", cs.error)
                         else -> HeroChip(quality.first, quality.second)
                     }
@@ -193,7 +194,7 @@ fun PingTool(c: PingController, prefill: String?) {
                 Text(
                     when (c.phase) {
                         Phase.Running -> "Dernière réponse"
-                        Phase.Empty -> "0 réponse sur ${c.count}"
+                        Phase.Empty -> "0 réponse sur $n"
                         else -> "Moyenne sur ${c.ok.size} réponses · ${c.size} octets"
                     },
                     style = rf(13, 18),
@@ -212,7 +213,7 @@ fun PingTool(c: PingController, prefill: String?) {
         if (c.phase.active) {
             SectionCard {
                 CardHeader("Latence par paquet") { Legend(listOf("RTT" to AntTheme.accent.accent, "Perdu" to cs.error)) }
-                LatencyBarChart(c.results, maxOf(c.count, 10), c.avg, running = c.phase == Phase.Running, modifier = Modifier.padding(top = 14.dp))
+                LatencyBarChart(if (c.count == 0) c.results.takeLast(30) else c.results, if (c.count == 0) 30 else maxOf(c.count, 10), c.avg, running = c.phase == Phase.Running, modifier = Modifier.padding(top = 14.dp))
             }
             TileGrid(
                 listOf(

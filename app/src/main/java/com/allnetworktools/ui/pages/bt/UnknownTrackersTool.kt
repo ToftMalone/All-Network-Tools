@@ -2,6 +2,9 @@ package com.allnetworktools.ui.pages.bt
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import com.allnetworktools.ui.components.AntFilterChip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -120,6 +123,9 @@ class UnknownTrackersController(private val context: android.content.Context?, p
     }
 
     val candidates = mutableStateMapOf<String, TrackerCandidate>()
+
+    /** Kind of device the list is limited to, or null for all of them. */
+    var kindFilter by mutableStateOf<TrackerKind?>(null)
     var sessionStart by mutableStateOf(System.currentTimeMillis())
         private set
     var travelledM by mutableStateOf(0.0)
@@ -283,10 +289,28 @@ fun UnknownTrackersTool(
                 null,
             )
         }
-        // Just the tags: name and status. Everything else is one tap away.
+        // Filter by type of device: only the kinds heard so far, with how many of each.
+        val counts = list.groupingBy { it.kind }.eachCount()
+        val kinds = TrackerKind.entries.filter { it in counts }
+        val filter = c.kindFilter
         if (list.isNotEmpty()) {
+            val roles = AntTheme.accent
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AntFilterChip("Tous", filter == null, { c.kindFilter = null }, roles.container, roles.onContainer, trailing = list.size.toString())
+                kinds.forEach { k ->
+                    AntFilterChip(k.label, filter == k, { c.kindFilter = k }, roles.container, roles.onContainer, trailing = counts[k].toString())
+                }
+                if (filter != null && filter !in kinds) AntFilterChip(filter.label, true, { c.kindFilter = null }, roles.container, roles.onContainer, trailing = "0")
+            }
+        }
+        val shown = if (filter == null) list else list.filter { it.kind == filter }
+        // Just the tags: name and status. Everything else is one tap away.
+        if (list.isNotEmpty() && shown.isEmpty()) {
+            SectionCard { Text("Aucun appareil de ce type pour l'instant.", style = rf(14, 20), color = cs.onSurfaceVariant) }
+        }
+        if (shown.isNotEmpty()) {
             SectionCard(padding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)) {
-                list.forEachIndexed { i, t ->
+                shown.forEachIndexed { i, t ->
                     if (i > 0) com.allnetworktools.ui.components.Hairline()
                     TrackerRow(t) { onOpen(t.address) }
                 }

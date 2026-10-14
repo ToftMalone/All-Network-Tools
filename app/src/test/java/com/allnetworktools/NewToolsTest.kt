@@ -248,7 +248,7 @@ class NewToolsTest {
         assertTrue(s < 40)
         val wpa3 = conn.copy(security = "WPA3-Personnel (SAE)")
         val good = com.allnetworktools.data.NetworkAudit.checks(wpa3, "[RSN-SAE-CCMP][MFPR][ESS]", cleanLink.copy(privateDns = true), setOf(443))
-        assertEquals("A", com.allnetworktools.data.NetworkAudit.grade(com.allnetworktools.data.NetworkAudit.score(good)))
+        assertEquals(100, com.allnetworktools.data.NetworkAudit.score(good))
     }
 
     @Test fun flagsAnIntermediaryOnThePath() {

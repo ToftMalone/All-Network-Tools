@@ -273,31 +273,6 @@ class ScreenshotTest {
         vm.tools.bleFilter.include = setOf(com.allnetworktools.data.BleVendor.Google)
         vm.tools.bleFilter.sheetOpen = true
     }
-    @Test fun upnp() = shot("B2_upnp", nav = tool(Tool.Upnp)) { vm ->
-        val c = vm.tools.upnp
-        c.devices.addAll(
-            listOf(
-                com.allnetworktools.data.net.UpnpDevice("192.168.1.254", "http://192.168.1.254:5678/desc.xml", "Linux/4.19 UPnP/1.0", "Freebox Server", "Free", "Freebox v7", "urn:schemas-upnp-org:device:InternetGatewayDevice:2", listOf("Layer3Forwarding", "WANIPConnection"), "http://192.168.1.254/"),
-                com.allnetworktools.data.net.UpnpDevice("192.168.1.20", "http://192.168.1.20:1500/", "WebOS/4.0 UPnP/1.0", "[LG] webOS TV OLED55C1", "LG Electronics", "OLED55C1", "urn:schemas-upnp-org:device:MediaRenderer:1", listOf("AVTransport", "RenderingControl", "ConnectionManager")),
-                com.allnetworktools.data.net.UpnpDevice("192.168.1.30", "http://192.168.1.30:5000/ssdp/desc-DSM-eth0.xml", "Synology/DSM UPnP/1.0", "NAS-Maison (DS220+)", "Synology", "DS220+", "urn:schemas-upnp-org:device:Basic:1"),
-            ),
-        )
-        c.expanded["http://192.168.1.254:5678/desc.xml"] = true
-        c.phase = com.allnetworktools.ui.tools.Phase.Results
-    }
-    @Test fun bonjour() = shot("B3_bonjour", nav = tool(Tool.Bonjour)) { vm ->
-        val c = vm.tools.bonjour
-        c.services.addAll(
-            listOf(
-                com.allnetworktools.data.net.BonjourService("_googlecast._tcp", "Chromecast Salon", "192.168.1.23", 8009, mapOf("md" to "Chromecast", "fn" to "Salon")),
-                com.allnetworktools.data.net.BonjourService("_googlecast._tcp", "Nest Mini Cuisine", "192.168.1.41", 8009, mapOf("md" to "Google Nest Mini")),
-                com.allnetworktools.data.net.BonjourService("_ipp._tcp", "HP LaserJet M110w", "192.168.1.60", 631, mapOf("ty" to "HP LaserJet M110w")),
-                com.allnetworktools.data.net.BonjourService("_airplay._tcp", "MacBook Air de Léa", "192.168.1.12", 7000, mapOf("model" to "Mac14,2")),
-                com.allnetworktools.data.net.BonjourService("_hap._tcp", "Hue Bridge", "192.168.1.70", 8080, emptyMap()),
-            ),
-        )
-        c.phase = com.allnetworktools.ui.tools.Phase.Results
-    }
     @Test fun whois() = shot("B4_whois", nav = tool(Tool.Whois)) { vm ->
         val c = vm.tools.whois
         c.query = "google.com"

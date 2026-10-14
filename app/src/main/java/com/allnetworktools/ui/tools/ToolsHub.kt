@@ -24,8 +24,6 @@ class ToolsHub(private val app: AntApplication, private val scope: CoroutineScop
     val ports by lazy { PortsController(scope) }
     val dns by lazy { DnsController(scope) }
     val speed by lazy { SpeedController(scope, app.history) }
-    val upnp by lazy { com.allnetworktools.ui.pages.wifi.UpnpController(app, scope) }
-    val bonjour by lazy { com.allnetworktools.ui.pages.wifi.BonjourController(app, scope) }
     val whois by lazy { com.allnetworktools.ui.pages.wifi.WhoisController(scope) }
     val bleFilter = com.allnetworktools.ui.pages.bt.BleFilterState()
     val gatt by lazy { GattController(app, scope, app.bluetooth.identities) }

@@ -1,7 +1,5 @@
 package com.allnetworktools
 
-import com.allnetworktools.data.net.Upnp
-import com.allnetworktools.data.net.UpnpDevice
 import com.allnetworktools.data.net.Whois
 import com.allnetworktools.data.net.WhoisHop
 import com.allnetworktools.data.net.WhoisResult
@@ -12,22 +10,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DiscoveryLogicTest {
-    @Test fun parsesUpnpDescription() {
-        val xml = """<?xml version="1.0"?><root xmlns="urn:schemas-upnp-org:device-1-0"><URLBase>http://192.168.1.254:5678/</URLBase>
-            <device><deviceType>urn:schemas-upnp-org:device:InternetGatewayDevice:2</deviceType><friendlyName>Freebox Server</friendlyName>
-            <manufacturer>Free &amp; Co</manufacturer><modelName>Freebox</modelName><modelNumber>v7</modelNumber>
-            <serviceList><service><serviceType>urn:schemas-upnp-org:service:Layer3Forwarding:1</serviceType></service></serviceList>
-            <deviceList><device><serviceList><service><serviceType>urn:schemas-upnp-org:service:WANIPConnection:2</serviceType></service></serviceList></device></deviceList>
-            <presentationURL>/admin</presentationURL></device></root>"""
-        val d = Upnp.describe(UpnpDevice("192.168.1.254", "http://192.168.1.254:5678/desc.xml", "Linux UPnP/1.0"), xml)
-        assertEquals("Freebox Server", d.name)
-        assertEquals("Free & Co", d.manufacturer)
-        assertEquals("Freebox v7", d.model)
-        assertEquals("InternetGatewayDevice", d.typeShort)
-        assertEquals(listOf("Layer3Forwarding", "WANIPConnection"), d.services)
-        assertEquals("http://192.168.1.254:5678/admin", d.presentationUrl)
-    }
-
     @Test fun parsesDomainWhois() {
         val verisign = """   Domain Name: GOOGLE.COM
    Registrar WHOIS Server: whois.markmonitor.com

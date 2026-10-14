@@ -96,7 +96,7 @@ private val IxHints = listOf("franceix", "ix.", "-ix", "decix", "de-cix", "ams-i
 
 class TraceController(private val scope: CoroutineScope) {
     var host by mutableStateOf("one.one.one.one")
-    var maxHops by mutableIntStateOf(30)
+    val maxHops = 30
     var phase by mutableStateOf(Phase.Idle)
     var target by mutableStateOf<String?>(null)
     var probingTtl by mutableIntStateOf(0)
@@ -179,10 +179,7 @@ fun TraceTool(c: TraceController) {
         if (c.phase.form) {
             HostInputField(c.host, { c.host = it }, "Destination", recent = c.recent.items, onDone = start)
             ParamCard {
-                ParamRow("Sauts max.", first = true) {
-                    SegmentedRow(listOf(15 to "15", 30 to "30", 64 to "64"), c.maxHops, { c.maxHops = it }, Modifier.width(200.dp), height = 36.dp)
-                }
-                ParamRow("Protocole", "ICMP · sans privilège root") {}
+                ParamRow("Protocole", "ICMP · sans privilège root", first = true) {}
             }
             StartButton("Lancer le traceroute", Sym.Route, enabled = c.host.isNotBlank(), onClick = start)
         }

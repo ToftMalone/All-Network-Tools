@@ -220,7 +220,7 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
                 vm.navigate { it.copy(page = Page.ToolPage(Tool.Neighbors)) }
             }
             Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed,
-            Tool.Upnp, Tool.Bonjour, Tool.Whois, Tool.EvilTwin, Tool.Audit, Tool.PortalDns, Tool.Mitm -> WifiToolRoute(vm, page)
+            Tool.Whois, Tool.EvilTwin, Tool.Audit, Tool.PortalDns, Tool.Mitm -> WifiToolRoute(vm, page)
             else -> ComingSoon(page.tool)
         }
         else -> Unit
@@ -248,8 +248,6 @@ private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
         Tool.Trace -> TraceTool(tools.trace)
         Tool.Ports -> PortsTool(tools.ports, page.arg, conn?.gateway)
         Tool.Dns -> DnsTool(tools.dns, conn?.dns?.firstOrNull { '.' in it })
-        Tool.Upnp -> com.allnetworktools.ui.pages.wifi.UpnpTool(tools.upnp)
-        Tool.Bonjour -> com.allnetworktools.ui.pages.wifi.BonjourTool(tools.bonjour)
         Tool.Whois -> com.allnetworktools.ui.pages.wifi.WhoisTool(tools.whois)
         Tool.Audit -> com.allnetworktools.ui.pages.wifi.AuditTool(tools.audit, conn, vm.wifiScan.collectAsStateWithLifecycle().value)
         Tool.PortalDns -> {

@@ -59,7 +59,7 @@ private val AllPermRows = listOf(
     PermRow(PermGroup.Location, Sym.LocationOn, "Position précise", "Wi-Fi (SSID, scans), cellules et GNSS"),
     PermRow(PermGroup.Nearby, Sym.BluetoothSearching, "Appareils à proximité", "Scan et connexion Bluetooth"),
     PermRow(PermGroup.Phone, Sym.SimCard, "Téléphone", "Opérateur, cellules, double SIM"),
-    PermRow(PermGroup.LocalNetwork, Sym.Lan, "Réseau local", "Appareils du LAN, UPnP, Bonjour, ping"),
+    PermRow(PermGroup.LocalNetwork, Sym.Lan, "Réseau local", "Appareils du LAN, ping, scan de ports"),
 )
 
 private val Licenses = listOf(

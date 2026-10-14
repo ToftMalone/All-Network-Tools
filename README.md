@@ -28,8 +28,8 @@ L'écran d'accueil propose six réseaux. Chacun a son tableau de bord, son outil
 | --- | --- |
 | Scanner Wi-Fi | Réseaux alentour, canaux, occupation |
 | Appareils du LAN | Découvrir les appareils du réseau |
-| Ping, Traceroute, Scan de ports, DNS, Test de débit | Les classiques du diagnostic réseau |
-| Scanner UPnP, Scanner Bonjour, Whois | Services annoncés sur le réseau |
+| Ping (illimité si 0 paquet), Traceroute, Scan de ports (courants ou 0 – 65535), DNS, Test de débit | Les classiques du diagnostic réseau |
+| Whois | Propriétaire d'un domaine ou d'une adresse IP |
 | Wi-Fi Direct | Appareils Wi-Fi Direct à proximité |
 | Audit du réseau | Chiffrement, WPS, PMF, box |
 | Faux points d'accès | SSID dupliqués, « evil twin » |
@@ -86,7 +86,7 @@ Les avions, ballons-sondes, navires et balises APRS s'exportent en **CSV** ; les
 | Position précise | Scans Wi-Fi, cellules, GNSS (imposée par Android) |
 | Appareils à proximité | Scan et connexion Bluetooth |
 | Téléphone | Opérateur, cellules, double SIM |
-| Réseau local (Android 17) | Scan du LAN, UPnP, Bonjour, ping |
+| Réseau local (Android 17) | Scan du LAN, ping, scan de ports |
 | Installer des applications | Mise à jour intégrée |
 
 Aucun compte, aucune publicité, aucun traceur. Les données restent sur le téléphone ; Internet n'est utilisé que pour les mises à jour, les éléments de satellites (CelesTrak) et les données d'antennes.
