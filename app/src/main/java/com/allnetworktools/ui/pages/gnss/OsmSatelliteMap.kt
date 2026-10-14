@@ -163,7 +163,8 @@ fun OsmSatelliteMap(
             setMultiTouchControls(true)
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             isTilesScaledToDpi = true
-            minZoomLevel = 1.0
+            // Low enough to see the whole world at once, even on a tall full-screen view.
+            minZoomLevel = 0.0
             maxZoomLevel = 12.0
             isVerticalMapRepetitionEnabled = false
             setScrollableAreaLimitLatitude(MapView.getTileSystem().maxLatitude, MapView.getTileSystem().minLatitude, 0)
@@ -208,7 +209,7 @@ fun OsmSatelliteMap(
             IconCircleButton(Sym.Add, { map.controller.zoomIn() }, size = 36.dp, bg = bg, tint = cs.onSurface)
             IconCircleButton(Sym.Remove, { map.controller.zoomOut() }, size = 36.dp, bg = bg, tint = cs.onSurface)
             IconCircleButton(Sym.MyLocation, { map.controller.animateTo(here, 5.0, 600L) }, size = 36.dp, bg = bg, tint = acc)
-            IconCircleButton(Sym.Public, { map.controller.animateTo(GeoPoint(here.latitude.coerceIn(-50.0, 50.0), here.longitude), 1.6, 600L) }, size = 36.dp, bg = bg, tint = cs.onSurface)
+            IconCircleButton(Sym.Public, { map.controller.animateTo(GeoPoint(here.latitude.coerceIn(-50.0, 50.0), here.longitude), 0.5, 600L) }, size = 36.dp, bg = bg, tint = cs.onSurface)
         }
         Text(
             "© les contributeurs d'OpenStreetMap",

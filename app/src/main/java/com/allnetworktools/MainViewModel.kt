@@ -40,7 +40,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Why a network card or page is unavailable. */
-enum class Blocker { NoHardware, WifiOff, BluetoothOff, NearbyPermission, Airplane, PhonePermission, NoSim, LocationPermission, LocationOff, SdrMissing, CableMissing }
+enum class Blocker {
+    NoHardware, WifiOff, BluetoothOff, NearbyPermission, Airplane, PhonePermission, NoSim, LocationPermission, LocationOff, SdrMissing, CableMissing;
+
+    /** Missing USB hardware: the network can still be browsed, only its tools refuse to start. */
+    val soft: Boolean get() = this == SdrMissing || this == CableMissing
+}
 
 sealed interface Page {
     data object Home : Page

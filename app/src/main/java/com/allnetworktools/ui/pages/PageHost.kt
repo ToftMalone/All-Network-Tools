@@ -167,7 +167,8 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
     }
     val blocker = vm.blockers.collectAsStateWithLifecycle().value[net]
     val internetTool = page is Page.ToolPage && page.tool in InternetTools
-    if (blocker != null && !internetTool) {
+    // Without a HackRF or a cable the dashboard and the tool list stay open; only the tools themselves are blocked.
+    if (blocker != null && !internetTool && (!blocker.soft || page is Page.ToolPage)) {
         BlockedPage(net, blocker)
         return
     }

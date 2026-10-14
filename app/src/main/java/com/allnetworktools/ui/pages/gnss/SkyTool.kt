@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -87,10 +89,19 @@ fun SkyTool(vm: MainViewModel) {
         val (lat, lon) = SatGeo.subPoint(observer.first, observer.second, s)
         SatOverhead(s, lat, lon, WorldMap.countryAt(countries, lat, lon) ?: WorldMap.oceanAt(lat, lon))
     }
-    var fullMap by remember { mutableStateOf(false) }
+    // The world map opens full screen; leaving it goes back to the classic sky.
+    var fullMap by remember { mutableStateOf(view == SkyView.Map) }
     var fullSky by remember { mutableStateOf(false) }
-    if (fullMap && observer != null) {
-        com.allnetworktools.ui.components.FullscreenDialog({ fullMap = false }) { OsmSatelliteMap(observer, overhead, Modifier.fillMaxSize()) }
+    val backToSky = { fullMap = false; view = SkyView.Sky }
+    if (fullMap && observer != null && g.visible.isNotEmpty()) {
+        com.allnetworktools.ui.components.FullscreenDialog(backToSky) {
+            OsmSatelliteMap(observer, overhead, Modifier.fillMaxSize())
+            com.allnetworktools.ui.components.PillButton(
+                "Ciel classique", backToSky,
+                Modifier.align(Alignment.BottomCenter).windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing).padding(bottom = 32.dp),
+                icon = Sym.Radar, height = 48.dp,
+            )
+        }
     }
     if (fullSky) {
         com.allnetworktools.ui.components.FullscreenDialog({ fullSky = false }) {
@@ -110,7 +121,7 @@ fun SkyTool(vm: MainViewModel) {
             }
             Text("satellites utilisés / visibles · ${g.constellationCount} constellations", style = rf(13, 18))
         }
-        SegmentedRow(SkyView.entries.map { it to it.label }, view, { view = it }, Modifier.fillMaxWidth(), icons = mapOf(SkyView.Sky to Sym.Radar, SkyView.Map to Sym.Public))
+        SegmentedRow(SkyView.entries.map { it to it.label }, view, { view = it; fullMap = it == SkyView.Map }, Modifier.fillMaxWidth(), icons = mapOf(SkyView.Sky to Sym.Radar, SkyView.Map to Sym.Public))
         if (g.visible.isEmpty()) {
             EmptyStateCard(Sym.SatelliteAlt, "Recherche de satellites…", "Placez-vous à l'extérieur, ciel dégagé. Les premiers satellites apparaissent en quelques secondes.")
             return@PageColumn

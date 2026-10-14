@@ -121,9 +121,6 @@ fun HomeScreen(
     onDeselect: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    val active = Network.entries.count { data.blockers[it] == null }
-    val total = Network.entries.size
-    val needed = total - active
     Box(
         Modifier
             .fillMaxSize()
@@ -135,11 +132,7 @@ fun HomeScreen(
                 Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 12.dp), verticalAlignment = Alignment.Top) {
                     Column(Modifier.weight(1f)) {
                         Text("All Radio Tools", style = gs(32, 40, 500, -0.3f), color = cs.onSurface, maxLines = 1)
-                        Text(
-                            if (needed == 0) "$total réseaux disponibles"
-                            else "$active sur $total disponibles · $needed ${plural(needed, "action requise", "actions requises")}",
-                            Modifier.padding(top = 4.dp), style = rf(14, 20), color = cs.onSurfaceVariant,
-                        )
+                        Text(Greetings.ofThisLaunch, Modifier.padding(top = 4.dp), style = rf(14, 20), color = cs.onSurfaceVariant)
                     }
                     IconCircleButton(
                         Sym.Settings, onSettings,
@@ -193,7 +186,7 @@ private fun NetworkCard(
     modifier: Modifier,
 ) {
     val roles = AntTheme.net[network]
-    val blocker = data.blockers[network]
+    val blocker = data.blockers[network]?.takeUnless { it.soft }
     val scale by animateFloatAsState(if (selected) 1.03f else if (dimmed) 0.96f else 1f, Motion.standard(), label = "cardScale")
     val alpha by animateFloatAsState(if (dimmed) 0.5f else 1f, tween(250, easing = Motion.Emphasized), label = "cardAlpha")
     val outline by animateColorAsState(if (selected) roles.accent else Color.Transparent, tween(200, easing = Motion.Emphasized), label = "outline")
@@ -317,4 +310,42 @@ private fun BlockedCardContent(network: Network, blocker: Blocker, onAction: (Bl
             }
         }
     }
+}
+
+/** A welcome line or a network joke, drawn once per launch of the app. */
+object Greetings {
+    private val all = listOf(
+        "Bienvenue ! Les ondes vous attendent.",
+        "Content de vous revoir, les antennes sont prêtes.",
+        "Bonjour ! Quelle fréquence on explore aujourd'hui ?",
+        "Prêt à écouter le monde invisible ?",
+        "Les satellites vous saluent depuis l'orbite.",
+        "Le Wi-Fi, c'est comme l'amour : ça passe mieux sans murs.",
+        "Pourquoi le routeur est-il zen ? Il a trouvé sa passerelle.",
+        "Mon Wi-Fi s'appelle « Virus » : personne ne s'y connecte.",
+        "Un paquet UDP entre dans un bar. Le barman ne le voit jamais.",
+        "Je connais une blague sur TCP. Je la répète jusqu'à ce que vous l'ayez reçue.",
+        "Il y a 10 sortes de gens : ceux qui comptent en binaire, et les autres.",
+        "Le Bluetooth, c'est l'art de s'appairer sans se parler.",
+        "Ping ? Pong. Tout va bien.",
+        "Pas de 5G dans la cave ? Normal, elle a le trac.",
+        "Les ballons-sondes montent à 30 km. Votre moral aussi, j'espère.",
+        "Une antenne a épousé une parabole : la cérémonie était nulle, la réception excellente.",
+        "127.0.0.1 : rien ne vaut la maison.",
+        "Le DNS, c'est toujours lui. Même quand ce n'est pas lui.",
+        "Votre box clignote ? Elle vous fait un clin d'œil.",
+        "Un AirTag perdu ? Il n'est jamais vraiment seul.",
+        "Le GPS ne se perd jamais. Il recalcule.",
+        "Les avions crient leur position sur 1090 MHz. Écoutons-les.",
+        "Le talkie-walkie : le premier réseau social. À tour de rôle.",
+        "Over. Terminé. À vous les studios.",
+        "Ondes courtes, idées longues.",
+        "Le ciel n'a jamais été aussi bavard.",
+        "Mieux vaut un bon dBm qu'un long câble.",
+        "Le Wi-Fi ne traverse pas les murs. Il les contourne avec élégance.",
+        "Aujourd'hui, une constellation de bonnes nouvelles.",
+        "Silence radio ? Pas ici.",
+    )
+
+    val ofThisLaunch: String = all.random()
 }
