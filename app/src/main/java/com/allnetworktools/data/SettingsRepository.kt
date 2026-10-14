@@ -31,7 +31,6 @@ data class AppSettings(
     val askedPermissions: Set<String> = emptySet(),
     /** Monthly mobile data allowance in GB, 0 when not set. */
     /** Look for a newer release on GitHub at launch and install it. */
-    val autoUpdate: Boolean = true,
 ) {
     val refreshMillis: Long get() = (refreshSeconds * 1000).toLong()
 }
@@ -47,7 +46,6 @@ class SettingsRepository(private val context: Context) {
         val awake = booleanPreferencesKey("keep_awake")
         val onboarding = booleanPreferencesKey("onboarding_done")
         val asked = stringSetPreferencesKey("asked_permissions")
-        val autoUpdate = booleanPreferencesKey("auto_update")
     }
 
     val settings: Flow<AppSettings> = context.store.data.map { p ->
@@ -60,7 +58,6 @@ class SettingsRepository(private val context: Context) {
             keepAwake = p[K.awake] ?: d.keepAwake,
             onboardingDone = p[K.onboarding] ?: d.onboardingDone,
             askedPermissions = p[K.asked] ?: d.askedPermissions,
-            autoUpdate = p[K.autoUpdate] ?: d.autoUpdate,
         )
     }
 
@@ -70,6 +67,5 @@ class SettingsRepository(private val context: Context) {
     suspend fun setHaptics(v: Boolean) = context.store.edit { it[K.haptics] = v }
     suspend fun setKeepAwake(v: Boolean) = context.store.edit { it[K.awake] = v }
     suspend fun setOnboardingDone(done: Boolean = true) = context.store.edit { it[K.onboarding] = done }
-    suspend fun setAutoUpdate(v: Boolean) = context.store.edit { it[K.autoUpdate] = v }
     suspend fun markAsked(group: String) = context.store.edit { it[K.asked] = (it[K.asked] ?: emptySet()) + group }
 }

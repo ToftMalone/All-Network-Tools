@@ -203,9 +203,11 @@ private fun MainShell(vm: MainViewModel) {
             val b = back.value
             val density = LocalDensity.current
             val cornerPx = with(density) { (if (isSettings) 24.dp else 28.dp).toPx() }
-            val rect = lerpRect(origin, full, p)
-            val radius = maxOf(cornerPx * (1f - p), with(density) { 28.dp.toPx() } * b)
-            val startBg = if (isSettings) cs.surfaceContainerHigh else AntTheme.net[net].container
+            // A network card grows into its page; the settings slide in from the right instead of swelling out of the
+            // small gear button, which stretched the whole screen out of a 44 dp circle.
+            val rect = if (isSettings) full else lerpRect(origin, full, p)
+            val radius = if (isSettings) with(density) { 28.dp.toPx() } * b else maxOf(cornerPx * (1f - p), with(density) { 28.dp.toPx() } * b)
+            val startBg = if (isSettings) cs.surface else AntTheme.net[net].container
             ProvideAccent(net) {
                 Box(
                     Modifier
@@ -213,6 +215,10 @@ private fun MainShell(vm: MainViewModel) {
                         .graphicsLayer {
                             val sc = 1f - 0.1f * b
                             scaleX = sc; scaleY = sc
+                            if (isSettings) {
+                                translationX = (1f - p) * size.width * 0.25f
+                                alpha = p
+                            }
                             clip = true
                             shape = RoundRectShape(rect, radius)
                         }

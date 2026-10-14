@@ -73,6 +73,10 @@ open class AppUpdater(
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     open val state: StateFlow<UpdateState> = _state.asStateFlow()
 
+    /** Newer release found by the last check, kept after « Plus tard » so the settings can still offer it. */
+    private val _latest = MutableStateFlow<UpdateInfo?>(null)
+    open val latest: StateFlow<UpdateInfo?> = _latest.asStateFlow()
+
     val lastCheckMs: Long get() = prefs.getLong("last_check", 0L)
 
     /** Parses the JSON of "releases/latest"; null when it has no APK asset or is not newer. */
@@ -141,6 +145,7 @@ open class AppUpdater(
             return
         }
         prefs.edit().putLong("last_check", System.currentTimeMillis()).apply()
+        _latest.value = info
         if (info == null) {
             _state.value = UpdateState.UpToDate(System.currentTimeMillis())
         } else {
@@ -264,8 +269,15 @@ open class AppUpdater(
         if (_state.value is UpdateState.Available) _state.value = UpdateState.Idle
     }
 
+    /** Shows again the proposal for the release found at launch. */
+    fun reoffer() {
+        val info = _latest.value ?: return
+        val s = _state.value
+        if (s !is UpdateState.Downloading && s !is UpdateState.Installing) _state.value = UpdateState.Available(info)
+    }
+
     /** Test hook: shows the proposal for [info]. */
-    internal fun offerForTest(info: UpdateInfo) { _state.value = UpdateState.Available(info) }
+    internal fun offerForTest(info: UpdateInfo) { _latest.value = info; _state.value = UpdateState.Available(info) }
 
     fun dismiss() {
         if (_state.value is UpdateState.Failed || _state.value is UpdateState.UpToDate) _state.value = UpdateState.Idle

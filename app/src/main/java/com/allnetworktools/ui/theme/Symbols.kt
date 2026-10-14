@@ -157,6 +157,8 @@ object Sym {
     const val Tv = "tv"
     const val UnfoldLess = "unfold_less"
     const val Update = "update"
+    const val SystemUpdate = "system_update"
+    const val NewReleases = "new_releases"
     const val Upload = "upload"
     const val Vibration = "vibration"
     const val Videocam = "videocam"

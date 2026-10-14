@@ -117,35 +117,26 @@ fun SettingsScreen(vm: MainViewModel) {
                     )
                 }
             }
-            Section("Mises à jour") {
+            Section("Application") {
                 val us by vm.updater.state.collectAsStateWithLifecycle()
+                val latest by vm.updater.latest.collectAsStateWithLifecycle()
+                // Checked at every launch: this only says what was found.
                 Item(
-                    0, 3, Sym.Update, "Rechercher au lancement", "Vérifie GitHub et propose la nouvelle version avec ses nouveautés",
-                    trailing = { AntSwitch(s.autoUpdate) }, onClick = { vm.updateSettings { setAutoUpdate(!s.autoUpdate) } },
-                )
-                Item(
-                    1, 3, Sym.Refresh, "Rechercher maintenant",
+                    0, 3, Sym.SystemUpdate, "Mise à jour",
                     when (val u = us) {
-                        is com.allnetworktools.update.UpdateState.Checking -> "Vérification…"
-                        is com.allnetworktools.update.UpdateState.UpToDate -> "Vous avez la dernière version (${BuildConfig.VERSION_NAME})"
-                        is com.allnetworktools.update.UpdateState.Available -> "Version ${u.info.version} disponible"
                         is com.allnetworktools.update.UpdateState.Downloading -> "Téléchargement de la version ${u.info.version}…"
-                        is com.allnetworktools.update.UpdateState.Failed -> u.message
-                        else -> "Version installée : ${BuildConfig.VERSION_NAME}"
+                        is com.allnetworktools.update.UpdateState.Installing -> "Installation…"
+                        else -> latest?.let { "Version ${it.version} disponible" } ?: "Version installée : ${BuildConfig.VERSION_NAME}"
                     },
-                    trailing = { LinkIcon(Sym.ChevronRight) },
-                    onClick = { scope.launch { vm.updater.check(autoInstall = false, force = true) } },
+                    trailing = latest?.let { { LinkIcon(Sym.ChevronRight) } },
+                    onClick = latest?.let { { vm.updater.reoffer() } },
                 )
                 Item(
-                    2, 3, Sym.NewspaperNotes, "Journal des nouveautés", "Les notes de chaque version, publiées sur GitHub",
+                    1, 3, Sym.NewReleases, "Journal des nouveautés",
                     trailing = { LinkIcon(Sym.ChevronRight) },
                     onClick = { vm.navigate { it.copy(network = null, page = com.allnetworktools.Page.Changelog) } },
                 )
-            }
-            Section("À propos") {
-                Item(0, 3, Sym.Info, "Version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
-                Item(1, 3, Sym.Description, "Licences open source", "Bibliothèques utilisées", trailing = { LinkIcon(Sym.ChevronRight) }, onClick = { dialog = "licenses" })
-                Item(2, 3, Sym.Shield, "Confidentialité", "Rien n'est conservé ni envoyé", trailing = { LinkIcon(Sym.OpenInNew) }, onClick = { dialog = "privacy" })
+                Item(2, 3, Sym.Info, "À propos", trailing = { LinkIcon(Sym.ChevronRight) }, onClick = { dialog = "about" })
             }
             Text(
                 "All Radio Tools ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · Aucune mesure n'est conservée.",
@@ -154,12 +145,12 @@ fun SettingsScreen(vm: MainViewModel) {
         }
     }
     when (dialog) {
-        "licenses" -> InfoDialog("Licences open source", Licenses.joinToString("\n\n") { (lib, lic) -> "$lib\n$lic" }) { dialog = null }
-        "privacy" -> InfoDialog(
-            "Confidentialité",
-            "Les mesures (signaux, positions, appareils détectés) sont traitées en mémoire, sur cet appareil, le temps de la session : " +
-                "rien n'est enregistré ni exportable, et tout disparaît à la fermeture de l'application. " +
-                "L'application n'envoie aucune donnée à un serveur et ne contient aucun traceur. Seuls vos réglages sont mémorisés.",
+        "about" -> InfoDialog(
+            "All Radio Tools ${BuildConfig.VERSION_NAME}",
+            "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}).\n\n" +
+                "Confidentialité : les mesures sont traitées en mémoire, sur cet appareil, le temps de la session. Rien n'est enregistré ni envoyé à un serveur, " +
+                "et l'application ne contient aucun traceur. Seuls vos réglages sont mémorisés.\n\n" +
+                "Licences open source :\n" + Licenses.joinToString("\n") { (lib, lic) -> "$lib · $lic" },
         ) { dialog = null }
         "help" -> InfoDialog(
             "Aide",
@@ -181,7 +172,7 @@ private fun Item(
     count: Int,
     icon: String,
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     danger: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
@@ -196,7 +187,7 @@ private fun Item(
             Symbol(icon, size = 24.dp, tint = cs.onSurfaceVariant)
             Column(Modifier.weight(1f)) {
                 Text(title, style = rf(16, 22, 500), color = if (danger) cs.error else cs.onSurface)
-                Text(subtitle, style = rf(13, 18), color = cs.onSurfaceVariant)
+                if (subtitle != null) Text(subtitle, style = rf(13, 18), color = cs.onSurfaceVariant)
             }
             trailing?.invoke()
         }
