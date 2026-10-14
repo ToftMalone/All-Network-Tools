@@ -39,7 +39,6 @@ import com.allnetworktools.data.net.Net
 import com.allnetworktools.data.net.Services
 import com.allnetworktools.ui.LocalActions
 import com.allnetworktools.ui.components.SectionTitle
-import com.allnetworktools.ui.components.SegmentedRow
 import com.allnetworktools.ui.components.Symbol
 import com.allnetworktools.ui.components.groupShape
 import com.allnetworktools.ui.components.rise
@@ -55,8 +54,6 @@ import com.allnetworktools.ui.tools.BtnKind
 import com.allnetworktools.ui.tools.HeroCard
 import com.allnetworktools.ui.tools.HeroTile
 import com.allnetworktools.ui.tools.HostInputField
-import com.allnetworktools.ui.tools.ParamCard
-import com.allnetworktools.ui.tools.ParamRow
 import com.allnetworktools.ui.tools.Phase
 import com.allnetworktools.ui.tools.ProgressRing
 import com.allnetworktools.ui.tools.StartButton
@@ -85,7 +82,7 @@ class PortsController(private val scope: CoroutineScope) {
     var preset by mutableStateOf(PortPreset.Common)
     var from by mutableStateOf("1")
     var to by mutableStateOf("1024")
-    var timeoutMs by mutableIntStateOf(500)
+    val timeoutMs = 1000
     var phase by mutableStateOf(Phase.Idle)
     var scanned by mutableIntStateOf(0)
     var total by mutableIntStateOf(0)
@@ -193,11 +190,6 @@ fun PortsTool(c: PortsController, prefill: String?, gateway: String?) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     NumberField("Port de début", c.from, { c.from = it }, Modifier.weight(1f))
                     NumberField("Port de fin", c.to, { c.to = it }, Modifier.weight(1f))
-                }
-            }
-            ParamCard {
-                ParamRow("Délai par port", first = true) {
-                    SegmentedRow(listOf(200 to "200 ms", 500 to "500 ms", 1000 to "1 s"), c.timeoutMs, { c.timeoutMs = it }, Modifier.width(200.dp), height = 36.dp)
                 }
             }
             StartButton("Scanner ${fmt(c.ports().size)} ports", Sym.Radar, enabled = c.host.isNotBlank(), onClick = start)
