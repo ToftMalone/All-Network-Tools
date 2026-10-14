@@ -43,7 +43,7 @@ private data class ToolGroup(val title: String, val items: List<ToolEntry>)
 
 private fun groups(net: Network, connectedDevice: String?, servingLabel: String?): List<ToolGroup> = when (net) {
     Network.Wifi -> listOf(
-        ToolGroup("Analyse", listOf(ToolEntry(Tool.Speed, "Test de débit", "Ping, download, upload"))),
+        ToolGroup("Analyse", listOf(ToolEntry(Tool.Speed, "Test de débit", "Ping, download, upload"), ToolEntry(Tool.Coverage, "Carte de couverture", "Le signal pièce par pièce"))),
         ToolGroup("Réseau local", listOf(ToolEntry(Tool.Lan, "Appareils du LAN", "Découverte des hôtes"), ToolEntry(Tool.Ports, "Scan de ports", "TCP, ports courants"))),
         ToolGroup("Découverte", listOf(ToolEntry(Tool.WifiDirect, "Wi-Fi Direct", "Appareils en connexion directe"))),
         ToolGroup(
@@ -62,7 +62,11 @@ private fun groups(net: Network, connectedDevice: String?, servingLabel: String?
     Network.Bluetooth -> listOf(
         ToolGroup(
             "Appareils",
-            listOf(ToolEntry(Tool.Tracker, "Chaud/Froid", "Retrouver un appareil")),
+            listOf(
+                ToolEntry(Tool.Tracker, "Chaud/Froid", "Retrouver un appareil"),
+                ToolEntry(Tool.Earbuds, "Batterie des écouteurs", "AirPods et Beats : gauche, droite, boîtier"),
+                ToolEntry(Tool.Beacons, "Balises", "iBeacon, Eddystone, AltBeacon"),
+            ),
         ),
         ToolGroup("Sécurité", listOf(ToolEntry(Tool.UnknownTrackers, "Traqueurs inconnus", "AirTag, SmartTag, Tile qui vous suivent"))),
     )

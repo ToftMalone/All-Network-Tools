@@ -62,6 +62,7 @@ enum class Tool(
     Audit(Network.Wifi, "Audit du réseau", Sym.Shield, Sym.Refresh),
     Mitm(Network.Wifi, "Homme du milieu", Sym.SwapHoriz, Sym.RestartAlt),
     WifiDirect(Network.Wifi, "Wi-Fi Direct", Sym.WifiTethering),
+    Coverage(Network.Wifi, "Carte de couverture", Sym.GridOn),
 
     BleScan(Network.Bluetooth, "Scanner BLE", Sym.BluetoothSearching, implemented = true),
     Gatt(Network.Bluetooth, "Appareil BLE", Sym.AccountTree, Sym.MoreVert),
@@ -69,6 +70,8 @@ enum class Tool(
     Tracker(Network.Bluetooth, "Chaud/Froid", Sym.MyLocation),
     UnknownTrackers(Network.Bluetooth, "Traqueurs inconnus", Sym.GppMaybe, Sym.RestartAlt),
     TrackerDetail(Network.Bluetooth, "Traqueur", Sym.Sell, parent = ToolParent.Other(UnknownTrackers)),
+    Beacons(Network.Bluetooth, "Balises", Sym.Sensors),
+    Earbuds(Network.Bluetooth, "Batterie des écouteurs", Sym.Headphones),
 
     CellDetail(Network.Cellular, "Cellule de service", Sym.CellTower, Sym.ContentCopy, implemented = true),
     Neighbors(Network.Cellular, "Cellules voisines", Sym.CellTower, implemented = true),

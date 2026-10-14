@@ -199,6 +199,7 @@ object Sym {
     const val Mic = "mic"
     const val Dialpad = "dialpad"
     const val Undo = "undo"
+    const val GridOn = "grid_on"
     const val Cable = "cable"
     const val PlaylistAdd = "playlist_add"
     const val Hearing = "hearing"

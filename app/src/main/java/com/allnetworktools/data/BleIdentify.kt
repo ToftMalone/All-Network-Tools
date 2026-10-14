@@ -127,14 +127,14 @@ object BleIdentify {
         0x0E to "Partage de connexion (source)", 0x0F to "Nearby Action", 0x10 to "Nearby Info", 0x12 to "Localiser",
     )
 
-    private val AirPods = mapOf(
+    internal val AirPods = mapOf(
         0x0220 to "AirPods", 0x0F20 to "AirPods (2e génération)", 0x1320 to "AirPods (3e génération)", 0x0E20 to "AirPods Pro",
         0x1420 to "AirPods Pro (2e génération)", 0x0A20 to "AirPods Max", 0x0B20 to "Powerbeats Pro", 0x0520 to "BeatsX",
         0x0620 to "Beats Solo3", 0x0920 to "Beats Studio3", 0x0320 to "Powerbeats3", 0x0C20 to "Beats Solo Pro",
         0x1020 to "Beats Flex", 0x1120 to "Beats Studio Buds",
     )
 
-    private val IBeaconUuids = mapOf(
+    internal val IBeaconUuids = mapOf(
         "B9407F30-F5F8-466E-AFF9-25556B57FE6D" to "Estimote", "F7826DA6-4FA2-4E98-8024-BC5B71E0893E" to "Kontakt.io",
         "2F234454-CF6D-4A0F-ADF2-F4911BA9FFA6" to "Radius Networks", "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0" to "AirLocate / Minew",
         "FDA50693-A4E2-4FB1-AFCF-C6EB07647825" to "Feasycom / beacon générique", "61687109-905F-4436-91F8-E602F514C96D" to "BlueCats",

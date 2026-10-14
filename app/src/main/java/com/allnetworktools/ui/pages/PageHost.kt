@@ -216,12 +216,12 @@ private fun PageBody(vm: MainViewModel, net: Network, page: Page) {
                     else "Android demande l'autorisation de localisation pour rechercher les appareils Wi-Fi Direct.",
                 ) { actions.request(if (modern) PermGroup.Nearby else PermGroup.Location) }
             }
-            Tool.Gatt, Tool.Paired, Tool.Tracker, Tool.UnknownTrackers, Tool.TrackerDetail -> BtToolRoute(vm, page)
+            Tool.Gatt, Tool.Paired, Tool.Tracker, Tool.UnknownTrackers, Tool.TrackerDetail, Tool.Beacons, Tool.Earbuds -> BtToolRoute(vm, page)
             Tool.CellDetail -> CellDetailTool(vm.cell.collectAsStateWithLifecycle().value.state, page.arg) {
                 vm.navigate { it.copy(page = Page.ToolPage(Tool.Neighbors)) }
             }
             Tool.Lan, Tool.LanDevice, Tool.Ping, Tool.Trace, Tool.Ports, Tool.Dns, Tool.Speed,
-            Tool.Whois, Tool.EvilTwin, Tool.Audit, Tool.Mitm -> WifiToolRoute(vm, page)
+            Tool.Whois, Tool.EvilTwin, Tool.Audit, Tool.Mitm, Tool.Coverage -> WifiToolRoute(vm, page)
             else -> ComingSoon(page.tool)
         }
         else -> Unit
@@ -241,6 +241,7 @@ private fun WifiToolRoute(vm: MainViewModel, page: Page.ToolPage) {
     fun open(tool: Tool, arg: String? = null) = vm.navigate { it.copy(page = Page.ToolPage(tool, arg)) }
     when (page.tool) {
         Tool.Lan -> LanTool(tools.lan, conn) { ip -> open(Tool.LanDevice, ip) }
+        Tool.Coverage -> com.allnetworktools.ui.pages.wifi.CoverageTool(tools.coverage, conn)
         Tool.LanDevice -> LanDeviceTool(
             tools.lanDevice, page.arg, page.arg?.let(tools.lan::device), conn?.prefix,
             onPing = { open(Tool.Ping, it) }, onPorts = { open(Tool.Ports, it) },
@@ -300,6 +301,8 @@ private fun BtToolRoute(vm: MainViewModel, page: Page.ToolPage) {
                 onOpen = { key -> vm.navigate { it.copy(page = Page.ToolPage(Tool.TrackerDetail, key)) } },
             )
         }
+        Tool.Beacons -> com.allnetworktools.ui.pages.bt.BeaconsTool(ble)
+        Tool.Earbuds -> com.allnetworktools.ui.pages.bt.EarbudsTool(ble)
         Tool.TrackerDetail -> {
             val positions by vm.positions.collectAsStateWithLifecycle()
             com.allnetworktools.ui.pages.bt.TrackerDetailTool(
