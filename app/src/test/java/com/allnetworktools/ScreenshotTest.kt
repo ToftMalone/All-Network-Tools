@@ -31,6 +31,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import com.allnetworktools.data.sdr.Meshtastic
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -453,6 +454,23 @@ class ScreenshotTest {
             ),
             mapOf(64 to strips, 65 to strips.map { s -> ByteArray(s.size) { (255 - (s[it].toInt() and 0xFF)).toByte() } }),
         )
+    }
+    @Test fun meshtastic() = shot("H15_meshtastic", nav = NavState(Network.Sdr, Page.ToolPage(Tool.Meshtastic))) { vm ->
+        fun h(from: Long, to: Long = Meshtastic.BROADCAST, hopLimit: Int = 3) = Meshtastic.Header(to, from, from xor 0x55L, hopLimit, false, false, 3, 8, 0, 0)
+        fun d(c: Meshtastic.Content, port: Int) = Meshtastic.Data(port, c, null, false)
+        val now = System.currentTimeMillis()
+        val list = listOf(
+            com.allnetworktools.ui.pages.sdr.MeshEntry(now, Meshtastic.Packet(h(0x433c1a2bL), Meshtastic.Status.Decoded, "LongFast", d(Meshtastic.Content.Text("Quelqu'un sur Lyon ce soir ?"), 1), 48), 6.5, 2),
+            com.allnetworktools.ui.pages.sdr.MeshEntry(now - 40_000, Meshtastic.Packet(h(0x9e7621c0L, hopLimit = 2), Meshtastic.Status.Decoded, "LongFast", d(Meshtastic.Content.Position(45.7578, 4.832, 172, 11, null), 3), 40), -4.25),
+            com.allnetworktools.ui.pages.sdr.MeshEntry(now - 95_000, Meshtastic.Packet(h(0x9e7621c0L), Meshtastic.Status.Decoded, "LongFast", d(Meshtastic.Content.NodeInfo("!9e7621c0", "Relais Fourvière", "FOUR", 43, 2, true), 4), 80), -2.0),
+            com.allnetworktools.ui.pages.sdr.MeshEntry(now - 160_000, Meshtastic.Packet(h(0x433c1a2bL), Meshtastic.Status.Decoded, "LongFast", d(Meshtastic.Content.Telemetry(87, 4.02f, 12.5f, 1.2f, 3600, null, null, null), 67), 44), 7.0),
+            com.allnetworktools.ui.pages.sdr.MeshEntry(now - 220_000, Meshtastic.Packet(h(0x1122aabbL, to = 0x433c1a2bL), Meshtastic.Status.Private, null, null, 90), -9.5),
+        )
+        val nodes = mapOf(
+            0x433c1a2bL to com.allnetworktools.ui.pages.sdr.MeshNode(0x433c1a2bL, "Thomas Mobile", "TM", 9, 0, now, 6.5, 0, 87, 4.02f, packets = 3),
+            0x9e7621c0L to com.allnetworktools.ui.pages.sdr.MeshNode(0x9e7621c0L, "Relais Fourvière", "FOUR", 43, 2, now - 40_000, -4.25, 1, lat = 45.7578, lon = 4.832, altitude = 172, packets = 2),
+        )
+        vm.tools.meshtastic.setForTest(list, nodes)
     }
     @Test fun sdrTools() = shot("H14_sdr_tools", nav = NavState(Network.Sdr, Page.Tools))
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard))
