@@ -69,6 +69,9 @@ class HackRf private constructor(
     /** The 14 dB RF front-end amplifier. */
     fun setAmp(on: Boolean): Boolean = out(REQ_AMP_ENABLE, if (on) 1 else 0, 0)
 
+    /** 3.3 V on the antenna port (bias tee), to power an active antenna such as a GNSS one. */
+    fun setAntennaPower(on: Boolean): Boolean = out(REQ_ANTENNA_ENABLE, if (on) 1 else 0, 0)
+
     /**
      * Starts receiving: [onSamples] gets each USB transfer on a dedicated thread. [onError] fires once if the
      * board stops answering (unplugged).
@@ -114,6 +117,7 @@ class HackRf private constructor(
         running = false
         runCatching { thread?.join(1500) }
         runCatching { out(REQ_SET_TRANSCEIVER_MODE, MODE_OFF, 0) }
+        runCatching { setAntennaPower(false) }
         runCatching { conn.releaseInterface(iface) }
         runCatching { conn.close() }
     }
@@ -134,6 +138,7 @@ class HackRf private constructor(
         private const val REQ_AMP_ENABLE = 17
         private const val REQ_SET_LNA_GAIN = 19
         private const val REQ_SET_VGA_GAIN = 20
+        private const val REQ_ANTENNA_ENABLE = 23
         private const val MODE_OFF = 0
         private const val MODE_RECEIVE = 1
         private const val TRANSFERS = 4

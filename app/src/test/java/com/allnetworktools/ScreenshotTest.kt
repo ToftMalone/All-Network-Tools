@@ -472,6 +472,16 @@ class ScreenshotTest {
         )
         vm.tools.meshtastic.setForTest(list, nodes)
     }
+    @Test fun gpsSdr() = shot("H16_gps", nav = NavState(Network.Sdr, Page.ToolPage(Tool.GpsSdr))) { vm ->
+        val pos = com.allnetworktools.data.sdr.Gps.ecef(45.764, 4.8357, 250.0)
+        val sky = mapOf(10 to doubleArrayOf(41.0, 60.0), 15 to doubleArrayOf(57.0, 150.0), 16 to doubleArrayOf(35.0, 250.0), 20 to doubleArrayOf(55.0, 310.0), 21 to doubleArrayOf(31.0, 200.0), 25 to doubleArrayOf(22.0, 20.0))
+        val fix = com.allnetworktools.data.sdr.Gps.Fix(pos, 45.764012, 4.835688, 253.0, 345_640.0, 2.1, listOf(10, 15, 16, 20, 21), sky, 3.2)
+        val stage = com.allnetworktools.data.sdr.GpsStage.Ephemeris
+        val ch = listOf(15 to 45.0, 20 to 44.0, 10 to 43.0, 21 to 42.0, 16 to 41.0, 25 to 36.0).map { (p, c) ->
+            com.allnetworktools.data.sdr.GpsChannelInfo(p, if (p == 25) com.allnetworktools.data.sdr.GpsStage.Frame else stage, c, -11_800.0 + p * 137, sky[p]!![0], sky[p]!![1], p != 25)
+        }
+        vm.tools.gps.setForTest(com.allnetworktools.data.sdr.GpsStatus(ch, fix, 2400, 7.4, false, 52))
+    }
     @Test fun sdrTools() = shot("H14_sdr_tools", nav = NavState(Network.Sdr, Page.Tools))
     @Test fun sdrDashboard() = shot("H0_sdr_dashboard", nav = NavState(Network.Sdr, Page.Dashboard))
     @Test fun sdrMissing() = shot("H3_sdr_missing", nav = NavState(Network.Sdr, Page.Dashboard)) { Scenario.sdrDevice.value = null }
