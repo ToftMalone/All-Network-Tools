@@ -124,7 +124,7 @@ class GpsReceiver(
     // ---- acquisition ------------------------------------------------------------------------------------
 
     private fun startAcquisition() {
-        val len = 20 * SAMPLES_PER_MS
+        val len = 41 * SAMPLES_PER_MS
         if (total < len) return
         val s0 = total - len
         val re = FloatArray(len)
@@ -137,12 +137,14 @@ class GpsReceiver(
         val prns = (1..32).filter { it !in busy }
         val center = clockHz ?: 0.0
         val span = if (clockHz == null) 40_000.0 else 10_000.0
+        // Weak signals (a passive whip antenna) need long sums: 20 ms over the wide search, 40 ms once it narrows.
+        val blocks = if (clockHz == null) 20 else 40
         acquiring = true
         // Search often until enough satellites are tracked, then only now and then for rising ones.
         nextAcquisition = total + (FS * when { clockHz == null -> 1.0; channels.size < 5 -> 3.0; else -> 15.0 }).toLong()
         acquire(Runnable {
             try {
-                acq.search(re, im, s0, prns, center, span).forEach { pending += it }
+                acq.search(re, im, s0, prns, center, span, blocks).forEach { pending += it }
             } finally {
                 acquiring = false
             }
@@ -305,10 +307,10 @@ class GpsReceiver(
                 val pd = sqrt(max(2 * a2 * a2 - a4, 0.0))
                 val pn = a2 - pd
                 cn0 = if (pd > 0 && pn > 0) 10 * log10(pd / pn / t) else 0.0
-                locked = pullIn >= PULL_IN_MS && (sumI2 - sumQ2) / (sumI2 + sumQ2) > 0.5
+                locked = pullIn >= PULL_IN_MS && (sumI2 - sumQ2) / (sumI2 + sumQ2) > 0.3
                 m2 = 0.0; m4 = 0.0; sumI2 = 0.0; sumQ2 = 0.0; count = 0
-                weakMs = if (cn0 < 27) weakMs + 100 else 0
-                if (weakMs >= 2500) lost = true
+                weakMs = if (cn0 < 23) weakMs + 100 else 0
+                if (weakMs >= 4000) lost = true
                 lockedMs = if (locked) lockedMs + 100 else 0
                 // No bit edges after 8 s: locked beside the carrier (±500 Hz); search it again.
                 if (ms > 8000 && bitPhase < 0) lost = true
@@ -407,7 +409,7 @@ class GpsReceiver(
             val tau2 = 2 * zeta / wn
             return (tau2 / tau1) to (1e-3 / tau1)
         }
-        val (p1, p2) = coef(20.0, 0.7, 0.25)
+        val (p1, p2) = coef(15.0, 0.7, 0.25)
         val (d1, d2) = coef(2.0, 0.7, 1.0)
         PLL_K1 = p1; PLL_K2 = p2; DLL_K1 = d1; DLL_K2 = d2
     }
@@ -458,7 +460,7 @@ class GpsReceiver(
 }
 
 /** Parallel code-phase search over Doppler bins, by FFT. */
-class GpsAcquisition(private val fs: Double) {
+class GpsAcquisition(private val fs: Double, private val z: Double = 6.2) {
     class Hit(val prn: Int, val codeStart: Double, val dopplerHz: Double, val ratio: Double)
 
     private val n = (fs / 1000).toInt()
@@ -475,12 +477,12 @@ class GpsAcquisition(private val fs: Double) {
     }
 
     /**
-     * Searches [prns] in the snapshot ([re], [im], starting at absolute sample [s0], at least 20 ms long) over
-     * [center] ± [span] Hz in 500 Hz steps, on the first 10 ms; returns the satellites found, strongest first, with
+     * Searches [prns] in the snapshot ([re], [im], starting at absolute sample [s0], a whole number of ms) over
+     * [center] ± [span] Hz in 500 Hz steps, summing [sum] ms; returns the satellites found, strongest first, with
      * their carrier refined to a few hertz on the whole snapshot.
      */
-    fun search(re: FloatArray, im: FloatArray, s0: Long, prns: List<Int>, center: Double, span: Double): List<Hit> {
-        val blocks = minOf(10, re.size / n)
+    fun search(re: FloatArray, im: FloatArray, s0: Long, prns: List<Int>, center: Double, span: Double, sum: Int = 10): List<Hit> {
+        val blocks = minOf(sum, re.size / n)
         // Spectra of each 1 ms block, as is and shifted by half a bin (500 Hz).
         val spec = Array(2) { h ->
             Array(blocks) { b ->
@@ -507,7 +509,7 @@ class GpsAcquisition(private val fs: Double) {
             var best = 0f
             var bestTau = 0
             var bestDop = 0.0
-            var second = 0f
+            var noise = 0f
             for (j in c0 - steps..c0 + steps) {
                 val half = Math.floorMod(j, 2)
                 val shift = Math.floorMod(Math.floorDiv(j, 2), n) // whole kHz = bins
@@ -533,19 +535,31 @@ class GpsAcquisition(private val fs: Double) {
                 var tau = 0
                 for (k in 0 until n) if (acc[k] > pk) { pk = acc[k]; tau = k }
                 if (pk > best) {
-                    // Second peak of this row, away from the main one by more than a chip.
-                    var sec = 0f
+                    // Noise level of this row, away from the peak by more than a chip.
+                    var sum = 0.0
+                    var cells = 0
                     for (k in 0 until n) {
                         val d = abs(Math.floorMod(k - tau + n / 2, n) - n / 2)
-                        if (d > 3 && acc[k] > sec) sec = acc[k]
+                        if (d > 3) { sum += acc[k]; cells++ }
                     }
-                    best = pk; bestTau = tau; bestDop = j * 500.0; second = sec
+                    best = pk; bestTau = tau; bestDop = j * 500.0; noise = (sum / cells).toFloat()
                 }
             }
-            val ratio = if (second > 0) (best / second).toDouble() else 0.0
-            if (ratio > 1.9) hits += Hit(prn, (s0 + bestTau).toDouble(), refine(re, im, prn, bestTau, bestDop), ratio)
+            val ratio = if (noise > 0) (best / noise).toDouble() else 0.0
+            if (ratio > threshold(blocks)) hits += Hit(prn, (s0 + bestTau).toDouble(), refine(re, im, prn, bestTau, bestDop), ratio)
         }
         return hits.sortedByDescending { it.ratio }
+    }
+
+    /**
+     * Peak over mean noise for [blocks] 1 ms correlations summed, from the χ² law with 2 × blocks degrees of freedom
+     * (Wilson–Hilferty approximation). z = 6.2 rather than the textbook 5.3 because the largest of the ~10⁷ cells of a
+     * search was measured above the theory: 3.1 for 20 ms (noise reached 2.86), 2.33 for 40 ms (noise reached 2.03).
+     */
+    private fun threshold(blocks: Int): Double {
+        val v = 2.0 / (9 * 2 * blocks)
+        val q = 1 - v + z * sqrt(v)
+        return q * q * q
     }
 
     /**

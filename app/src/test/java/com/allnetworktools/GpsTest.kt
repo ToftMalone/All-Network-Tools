@@ -69,16 +69,32 @@ class GpsTest {
         assertEquals(rx, fix.tow, 1e-6)
     }
 
+    private fun snapshot(sim: GpsSim, ms: Int): Pair<FloatArray, FloatArray> {
+        val b = sim.next(2048 * ms)
+        return FloatArray(2048 * ms) { b[2 * it].toFloat() } to FloatArray(2048 * ms) { b[2 * it + 1].toFloat() }
+    }
+
     @Test fun acquisitionFindsSatellitesAndClockOffset() {
         val sats = visible().take(5)
-        val sim = GpsSim(lyon, t0, week, sats, ppm = 9.0)
-        val b = sim.next(20480)
-        val re = FloatArray(20480) { b[2 * it].toFloat() }
-        val im = FloatArray(20480) { b[2 * it + 1].toFloat() }
-        val hits = GpsAcquisition(GpsReceiver.FS).search(re, im, 0, (1..32).toList(), 0.0, 40_000.0)
-        assertEquals(sats.map { it.prn }.toSet(), hits.map { it.prn }.toSet())
+        // Wide search (crystal offset unknown, 20 ms): the first, strongest satellites, 40 dB-Hz.
+        val (re, im) = snapshot(GpsSim(lyon, t0, week, sats, ppm = 9.0, cn0 = 40.0), 20)
+        val hits = GpsAcquisition(GpsReceiver.FS).search(re, im, 0, (1..32).toList(), 0.0, 40_000.0, 20)
+        assertTrue("${hits.map { it.prn }}", hits.size == 5 && hits.all { h -> sats.any { it.prn == h.prn } })
         // 9 ppm of a fast crystal pulls every carrier about 14 kHz down.
         hits.forEach { assertEquals(-9e-6 * Gps.L1_HZ, it.dopplerHz, 6_000.0) }
+        // Narrow search once the offset is known (40 ms): 35 dB-Hz, a satellite well up with the stock telescopic antenna.
+        val (re2, im2) = snapshot(GpsSim(lyon, t0, week, sats, ppm = 9.0, cn0 = 35.0, seed = 2), 41)
+        val weak = GpsAcquisition(GpsReceiver.FS).search(re2, im2, 0, (1..32).toList(), -9e-6 * Gps.L1_HZ, 10_000.0, 40)
+        assertTrue("${weak.map { it.prn }}", weak.size >= 4 && weak.all { h -> sats.any { it.prn == h.prn } })
+    }
+
+    @Test fun acquisitionInventsNothingInNoise() {
+        val rnd = java.util.Random(4)
+        val re = FloatArray(2048 * 41) { (20 * rnd.nextGaussian()).toFloat() }
+        val im = FloatArray(2048 * 41) { (20 * rnd.nextGaussian()).toFloat() }
+        val acq = GpsAcquisition(GpsReceiver.FS)
+        assertEquals(emptyList<Int>(), acq.search(re, im, 0, (1..32).toList(), 0.0, 40_000.0, 20).map { it.prn })
+        assertEquals(emptyList<Int>(), acq.search(re, im, 0, (1..32).toList(), 0.0, 10_000.0, 40).map { it.prn })
     }
 
     @Test fun fullReceiverGetsAFix() {
@@ -86,7 +102,7 @@ class GpsTest {
         val unix = ((315_964_800.0 + week * Gps.SECONDS_PER_WEEK + t0 - 18) * 1000).toLong()
         var last: GpsStatus? = null
         val rx = GpsReceiver(nowMillis = { unix }) { last = it }
-        val sim = GpsSim(lyon, t0, week, sats, ppm = 7.5, cn0 = 44.0)
+        val sim = GpsSim(lyon, t0, week, sats, ppm = 7.5, cn0 = 36.0)
         repeat(28 * 16) { // 28 s in 1/16 s chunks
             val b = sim.next(128_000)
             rx.feed(b, b.size)
@@ -100,6 +116,6 @@ class GpsTest {
         assertEquals(45.764, fix!!.lat, 0.001)
         assertEquals(week, s.week)
         assertEquals(7.5, s.clockPpm!!, 0.3)
-        s.channels.forEach { assertTrue("C/N0 ${it.cn0}", it.cn0 in 39.0..49.0) }
+        s.channels.forEach { assertTrue("C/N0 ${it.cn0}", it.cn0 in 32.0..41.0) }
     }
 }

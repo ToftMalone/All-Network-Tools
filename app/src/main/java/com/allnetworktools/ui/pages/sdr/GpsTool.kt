@@ -63,14 +63,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * GPS with the HackRF alone: 2.048 MS/s at 1575.42 MHz, an active antenna powered by the HackRF, and the software
- * receiver of [GpsReceiver]. Nothing is shared with the phone's own GNSS chip.
+ * GPS with the HackRF alone and its stock telescopic antenna: 2.048 MS/s at 1575.42 MHz, full gain, and the software
+ * receiver of [GpsReceiver]. Nothing is shared with the phone's own GNSS chip. The antenna port is never powered.
  */
 class GpsController(private val repo: SdrRepository, private val scope: CoroutineScope, private val onAcquire: () -> Unit = {}) {
     var lnaGain by mutableIntStateOf(40)
-    var vgaGain by mutableIntStateOf(30)
+    var vgaGain by mutableIntStateOf(40)
     var amp by mutableStateOf(true)
-    var antennaPower by mutableStateOf(true)
     var running by mutableStateOf(false)
         private set
     var starting by mutableStateOf(false)
@@ -102,10 +101,9 @@ class GpsController(private val repo: SdrRepository, private val scope: Coroutin
                 val lna = lnaGain
                 val vga = vgaGain
                 val withAmp = amp
-                val power = antennaPower
                 val ok = withContext(Dispatchers.IO) {
                     r.setSampleRate(GpsReceiver.FS.toInt(), 1_750_000) && r.setFrequency(Gps.L1_HZ.toLong()) &&
-                        r.setLnaGain(lna) && r.setVgaGain(vga) && r.setAmp(withAmp) && r.setAntennaPower(power)
+                        r.setLnaGain(lna) && r.setVgaGain(vga) && r.setAmp(withAmp) && r.setAntennaPower(false)
                 }
                 if (!ok) { r.close(); error = "Le HackRF n'a pas accepté la configuration"; return@launch }
                 radio = r
@@ -155,8 +153,7 @@ class GpsController(private val repo: SdrRepository, private val scope: Coroutin
         val lna = lnaGain
         val vga = vgaGain
         val withAmp = amp
-        val power = antennaPower
-        scope.launch(Dispatchers.IO) { r.setLnaGain(lna); r.setVgaGain(vga); r.setAmp(withAmp); r.setAntennaPower(power) }
+        scope.launch(Dispatchers.IO) { r.setLnaGain(lna); r.setVgaGain(vga); r.setAmp(withAmp) }
     }
 
     fun stop() {
@@ -204,7 +201,7 @@ fun GpsTool(vm: MainViewModel) {
             Text(
                 when {
                     fix != null -> "%.6f, %.6f · %.0f m".format(Locale.ROOT, fix.lat, fix.lon, fix.height)
-                    c.running -> "GPS L1 · 1575,42 MHz · position après 30 s à 1 min de poursuite"
+                    c.running -> "GPS L1 · 1575,42 MHz · première position en une à quelques minutes"
                     else -> "GPS L1 · 1575,42 MHz, reçu et calculé par l'application"
                 },
                 style = rf(14, 20, tnum = true),
@@ -280,15 +277,6 @@ fun GpsTool(vm: MainViewModel) {
         }
         SectionCard {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Antenne", style = rf(13, 18, 600), color = cs.onSurfaceVariant)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AntFilterChip("Alimenter l'antenne active (3,3 V)", c.antennaPower, { c.antennaPower = !c.antennaPower; c.applyGains() })
-                }
-                Text(
-                    "Une antenne GPS active (patch magnétique de voiture, par exemple) a besoin de cette alimentation. Coupez-la si votre antenne est passive ou si un filtre DC-block est branché.",
-                    style = rf(12, 16), color = cs.onSurfaceVariant,
-                )
-                Hairline()
                 GainSettings(
                     c.lnaGain, listOf(24, 32, 40), { c.lnaGain = it; c.applyGains() },
                     c.vgaGain, listOf(20, 30, 40, 50), { c.vgaGain = it; c.applyGains() },
@@ -302,7 +290,9 @@ fun GpsTool(vm: MainViewModel) {
                 Text(
                     "Le HackRF reçoit lui-même les signaux GPS, bien en dessous du bruit, et l'application fait tout le travail d'un récepteur : " +
                         "recherche des satellites, poursuite de leurs codes, lecture de leurs orbites puis calcul de la position, sans la puce GNSS du téléphone. " +
-                        "Placez l'antenne dehors, ciel dégagé. Il faut environ 30 s de lecture sans interruption pour connaître l'orbite d'un satellite.",
+                        "Avec l'antenne télescopique d'origine : repliez-la presque entièrement (le GPS veut un brin court, 5 cm environ), " +
+                        "tenez-la verticale, dehors, ciel bien dégagé, loin des murs. Les signaux arrivent faibles : comptez une à quelques minutes avant la première position, " +
+                        "dont 30 s de lecture sans interruption pour connaître l'orbite de chaque satellite.",
                     style = rf(13, 18), color = cs.onSurfaceVariant,
                 )
             }
